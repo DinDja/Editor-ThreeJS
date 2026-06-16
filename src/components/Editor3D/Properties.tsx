@@ -4,6 +4,7 @@ import type { ReactNode } from 'react';
 import { Box, Eye, EyeOff, Move3D, PanelRight, Rotate3D, Scale3D, SlidersHorizontal, type LucideIcon } from 'lucide-react';
 import * as THREE from 'three';
 import MaterialEditor from './MaterialEditor';
+import ModelingTools from './ModelingTools';
 import { useEditorStore } from '@/store/editorStore';
 import { useHistoryStore } from '@/store/historyStore';
 import { useMaterialStore } from '@/store/materialStore';
@@ -157,7 +158,7 @@ export default function Properties() {
                     pushSnapshot();
                     updateObject(object.uuid, { visible: !object.visible });
                   }}
-                  className={`flex h-11 cursor-pointer items-center gap-2 rounded-md border px-3 text-left transition ${
+                  className={`flex h-11 cursor-pointer items-center gap-2 rounded-md border px-4 text-left transition ${
                     object.visible
                       ? 'border-emerald-400/40 bg-emerald-400/10 text-emerald-100'
                       : 'border-neutral-800 bg-neutral-950 text-neutral-500'
@@ -175,6 +176,11 @@ export default function Properties() {
             <TransformRow object={object} field="position" />
             <TransformRow object={object} field="rotation" />
             <TransformRow object={object} field="scale" />
+          </section>
+
+          <section className="grid gap-4 border-t border-neutral-800 pt-5">
+            <SectionTitle icon={Box}>Modelagem</SectionTitle>
+            <ModelingTools object={object} material={material} />
           </section>
 
           <section className="grid gap-4 border-t border-neutral-800 pt-5">

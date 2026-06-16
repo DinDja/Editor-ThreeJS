@@ -3,6 +3,7 @@
 import { useRef, useState, type MutableRefObject } from 'react';
 import {
   Box,
+  Brush,
   ChevronDown,
   Download,
   Grid3X3,
@@ -20,6 +21,7 @@ import {
 import * as THREE from 'three';
 import { exportObjectAsGLB, isModelFile, MODEL_FILE_ACCEPT } from '@/lib/fileOps';
 import { primitiveKinds, primitiveLabels } from '@/lib/geometryOps';
+import { createPrimitiveEditableMesh } from '@/lib/meshOps';
 import { useEditorStore } from '@/store/editorStore';
 import { useHistoryStore } from '@/store/historyStore';
 import { useMaterialStore } from '@/store/materialStore';
@@ -35,6 +37,8 @@ const toolLabels: Record<ActiveTool, string> = {
   translate: 'Mover',
   rotate: 'Girar',
   scale: 'Escalar',
+  edit: 'Editar',
+  sculpt: 'Sculpt',
 };
 
 const toolIcons: Record<ActiveTool, LucideIcon> = {
@@ -42,9 +46,11 @@ const toolIcons: Record<ActiveTool, LucideIcon> = {
   translate: Move3D,
   rotate: Rotate3D,
   scale: Scale3D,
+  edit: Grid3X3,
+  sculpt: Brush,
 };
 
-const tools: ActiveTool[] = ['select', 'translate', 'rotate', 'scale'];
+const tools: ActiveTool[] = ['select', 'translate', 'rotate', 'scale', 'edit', 'sculpt'];
 
 const buttonClass =
   'inline-flex min-h-11 shrink-0 cursor-pointer items-center justify-center gap-2 rounded-md border border-neutral-700/80 bg-[#111315] px-5 py-2.5 text-xs font-medium text-neutral-300 shadow-[inset_0_1px_0_rgba(255,255,255,0.04)] transition hover:border-emerald-400/70 hover:bg-[#151918] hover:text-emerald-100 disabled:cursor-not-allowed disabled:opacity-35';
@@ -66,8 +72,11 @@ export default function Toolbar({ sceneRootRef }: ToolbarProps) {
   const snapping = useEditorStore((state) => state.snapping);
   const setSnapping = useEditorStore((state) => state.setSnapping);
   const setSelectedObject = useEditorStore((state) => state.setSelectedObject);
+  const selectedObjectId = useEditorStore((state) => state.selectedObjectId);
+  const objects = useSceneStore((state) => state.objects);
   const addObject = useSceneStore((state) => state.addObject);
   const addPrimitive = useSceneStore((state) => state.addPrimitive);
+  const updateObject = useSceneStore((state) => state.updateObject);
   const resetScene = useSceneStore((state) => state.resetScene);
   const createMaterialForObject = useMaterialStore((state) => state.createMaterialForObject);
   const resetMaterials = useMaterialStore((state) => state.resetMaterials);
@@ -76,6 +85,7 @@ export default function Toolbar({ sceneRootRef }: ToolbarProps) {
   const pushSnapshot = useHistoryStore((state) => state.pushSnapshot);
   const undoCount = useHistoryStore((state) => state.undoStack.length);
   const redoCount = useHistoryStore((state) => state.redoStack.length);
+  const selectedObject = objects.find((object) => object.uuid === selectedObjectId);
 
   const handleAddPrimitive = (primitive: PrimitiveKind) => {
     pushSnapshot();
@@ -107,32 +117,41 @@ export default function Toolbar({ sceneRootRef }: ToolbarProps) {
 
     setExporting(true);
     try {
-      await exportObjectAsGLB(sceneRootRef.current, 'brain-editor-scene.glb');
+      await exportObjectAsGLB(sceneRootRef.current, 'editor-scene.glb');
     } finally {
       setExporting(false);
     }
+  };
+
+  const handleTool = (tool: ActiveTool) => {
+    if (tool !== 'edit' && tool !== 'sculpt') {
+      setActiveTool(tool);
+      return;
+    }
+
+    if (selectedObject && !selectedObject.editableMesh) {
+      pushSnapshot();
+
+      if (selectedObject.kind === 'primitive' && selectedObject.primitive) {
+        updateObject(selectedObject.uuid, {
+          editableMesh: createPrimitiveEditableMesh(selectedObject.primitive, selectedObject.geometry),
+        });
+      }
+    }
+
+    setActiveTool(tool);
   };
 
   const handleReset = () => {
     pushSnapshot();
     resetScene();
     resetMaterials();
-    setSelectedObject('object-brain');
+    setSelectedObject(null);
     setActiveTool('select');
   };
 
   return (
     <header className="flex min-h-[72px] items-center gap-2.5 overflow-x-auto overflow-y-hidden border-b border-neutral-800 bg-[#17191b] px-3 py-2.5 text-neutral-100 shadow-[0_1px_0_rgba(255,255,255,0.03)] max-sm:min-h-[64px]">
-      <div className="mr-2 hidden min-w-32 shrink-0 items-center gap-2 sm:flex">
-        <div className="grid h-8 w-8 place-items-center rounded-md border border-emerald-400/35 bg-emerald-400/10 text-emerald-200">
-          <Box size={17} strokeWidth={2.2} />
-        </div>
-        <div className="min-w-0">
-          <div className="text-sm font-semibold leading-4 text-neutral-100">Brain Editor</div>
-          <div className="text-[10px] uppercase tracking-[0.18em] text-neutral-500">Scene</div>
-        </div>
-      </div>
-
       <div className="flex shrink-0 items-center gap-1 rounded-lg border border-neutral-800 bg-neutral-950/80 p-1">
         {tools.map((tool) => (
           (() => {
@@ -144,7 +163,7 @@ export default function Toolbar({ sceneRootRef }: ToolbarProps) {
                 type="button"
                 title={toolLabels[tool]}
                 aria-label={toolLabels[tool]}
-                onClick={() => setActiveTool(tool)}
+                onClick={() => handleTool(tool)}
                 className={`inline-flex h-10 min-w-10 shrink-0 cursor-pointer items-center justify-center gap-2 rounded-md px-4 text-xs font-medium transition ${
                   activeTool === tool
                     ? 'bg-emerald-400 text-neutral-950 shadow-[0_0_0_1px_rgba(16,185,129,0.25),0_8px_18px_rgba(16,185,129,0.15)]'

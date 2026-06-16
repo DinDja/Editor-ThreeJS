@@ -1,15 +1,18 @@
 'use client';
 
 import { Suspense, useCallback, useEffect, useMemo, useRef, useState, type MutableRefObject } from 'react';
-import { Canvas, useFrame, useThree } from '@react-three/fiber';
+import { Canvas, useFrame, useLoader, useThree, type ThreeEvent } from '@react-three/fiber';
 import { Html, OrbitControls, useGLTF } from '@react-three/drei';
 import * as THREE from 'three';
+import MeshEditOverlay from './MeshEditOverlay';
 import TransformGizmo from './TransformGizmo';
-import { installMeshBVH } from '@/lib/geometryOps';
+import { installMeshBVH, mergePrimitiveGeometry } from '@/lib/geometryOps';
+import { editableMeshFromObject3D, editableMeshToBufferGeometry, sculptMesh } from '@/lib/meshOps';
 import { useEditorStore } from '@/store/editorStore';
+import { useHistoryStore } from '@/store/historyStore';
 import { useMaterialStore } from '@/store/materialStore';
 import { useSceneStore } from '@/store/sceneStore';
-import type { EditorMaterial, SceneObject } from '@/store/types';
+import type { EditableMesh, EditorMaterial, SceneObject } from '@/store/types';
 
 type Canvas3DProps = {
   sceneRootRef: MutableRefObject<THREE.Group | null>;
@@ -17,21 +20,28 @@ type Canvas3DProps = {
 
 type ObjectRefRegistry = (uuid: string, object: THREE.Object3D | null) => void;
 
+const EMPTY_TEXTURE_URL =
+  'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAFgwJ/luz5SAAAAABJRU5ErkJggg==';
+
 const useMaterialTexture = (textureUrl: string | null) => {
-  const texture = useMemo(() => {
+  const gl = useThree((state) => state.gl);
+  const texture = useLoader(THREE.TextureLoader, textureUrl ?? EMPTY_TEXTURE_URL);
+  const configuredTexture = useMemo(() => {
     if (!textureUrl) return null;
 
-    const nextTexture = new THREE.TextureLoader().load(textureUrl);
+    const nextTexture = texture.clone();
+    nextTexture.image = texture.image;
     nextTexture.colorSpace = THREE.SRGBColorSpace;
     nextTexture.wrapS = THREE.RepeatWrapping;
     nextTexture.wrapT = THREE.RepeatWrapping;
+    nextTexture.anisotropy = Math.min(8, gl.capabilities.getMaxAnisotropy());
     nextTexture.needsUpdate = true;
     return nextTexture;
-  }, [textureUrl]);
+  }, [gl, texture, textureUrl]);
 
-  useEffect(() => () => texture?.dispose(), [texture]);
+  useEffect(() => () => configuredTexture?.dispose(), [configuredTexture]);
 
-  return texture;
+  return configuredTexture;
 };
 
 const applyMaterialProps = (material: THREE.MeshStandardMaterial, editorMaterial: EditorMaterial, texture: THREE.Texture | null) => {
@@ -44,6 +54,7 @@ const applyMaterialProps = (material: THREE.MeshStandardMaterial, editorMaterial
   material.transparent = editorMaterial.opacity < 1;
   material.depthWrite = editorMaterial.opacity >= 1;
   material.map = texture;
+  material.side = THREE.DoubleSide;
   material.needsUpdate = true;
 };
 
@@ -65,7 +76,19 @@ const cloneMaterialAsStandard = (source: THREE.Material | null | undefined) => {
 function ModelAsset({ object, material }: { object: SceneObject; material: EditorMaterial }) {
   const gltf = useGLTF(object.source ?? '');
   const texture = useMaterialTexture(material.textureUrl);
+  const activeTool = useEditorStore((state) => state.activeTool);
+  const selectedObjectId = useEditorStore((state) => state.selectedObjectId);
+  const updateObject = useSceneStore((state) => state.updateObject);
   const clone = useMemo(() => gltf.scene.clone(true), [gltf.scene]);
+
+  useEffect(() => {
+    if ((activeTool !== 'edit' && activeTool !== 'sculpt') || selectedObjectId !== object.uuid || object.editableMesh) return;
+
+    const editableMesh = editableMeshFromObject3D(clone);
+    if (!editableMesh) return;
+
+    updateObject(object.uuid, { editableMesh });
+  }, [activeTool, clone, object.editableMesh, object.uuid, selectedObjectId, updateObject]);
 
   useEffect(() => {
     clone.traverse((node) => {
@@ -91,18 +114,81 @@ function ModelAsset({ object, material }: { object: SceneObject; material: Edito
   return <primitive object={clone} />;
 }
 
-function PrimitiveAsset({ object, material }: { object: SceneObject; material: EditorMaterial }) {
+function EditableMeshAsset({ object, material }: { object: SceneObject; material: EditorMaterial }) {
+  const meshRef = useRef<THREE.Mesh>(null);
   const texture = useMaterialTexture(material.textureUrl);
+  const activeTool = useEditorStore((state) => state.activeTool);
+  const selectedObjectId = useEditorStore((state) => state.selectedObjectId);
+  const sculptMode = useEditorStore((state) => state.sculptMode);
+  const sculptRadius = useEditorStore((state) => state.sculptRadius);
+  const sculptStrength = useEditorStore((state) => state.sculptStrength);
+  const updateObject = useSceneStore((state) => state.updateObject);
+  const pushSnapshot = useHistoryStore((state) => state.pushSnapshot);
+  const sculptingRef = useRef(false);
+  const strokeMeshRef = useRef<EditableMesh | null>(null);
+  const geometry = useMemo(
+    () => (object.editableMesh ? editableMeshToBufferGeometry(object.editableMesh) : null),
+    [object.editableMesh],
+  );
+
+  useEffect(() => () => geometry?.dispose(), [geometry]);
+
+  if (!geometry) return null;
+
+  const applySculptStroke = (event: ThreeEvent<PointerEvent>) => {
+    if (activeTool !== 'sculpt' || selectedObjectId !== object.uuid || !meshRef.current || !event.face) return;
+
+    const sourceMesh = strokeMeshRef.current ?? object.editableMesh;
+    if (!sourceMesh) return;
+
+    event.stopPropagation();
+    const localPoint = meshRef.current.worldToLocal(event.point.clone());
+    const localNormal = event.face.normal.clone().normalize();
+    const nextMesh = sculptMesh({
+      mesh: sourceMesh,
+      center: localPoint,
+      normal: localNormal,
+      radius: sculptRadius,
+      strength: sculptStrength,
+      mode: sculptMode,
+    });
+
+    strokeMeshRef.current = nextMesh;
+    updateObject(object.uuid, { editableMesh: nextMesh });
+  };
+
+  const startSculpt = (event: ThreeEvent<PointerEvent>) => {
+    if (activeTool !== 'sculpt' || selectedObjectId !== object.uuid || !object.editableMesh) return;
+
+    pushSnapshot();
+    sculptingRef.current = true;
+    strokeMeshRef.current = object.editableMesh;
+    applySculptStroke(event);
+  };
+
+  const updateSculpt = (event: ThreeEvent<PointerEvent>) => {
+    if (!sculptingRef.current) return;
+    applySculptStroke(event);
+  };
+
+  const endSculpt = () => {
+    sculptingRef.current = false;
+    strokeMeshRef.current = null;
+  };
 
   return (
-    <mesh castShadow receiveShadow>
-      {object.primitive === 'sphere' && <sphereGeometry args={[0.6, 48, 32]} />}
-      {object.primitive === 'cylinder' && <cylinderGeometry args={[0.45, 0.45, 1.1, 48]} />}
-      {object.primitive === 'cone' && <coneGeometry args={[0.55, 1.2, 48]} />}
-      {object.primitive === 'torus' && <torusGeometry args={[0.48, 0.16, 24, 72]} />}
-      {object.primitive === 'plane' && <planeGeometry args={[1.6, 1.6, 12, 12]} />}
-      {(!object.primitive || object.primitive === 'box') && <boxGeometry args={[1, 1, 1]} />}
+    <mesh
+      ref={meshRef}
+      geometry={geometry}
+      castShadow
+      receiveShadow
+      onPointerDown={startSculpt}
+      onPointerMove={updateSculpt}
+      onPointerUp={endSculpt}
+      onPointerLeave={endSculpt}
+    >
       <meshStandardMaterial
+        key={material.textureUrl ?? 'no-texture'}
         color={material.color}
         metalness={material.metalness}
         roughness={material.roughness}
@@ -113,6 +199,58 @@ function PrimitiveAsset({ object, material }: { object: SceneObject; material: E
         depthWrite={material.opacity >= 1}
         map={texture}
         side={THREE.DoubleSide}
+        onUpdate={(nextMaterial) => {
+          nextMaterial.needsUpdate = true;
+        }}
+      />
+    </mesh>
+  );
+}
+
+function PrimitiveAsset({ object, material }: { object: SceneObject; material: EditorMaterial }) {
+  const texture = useMaterialTexture(material.textureUrl);
+  const primitive = object.primitive ?? 'box';
+  const geometry = mergePrimitiveGeometry(primitive, object.geometry);
+  const geometryKey = JSON.stringify([primitive, geometry]);
+
+  return (
+    <mesh castShadow receiveShadow>
+      {primitive === 'sphere' && (
+        <sphereGeometry key={geometryKey} args={[geometry.radius, geometry.radialSegments, geometry.heightSegments]} />
+      )}
+      {primitive === 'cylinder' && (
+        <cylinderGeometry
+          key={geometryKey}
+          args={[geometry.radiusTop, geometry.radiusBottom, geometry.height, geometry.radialSegments, geometry.heightSegments]}
+        />
+      )}
+      {primitive === 'cone' && (
+        <coneGeometry key={geometryKey} args={[geometry.radiusBottom, geometry.height, geometry.radialSegments, geometry.heightSegments]} />
+      )}
+      {primitive === 'torus' && (
+        <torusGeometry key={geometryKey} args={[geometry.radius, geometry.tube, geometry.radialSegments, geometry.tubularSegments]} />
+      )}
+      {primitive === 'plane' && (
+        <planeGeometry key={geometryKey} args={[geometry.width, geometry.height, geometry.widthSegments, geometry.heightSegments]} />
+      )}
+      {primitive === 'box' && (
+        <boxGeometry key={geometryKey} args={[geometry.width, geometry.height, geometry.depth, geometry.widthSegments, geometry.heightSegments, geometry.depthSegments]} />
+      )}
+      <meshStandardMaterial
+        key={material.textureUrl ?? 'no-texture'}
+        color={material.color}
+        metalness={material.metalness}
+        roughness={material.roughness}
+        emissive={material.emissive}
+        emissiveIntensity={material.emissiveIntensity}
+        opacity={material.opacity}
+        transparent={material.opacity < 1}
+        depthWrite={material.opacity >= 1}
+        map={texture}
+        side={THREE.DoubleSide}
+        onUpdate={(nextMaterial) => {
+          nextMaterial.needsUpdate = true;
+        }}
       />
     </mesh>
   );
@@ -158,7 +296,14 @@ function ObjectNode({
         document.body.style.cursor = 'default';
       }}
     >
-      {object.kind === 'model' ? <ModelAsset object={object} material={material} /> : <PrimitiveAsset object={object} material={material} />}
+      {object.editableMesh ? (
+        <EditableMeshAsset object={object} material={material} />
+      ) : object.kind === 'model' ? (
+        <ModelAsset object={object} material={material} />
+      ) : (
+        <PrimitiveAsset object={object} material={material} />
+      )}
+      <MeshEditOverlay object={object} />
     </group>
   );
 }
@@ -266,7 +411,7 @@ function EditorScene({ sceneRootRef }: Canvas3DProps) {
         })}
       </group>
 
-      <SelectionBox object={selectedObject} />
+      {activeTool !== 'edit' && <SelectionBox object={selectedObject} />}
       <TransformGizmo objectId={selectedObjectId} object={selectedObject} />
       <OrbitControls makeDefault enabled={activeTool === 'select'} enableDamping dampingFactor={0.08} />
       <mesh

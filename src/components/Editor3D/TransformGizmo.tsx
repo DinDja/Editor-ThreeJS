@@ -31,7 +31,7 @@ export default function TransformGizmo({ objectId, object }: TransformGizmoProps
     });
   }, [object, objectId, updateObject]);
 
-  if (!object || !objectId || activeTool === 'select') return null;
+  if (!object || !objectId || activeTool === 'select' || activeTool === 'edit' || activeTool === 'sculpt') return null;
 
   return (
     <TransformControls

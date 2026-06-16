@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 import { INITIAL_OBJECTS } from './initialScene';
-import { cloneSceneObject, createId, type PrimitiveKind, type SceneObject, type SceneObjectInput } from './types';
+import { cloneEditableMesh, cloneSceneObject, createId, type PrimitiveKind, type SceneObject, type SceneObjectInput } from './types';
 
 type SceneState = {
   objects: SceneObject[];
@@ -22,6 +22,8 @@ const createSceneObject = (input: SceneObjectInput): SceneObject => {
     source: input.source,
     sourceType: input.sourceType,
     primitive: input.primitive,
+    geometry: input.geometry ? { ...input.geometry } : undefined,
+    editableMesh: input.editableMesh ? cloneEditableMesh(input.editableMesh) : undefined,
     position: input.position ?? [0, 0, 0],
     rotation: input.rotation ?? [0, 0, 0],
     scale: input.scale ?? [1, 1, 1],

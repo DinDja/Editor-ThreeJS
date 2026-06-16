@@ -1,5 +1,6 @@
 'use client';
 
+import { useRef } from 'react';
 import { ImagePlus, Trash2 } from 'lucide-react';
 import { TEXTURE_FILE_ACCEPT } from '@/lib/fileOps';
 import { useHistoryStore } from '@/store/historyStore';
@@ -80,6 +81,7 @@ function SliderRow({
 }
 
 export default function MaterialEditor({ material }: MaterialEditorProps) {
+  const textureInputRef = useRef<HTMLInputElement>(null);
   const updateMaterial = useMaterialStore((state) => state.updateMaterial);
   const pushSnapshot = useHistoryStore((state) => state.pushSnapshot);
 
@@ -91,10 +93,6 @@ export default function MaterialEditor({ material }: MaterialEditorProps) {
     if (!file) return;
 
     pushSnapshot();
-    if (material.textureUrl?.startsWith('blob:')) {
-      URL.revokeObjectURL(material.textureUrl);
-    }
-
     update({
       textureUrl: URL.createObjectURL(file),
       textureName: file.name,
@@ -103,9 +101,6 @@ export default function MaterialEditor({ material }: MaterialEditorProps) {
 
   const clearTexture = () => {
     pushSnapshot();
-    if (material.textureUrl?.startsWith('blob:')) {
-      URL.revokeObjectURL(material.textureUrl);
-    }
     update({ textureUrl: null, textureName: null });
   };
 
@@ -124,19 +119,24 @@ export default function MaterialEditor({ material }: MaterialEditorProps) {
       <div className="grid gap-2">
         <span className={labelClass}>Textura</span>
         <div className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-2">
-          <label className="flex h-11 min-w-0 cursor-pointer items-center gap-2 rounded-md border border-neutral-700/80 bg-[#0d0f10] px-4 text-xs text-neutral-300 transition hover:border-emerald-400/70 hover:text-emerald-100">
+          <button
+            type="button"
+            onClick={() => textureInputRef.current?.click()}
+            className="flex h-11 min-w-0 cursor-pointer items-center gap-2 rounded-md border border-neutral-700/80 bg-[#0d0f10] px-4 text-xs text-neutral-300 transition hover:border-emerald-400/70 hover:text-emerald-100"
+          >
             <ImagePlus size={14} className="shrink-0 text-neutral-500" />
             <span className="block truncate">{material.textureName ?? 'Selecionar imagem'}</span>
-            <input
-              type="file"
-              accept={TEXTURE_FILE_ACCEPT}
-              className="sr-only"
-              onChange={(event) => {
-                handleTexture(event.target.files?.[0]);
-                event.currentTarget.value = '';
-              }}
-            />
-          </label>
+          </button>
+          <input
+            ref={textureInputRef}
+            type="file"
+            accept={TEXTURE_FILE_ACCEPT}
+            className="hidden"
+            onChange={(event) => {
+              handleTexture(event.target.files?.[0]);
+              event.currentTarget.value = '';
+            }}
+          />
           <button
             type="button"
             title="Limpar textura"

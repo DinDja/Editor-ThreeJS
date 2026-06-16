@@ -28,7 +28,7 @@ const createDefaultMaterial = (objectId: string, materialId = `material-${object
 const cloneMaterials = (materials: Record<string, EditorMaterial>) =>
   Object.fromEntries(Object.entries(materials).map(([key, value]) => [key, cloneMaterial(value)]));
 
-export const useMaterialStore = create<MaterialState>((set, get) => ({
+export const useMaterialStore = create<MaterialState>((set) => ({
   materials: cloneMaterials(INITIAL_MATERIALS),
 
   createMaterialForObject: (objectId, materialId = createId(), name = 'Material') => {
@@ -59,13 +59,5 @@ export const useMaterialStore = create<MaterialState>((set, get) => ({
 
   setMaterials: (materials) => set({ materials: cloneMaterials(materials) }),
 
-  resetMaterials: () => {
-    for (const material of Object.values(get().materials)) {
-      if (material.textureUrl?.startsWith('blob:')) {
-        URL.revokeObjectURL(material.textureUrl);
-      }
-    }
-
-    set({ materials: cloneMaterials(INITIAL_MATERIALS) });
-  },
+  resetMaterials: () => set({ materials: cloneMaterials(INITIAL_MATERIALS) }),
 }));
