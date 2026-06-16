@@ -3,11 +3,11 @@
 import { useRef, useState, type MutableRefObject, useCallback } from 'react';
 import {
   Box,
-  Bot,
   Brush,
   ChevronDown,
   Download,
   Grid3X3,
+  HelpCircle,
   Magnet,
   MousePointer2,
   Move3D,
@@ -32,6 +32,7 @@ import type { ActiveTool, PrimitiveGeometry, PrimitiveKind } from '@/store/types
 
 type ToolbarProps = {
   sceneRootRef: MutableRefObject<THREE.Group | null>;
+  onOpenTutorial: () => void;
 };
 
 const toolLabels: Record<ActiveTool, string> = {
@@ -93,7 +94,7 @@ function ToolbarDivider() {
   return <div className="mx-1 h-7 w-px bg-neutral-800" />;
 }
 
-export default function Toolbar({ sceneRootRef }: ToolbarProps) {
+export default function Toolbar({ sceneRootRef, onOpenTutorial }: ToolbarProps) {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [exporting, setExporting] = useState(false);
   const [generatingAi, setGeneratingAi] = useState(false);
@@ -271,14 +272,9 @@ export default function Toolbar({ sceneRootRef }: ToolbarProps) {
     }
   }, [addObject, createMaterialForObject, pushSnapshot, setSelectedObject, setActiveTool, updateMaterial, updateObject]);
 
-  const handleAiGenerate = () => {
-    setAiError(null);
-    setAiModalOpen(true);
-  };
-
   return (
     <header className="flex min-h-[72px] items-center gap-2.5 overflow-x-auto overflow-y-hidden border-b border-neutral-800 bg-[#17191b] px-3 py-2.5 text-neutral-100 shadow-[0_1px_0_rgba(255,255,255,0.03)] max-sm:min-h-[64px]">
-      <div className="flex shrink-0 items-center gap-1 rounded-lg border border-neutral-800 bg-neutral-950/80 p-1">
+      <div data-tutorial="tools-group" className="flex shrink-0 items-center gap-1 rounded-lg border border-neutral-800 bg-neutral-950/80 p-1">
         {tools.map((tool) => (
           (() => {
             const Icon = toolIcons[tool];
@@ -289,6 +285,7 @@ export default function Toolbar({ sceneRootRef }: ToolbarProps) {
                 type="button"
                 title={toolLabels[tool]}
                 aria-label={toolLabels[tool]}
+                data-tutorial={`tool-${tool}`}
                 onClick={() => handleTool(tool)}
                 className={`inline-flex h-10 min-w-10 shrink-0 cursor-pointer items-center justify-center gap-2 rounded-md px-4 text-xs font-medium transition ${
                   activeTool === tool
@@ -308,10 +305,10 @@ export default function Toolbar({ sceneRootRef }: ToolbarProps) {
         <ToolbarDivider />
       </div>
 
-      <button type="button" title="Undo" aria-label="Undo" onClick={undo} disabled={undoCount === 0} className={iconButtonClass}>
+      <button type="button" title="Undo" aria-label="Undo" data-tutorial="undo" onClick={undo} disabled={undoCount === 0} className={iconButtonClass}>
         <Undo2 size={15} />
       </button>
-      <button type="button" title="Redo" aria-label="Redo" onClick={redo} disabled={redoCount === 0} className={iconButtonClass}>
+      <button type="button" title="Redo" aria-label="Redo" data-tutorial="redo" onClick={redo} disabled={redoCount === 0} className={iconButtonClass}>
         <Redo2 size={15} />
       </button>
 
@@ -323,6 +320,7 @@ export default function Toolbar({ sceneRootRef }: ToolbarProps) {
         type="button"
         title="Grid"
         aria-label="Grid"
+        data-tutorial="grid"
         onClick={() => setShowGrid(!showGrid)}
         className={`${iconButtonClass} ${showGrid ? 'border-emerald-400/70 bg-emerald-400/10 text-emerald-100' : ''}`}
       >
@@ -332,6 +330,7 @@ export default function Toolbar({ sceneRootRef }: ToolbarProps) {
         type="button"
         title="Snap"
         aria-label="Snap"
+        data-tutorial="snap"
         onClick={() => setSnapping(!snapping)}
         className={`${iconButtonClass} ${snapping ? 'border-amber-300/70 bg-amber-300/10 text-amber-100' : ''}`}
       >
@@ -341,6 +340,7 @@ export default function Toolbar({ sceneRootRef }: ToolbarProps) {
       <div className="relative shrink-0">
         <select
           aria-label="Adicionar primitiva"
+          data-tutorial="add-primitive"
           defaultValue=""
           onChange={(event) => {
             const primitive = event.target.value as PrimitiveKind;
@@ -373,21 +373,25 @@ export default function Toolbar({ sceneRootRef }: ToolbarProps) {
             event.currentTarget.value = '';
           }}
         />
-        <button type="button" onClick={() => fileInputRef.current?.click()} className={buttonClass}>
+        <button type="button" data-tutorial="import" onClick={() => fileInputRef.current?.click()} className={buttonClass}>
           <Upload size={14} />
           <span className="hidden sm:inline">Importar</span>
         </button>
-        <button type="button" onClick={handleAiGenerate} disabled={generatingAi} className={buttonClass}>
+        {/* <button type="button" onClick={handleAiGenerate} disabled={generatingAi} className={buttonClass}>
           <Bot size={14} />
           <span className="hidden sm:inline">{generatingAi ? 'Gerando' : 'Modelar com IA'}</span>
-        </button>
-        <button type="button" onClick={handleExport} disabled={exporting} className={buttonClass}>
+        </button> */}
+        <button type="button" data-tutorial="export" onClick={handleExport} disabled={exporting} className={buttonClass}>
           <Download size={14} />
           <span className="hidden sm:inline">{exporting ? 'Exportando' : 'Exportar'}</span>
         </button>
-        <button type="button" onClick={handleReset} className={buttonClass}>
+        <button type="button" data-tutorial="reset" onClick={handleReset} className={buttonClass}>
           <RotateCcw size={14} />
           <span className="hidden sm:inline">Reset</span>
+        </button>
+        <button type="button" data-tutorial="tutorial-button" onClick={onOpenTutorial} className={buttonClass}>
+          <HelpCircle size={14} />
+          <span className="hidden sm:inline">Tutorial</span>
         </button>
       </div>
 

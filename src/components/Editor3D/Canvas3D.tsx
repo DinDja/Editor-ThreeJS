@@ -125,12 +125,20 @@ function EditableMeshAsset({ object, material }: { object: SceneObject; material
   const activeTool = useEditorStore((state) => state.activeTool);
   const selectedObjectId = useEditorStore((state) => state.selectedObjectId);
   const sculptMode = useEditorStore((state) => state.sculptMode);
+  const sculptFalloff = useEditorStore((state) => state.sculptFalloff);
+  const sculptSymmetryX = useEditorStore((state) => state.sculptSymmetryX);
+  const sculptFrontFacesOnly = useEditorStore((state) => state.sculptFrontFacesOnly);
+  const sculptAccumulate = useEditorStore((state) => state.sculptAccumulate);
+  const sculptSpacing = useEditorStore((state) => state.sculptSpacing);
   const sculptRadius = useEditorStore((state) => state.sculptRadius);
   const sculptStrength = useEditorStore((state) => state.sculptStrength);
+  const camera = useThree((state) => state.camera);
   const updateObject = useSceneStore((state) => state.updateObject);
   const pushSnapshot = useHistoryStore((state) => state.pushSnapshot);
   const sculptingRef = useRef(false);
   const strokeMeshRef = useRef<EditableMesh | null>(null);
+  const strokeLastPointRef = useRef<THREE.Vector3 | null>(null);
+  const strokePaintedVerticesRef = useRef<Set<number>>(new Set());
   const geometry = useMemo(
     () => (object.editableMesh ? editableMeshToBufferGeometry(object.editableMesh) : null),
     [object.editableMesh],
@@ -148,7 +156,16 @@ function EditableMeshAsset({ object, material }: { object: SceneObject; material
 
     event.stopPropagation();
     const localPoint = meshRef.current.worldToLocal(event.point.clone());
+
+    if (strokeLastPointRef.current) {
+      const spacingDistance = sculptRadius * sculptSpacing;
+      if (localPoint.distanceTo(strokeLastPointRef.current) < spacingDistance) return;
+    }
+
+    strokeLastPointRef.current = localPoint.clone();
     const localNormal = event.face.normal.clone().normalize();
+    const localCamera = meshRef.current.worldToLocal(camera.position.clone());
+    const localViewDirection = localCamera.sub(localPoint).normalize();
     const nextMesh = sculptMesh({
       mesh: sourceMesh,
       center: localPoint,
@@ -156,6 +173,12 @@ function EditableMeshAsset({ object, material }: { object: SceneObject; material
       radius: sculptRadius,
       strength: sculptStrength,
       mode: sculptMode,
+      falloff: sculptFalloff,
+      symmetryX: sculptSymmetryX,
+      frontFacesOnly: sculptFrontFacesOnly,
+      viewDirection: localViewDirection,
+      accumulate: sculptAccumulate,
+      paintedVertices: strokePaintedVerticesRef.current,
     });
 
     strokeMeshRef.current = nextMesh;
@@ -168,6 +191,8 @@ function EditableMeshAsset({ object, material }: { object: SceneObject; material
     pushSnapshot();
     sculptingRef.current = true;
     strokeMeshRef.current = object.editableMesh;
+    strokeLastPointRef.current = null;
+    strokePaintedVerticesRef.current = new Set();
     applySculptStroke(event);
   };
 
@@ -179,6 +204,8 @@ function EditableMeshAsset({ object, material }: { object: SceneObject; material
   const endSculpt = () => {
     sculptingRef.current = false;
     strokeMeshRef.current = null;
+    strokeLastPointRef.current = null;
+    strokePaintedVerticesRef.current.clear();
   };
 
   return (
@@ -364,6 +391,59 @@ function EditorScene({ sceneRootRef }: Canvas3DProps) {
   const objectRefs = useRef(new Map<string, THREE.Object3D>());
   const rootRef = useRef<THREE.Group>(null);
   const [selectedObject, setSelectedObject3D] = useState<THREE.Object3D | null>(null);
+  const [ctrlPressed, setCtrlPressed] = useState(false);
+  const [altPressed, setAltPressed] = useState(false);
+
+  useEffect(() => {
+    const updateFromEvent = (event: KeyboardEvent) => {
+      setCtrlPressed(event.ctrlKey);
+      setAltPressed(event.altKey);
+    };
+
+    const handleKeyDown = (event: KeyboardEvent) => updateFromEvent(event);
+    const handleKeyUp = (event: KeyboardEvent) => updateFromEvent(event);
+    const handleBlur = () => {
+      setCtrlPressed(false);
+      setAltPressed(false);
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    window.addEventListener('keyup', handleKeyUp);
+    window.addEventListener('blur', handleBlur);
+
+    return () => {
+      window.removeEventListener('keydown', handleKeyDown);
+      window.removeEventListener('keyup', handleKeyUp);
+      window.removeEventListener('blur', handleBlur);
+    };
+  }, []);
+
+  const modifierNavigation = altPressed ? 'zoom' : ctrlPressed ? 'pan' : null;
+  const controlsEnabled = activeTool === 'select' || modifierNavigation !== null;
+
+  const mouseButtons = useMemo(() => {
+    if (modifierNavigation === 'zoom') {
+      return {
+        LEFT: THREE.MOUSE.DOLLY,
+        MIDDLE: THREE.MOUSE.DOLLY,
+        RIGHT: THREE.MOUSE.DOLLY,
+      };
+    }
+
+    if (modifierNavigation === 'pan') {
+      return {
+        LEFT: THREE.MOUSE.PAN,
+        MIDDLE: THREE.MOUSE.PAN,
+        RIGHT: THREE.MOUSE.PAN,
+      };
+    }
+
+    return {
+      LEFT: THREE.MOUSE.ROTATE,
+      MIDDLE: THREE.MOUSE.DOLLY,
+      RIGHT: THREE.MOUSE.PAN,
+    };
+  }, [modifierNavigation]);
 
   useEffect(() => {
     installMeshBVH();
@@ -418,7 +498,16 @@ function EditorScene({ sceneRootRef }: Canvas3DProps) {
 
       {activeTool !== 'edit' && <SelectionBox object={selectedObject} />}
       <TransformGizmo objectId={selectedObjectId} object={selectedObject} />
-      <OrbitControls makeDefault enabled={activeTool === 'select'} enableDamping dampingFactor={0.08} />
+      <OrbitControls
+        makeDefault
+        enabled={controlsEnabled}
+        enableDamping
+        dampingFactor={0.08}
+        enableRotate={modifierNavigation === 'zoom' || modifierNavigation === 'pan' ? false : true}
+        enablePan={modifierNavigation === 'zoom' ? false : true}
+        enableZoom
+        mouseButtons={mouseButtons}
+      />
       <mesh
         rotation={[-Math.PI / 2, 0, 0]}
         position={[0, -0.015, 0]}

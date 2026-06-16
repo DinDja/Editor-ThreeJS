@@ -3,7 +3,17 @@
 import { useMemo, useState } from 'react';
 import { Brush, Check, Copy, Crosshair, FlipHorizontal2, Grid3X3, Layers, RotateCcw, Trash2 } from 'lucide-react';
 import { applyScaleToPrimitiveGeometry, mergePrimitiveGeometry } from '@/lib/geometryOps';
-import { createPrimitiveEditableMesh, deleteFace, extrudeFace, subdivideFace, weldVertices } from '@/lib/meshOps';
+import {
+  clearMask,
+  createPrimitiveEditableMesh,
+  deleteFace,
+  extrudeFace,
+  invertMask,
+  remeshDyntopoLite,
+  subdivideMesh,
+  subdivideFace,
+  weldVertices,
+} from '@/lib/meshOps';
 import { useEditorStore } from '@/store/editorStore';
 import { useHistoryStore } from '@/store/historyStore';
 import { useMaterialStore } from '@/store/materialStore';
@@ -14,6 +24,7 @@ import {
   type MeshSelectionMode,
   type PrimitiveGeometry,
   type PrimitiveKind,
+  type SculptFalloff,
   type SceneObject,
   type SculptMode,
   type Vec3,
@@ -111,6 +122,18 @@ const sculptModes: { label: string; value: SculptMode }[] = [
   { label: 'Puxar', value: 'pull' },
   { label: 'Inflar', value: 'inflate' },
   { label: 'Suavizar', value: 'smooth' },
+  { label: 'Clay', value: 'clay' },
+  { label: 'Crease', value: 'crease' },
+  { label: 'Flatten', value: 'flatten' },
+  { label: 'Pinch', value: 'pinch' },
+  { label: 'Mask', value: 'mask' },
+];
+
+const sculptFalloffs: { label: string; value: SculptFalloff }[] = [
+  { label: 'Smooth', value: 'smooth' },
+  { label: 'Sphere', value: 'sphere' },
+  { label: 'Sharp', value: 'sharp' },
+  { label: 'Linear', value: 'linear' },
 ];
 
 const clampValue = (value: number, field: GeometryField) => {
@@ -137,6 +160,9 @@ const offsetPosition = (position: Vec3, offset: number): Vec3 => [position[0] + 
 export default function ModelingTools({ object, material }: ModelingToolsProps) {
   const [arrayCount, setArrayCount] = useState(3);
   const [arraySpacing, setArraySpacing] = useState(1.25);
+  const [subdividePasses, setSubdividePasses] = useState(1);
+  const [dyntopoPasses, setDyntopoPasses] = useState(6);
+  const [dyntopoEdgeLength, setDyntopoEdgeLength] = useState(0.32);
   const addObject = useSceneStore((state) => state.addObject);
   const updateObject = useSceneStore((state) => state.updateObject);
   const removeObject = useSceneStore((state) => state.removeObject);
@@ -148,6 +174,11 @@ export default function ModelingTools({ object, material }: ModelingToolsProps) 
   const selectedVertexIndices = useEditorStore((state) => state.selectedVertexIndices);
   const selectedFaceIndex = useEditorStore((state) => state.selectedFaceIndex);
   const sculptMode = useEditorStore((state) => state.sculptMode);
+  const sculptFalloff = useEditorStore((state) => state.sculptFalloff);
+  const sculptSymmetryX = useEditorStore((state) => state.sculptSymmetryX);
+  const sculptFrontFacesOnly = useEditorStore((state) => state.sculptFrontFacesOnly);
+  const sculptAccumulate = useEditorStore((state) => state.sculptAccumulate);
+  const sculptSpacing = useEditorStore((state) => state.sculptSpacing);
   const sculptRadius = useEditorStore((state) => state.sculptRadius);
   const sculptStrength = useEditorStore((state) => state.sculptStrength);
   const setSelectedObject = useEditorStore((state) => state.setSelectedObject);
@@ -155,6 +186,11 @@ export default function ModelingTools({ object, material }: ModelingToolsProps) 
   const setMeshSelectionMode = useEditorStore((state) => state.setMeshSelectionMode);
   const setSelectedFace = useEditorStore((state) => state.setSelectedFace);
   const setSculptMode = useEditorStore((state) => state.setSculptMode);
+  const setSculptFalloff = useEditorStore((state) => state.setSculptFalloff);
+  const setSculptSymmetryX = useEditorStore((state) => state.setSculptSymmetryX);
+  const setSculptFrontFacesOnly = useEditorStore((state) => state.setSculptFrontFacesOnly);
+  const setSculptAccumulate = useEditorStore((state) => state.setSculptAccumulate);
+  const setSculptSpacing = useEditorStore((state) => state.setSculptSpacing);
   const setSculptRadius = useEditorStore((state) => state.setSculptRadius);
   const setSculptStrength = useEditorStore((state) => state.setSculptStrength);
   const pushSnapshot = useHistoryStore((state) => state.pushSnapshot);
@@ -321,6 +357,40 @@ export default function ModelingTools({ object, material }: ModelingToolsProps) 
     updateObject(object.uuid, { editableMesh: weldVertices(object.editableMesh, selectedVertexIndices) });
   };
 
+  const handleRemeshLite = () => {
+    if (!object.editableMesh) return;
+
+    pushSnapshot();
+    updateObject(object.uuid, {
+      editableMesh: remeshDyntopoLite(
+        object.editableMesh,
+        Math.max(1, Math.min(20, Math.round(dyntopoPasses))),
+        Math.max(0.05, Math.min(2, dyntopoEdgeLength)),
+      ),
+    });
+  };
+
+  const handleSubdivideMesh = () => {
+    if (!object.editableMesh) return;
+
+    pushSnapshot();
+    updateObject(object.uuid, {
+      editableMesh: subdivideMesh(object.editableMesh, Math.max(1, Math.min(6, Math.round(subdividePasses)))),
+    });
+  };
+
+  const handleMaskClear = () => {
+    if (!object.editableMesh) return;
+    pushSnapshot();
+    updateObject(object.uuid, { editableMesh: clearMask(object.editableMesh) });
+  };
+
+  const handleMaskInvert = () => {
+    if (!object.editableMesh) return;
+    pushSnapshot();
+    updateObject(object.uuid, { editableMesh: invertMask(object.editableMesh) });
+  };
+
   const updateGeometryField = (field: GeometryField, rawValue: number) => {
     if (!primitive || !geometry) return;
 
@@ -407,6 +477,70 @@ export default function ModelingTools({ object, material }: ModelingToolsProps) 
             className="h-1.5 w-full cursor-pointer accent-emerald-400"
           />
         </label>
+        <label className="grid gap-2">
+          <span className={labelClass}>Falloff (Blender)</span>
+          <select
+            value={sculptFalloff}
+            onChange={(event) => setSculptFalloff(event.target.value as SculptFalloff)}
+            className={inputClass}
+          >
+            {sculptFalloffs.map((falloff) => (
+              <option key={falloff.value} value={falloff.value}>
+                {falloff.label}
+              </option>
+            ))}
+          </select>
+        </label>
+        <label className="flex h-11 cursor-pointer items-center justify-between gap-3 rounded-md border border-neutral-700/80 bg-[#0d0f10] px-3 text-xs font-medium text-neutral-300 transition hover:border-emerald-400/70 hover:text-emerald-100">
+          <span>Simetria X</span>
+          <input
+            type="checkbox"
+            checked={sculptSymmetryX}
+            onChange={(event) => setSculptSymmetryX(event.target.checked)}
+            className="h-4 w-4 cursor-pointer accent-emerald-400"
+          />
+        </label>
+        <label className="flex h-11 cursor-pointer items-center justify-between gap-3 rounded-md border border-neutral-700/80 bg-[#0d0f10] px-3 text-xs font-medium text-neutral-300 transition hover:border-emerald-400/70 hover:text-emerald-100">
+          <span>Front Faces Only</span>
+          <input
+            type="checkbox"
+            checked={sculptFrontFacesOnly}
+            onChange={(event) => setSculptFrontFacesOnly(event.target.checked)}
+            className="h-4 w-4 cursor-pointer accent-emerald-400"
+          />
+        </label>
+        <label className="flex h-11 cursor-pointer items-center justify-between gap-3 rounded-md border border-neutral-700/80 bg-[#0d0f10] px-3 text-xs font-medium text-neutral-300 transition hover:border-emerald-400/70 hover:text-emerald-100">
+          <span>Accumulate</span>
+          <input
+            type="checkbox"
+            checked={sculptAccumulate}
+            onChange={(event) => setSculptAccumulate(event.target.checked)}
+            className="h-4 w-4 cursor-pointer accent-emerald-400"
+          />
+        </label>
+        <label className="grid gap-2">
+          <div className="flex items-center justify-between gap-3">
+            <span className={labelClass}>Stroke Spacing</span>
+            <span className="w-10 text-right text-xs tabular-nums text-neutral-400">{sculptSpacing.toFixed(2)}</span>
+          </div>
+          <input
+            type="range"
+            min={0}
+            max={1}
+            step={0.02}
+            value={sculptSpacing}
+            onChange={(event) => setSculptSpacing(Number(event.target.value))}
+            className="h-1.5 w-full cursor-pointer accent-emerald-400"
+          />
+        </label>
+        <div className="grid grid-cols-2 gap-2">
+          <button type="button" onClick={handleMaskClear} disabled={!object.editableMesh} className={buttonClass}>
+            Limpar Mask
+          </button>
+          <button type="button" onClick={handleMaskInvert} disabled={!object.editableMesh} className={buttonClass}>
+            Inverter Mask
+          </button>
+        </div>
       </div>
 
       {object.editableMesh && (
@@ -421,6 +555,55 @@ export default function ModelingTools({ object, material }: ModelingToolsProps) 
               <span className="tabular-nums text-neutral-200">{Math.floor(object.editableMesh.indices.length / 3)}</span>
             </div>
           </div>
+
+          <div className="grid gap-2 rounded-md border border-neutral-800 bg-neutral-950/50 p-2.5">
+            <div className="grid grid-cols-2 gap-2">
+              <label className="grid gap-1">
+                <span className={labelClass}>Subdiv Passes</span>
+                <input
+                  type="number"
+                  min={1}
+                  max={6}
+                  step={1}
+                  value={subdividePasses}
+                  onChange={(event) => setSubdividePasses(Math.max(1, Math.min(6, Math.round(event.target.valueAsNumber || 1))))}
+                  className={inputClass}
+                />
+              </label>
+              <button type="button" onClick={handleSubdivideMesh} className={buttonClass}>
+                <Grid3X3 size={13} />
+                Subdividir Malha
+              </button>
+            </div>
+
+            <div className="grid grid-cols-2 gap-2">
+              <label className="grid gap-1">
+                <span className={labelClass}>DynTopo Passes</span>
+                <input
+                  type="number"
+                  min={1}
+                  max={20}
+                  step={1}
+                  value={dyntopoPasses}
+                  onChange={(event) => setDyntopoPasses(Math.max(1, Math.min(20, Math.round(event.target.valueAsNumber || 1))))}
+                  className={inputClass}
+                />
+              </label>
+              <label className="grid gap-1">
+                <span className={labelClass}>Edge Target</span>
+                <input
+                  type="number"
+                  min={0.05}
+                  max={2}
+                  step={0.01}
+                  value={dyntopoEdgeLength}
+                  onChange={(event) => setDyntopoEdgeLength(Number.isFinite(event.target.valueAsNumber) ? event.target.valueAsNumber : 0.32)}
+                  className={inputClass}
+                />
+              </label>
+            </div>
+          </div>
+
           <div className="grid grid-cols-2 gap-2">
             <button
               type="button"
@@ -457,6 +640,15 @@ export default function ModelingTools({ object, material }: ModelingToolsProps) 
             >
               <Trash2 size={13} />
               Face
+            </button>
+            <button
+              type="button"
+              onClick={handleRemeshLite}
+              disabled={!object.editableMesh}
+              className={buttonClass}
+            >
+              <Grid3X3 size={13} />
+              DynTopo Lite
             </button>
           </div>
         </div>

@@ -104,25 +104,74 @@ export default function MeshEditOverlay({ object }: MeshEditOverlayProps) {
     dragRef.current = null;
   };
 
-  if (!mesh || activeTool !== 'edit' || selectedObjectId !== object.uuid) return null;
+  if (!mesh || selectedObjectId !== object.uuid || (activeTool !== 'edit' && activeTool !== 'sculpt')) return null;
+
+  const isEditMode = activeTool === 'edit';
+  const isSculptMode = activeTool === 'sculpt';
 
   const faceCount = Math.floor(mesh.indices.length / 3);
+
+  const pickClosestVertexInFace = (faceIndex: number, point: THREE.Vector3) => {
+    const vertices = getFaceVertexIndices(mesh, faceIndex);
+    let closest = vertices[0] ?? null;
+    let minDistance = Number.POSITIVE_INFINITY;
+
+    for (const vertexIndex of vertices) {
+      const vertex = mesh.vertices[vertexIndex];
+      if (!vertex) continue;
+      const distance = new THREE.Vector3(vertex[0], vertex[1], vertex[2]).distanceTo(point);
+      if (distance < minDistance) {
+        minDistance = distance;
+        closest = vertexIndex;
+      }
+    }
+
+    return closest;
+  };
 
   return (
     <>
       {edgesGeometry && (
         <lineSegments geometry={edgesGeometry} renderOrder={20}>
-          <lineBasicMaterial color="#5eead4" transparent opacity={0.45} depthTest={false} />
+          <lineBasicMaterial color={isSculptMode ? '#f8fafc' : '#5eead4'} transparent opacity={isSculptMode ? 0.35 : 0.45} depthTest={false} />
         </lineSegments>
       )}
 
-      {selectedFaceGeometry && (
+      {isEditMode && geometry && (
+        <mesh
+          geometry={geometry}
+          visible={false}
+          onClick={(event) => {
+            if (!event.face) return;
+            event.stopPropagation();
+            setSelectedObject(object.uuid);
+
+            const faceIndex = event.faceIndex ?? Math.floor(event.face.a / 3);
+
+            if (selectionMode === 'face') {
+              const faceVertices = getFaceVertexIndices(mesh, faceIndex);
+              setSelectedFace(faceIndex, faceVertices);
+              return;
+            }
+
+            const localPoint = event.object.worldToLocal(event.point.clone());
+            const closestVertex = pickClosestVertexInFace(faceIndex, localPoint);
+            if (closestVertex !== null) {
+              toggleVertexSelection(closestVertex, event.nativeEvent.shiftKey);
+            }
+          }}
+        >
+          <meshBasicMaterial transparent opacity={0} depthWrite={false} />
+        </mesh>
+      )}
+
+      {isEditMode && selectedFaceGeometry && (
         <mesh geometry={selectedFaceGeometry} renderOrder={21}>
           <meshBasicMaterial color="#fbbf24" transparent opacity={0.28} depthTest={false} side={THREE.DoubleSide} />
         </mesh>
       )}
 
-      {selectionMode === 'vertex' &&
+      {isEditMode && selectionMode === 'vertex' &&
         mesh.vertices.map((vertex, index) => {
           const selected = selectedVertexIndices.includes(index);
 
@@ -143,7 +192,7 @@ export default function MeshEditOverlay({ object }: MeshEditOverlayProps) {
           );
         })}
 
-      {selectionMode === 'face' &&
+      {isEditMode && selectionMode === 'face' &&
         Array.from({ length: faceCount }, (_, faceIndex) => {
           const faceVertices = getFaceVertexIndices(mesh, faceIndex);
           const center = getSelectionCenter(mesh, faceVertices);
@@ -166,8 +215,8 @@ export default function MeshEditOverlay({ object }: MeshEditOverlayProps) {
           );
         })}
 
-      <group ref={setPivotRef} visible={false} />
-      {pivotObject && selectedIndices.length > 0 && (
+      {isEditMode && <group ref={setPivotRef} visible={false} />}
+      {isEditMode && pivotObject && selectedIndices.length > 0 && (
         <TransformControls
           object={pivotObject}
           mode="translate"

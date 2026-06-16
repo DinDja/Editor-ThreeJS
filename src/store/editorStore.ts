@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import type { ActiveTool, MeshSelectionMode, SculptMode } from './types';
+import type { ActiveTool, MeshSelectionMode, SculptFalloff, SculptMode } from './types';
 
 type EditorState = {
   selectedObjectId: string | null;
@@ -8,6 +8,11 @@ type EditorState = {
   selectedVertexIndices: number[];
   selectedFaceIndex: number | null;
   sculptMode: SculptMode;
+  sculptFalloff: SculptFalloff;
+  sculptSymmetryX: boolean;
+  sculptFrontFacesOnly: boolean;
+  sculptAccumulate: boolean;
+  sculptSpacing: number;
   sculptRadius: number;
   sculptStrength: number;
   showGrid: boolean;
@@ -21,6 +26,11 @@ type EditorState = {
   setSelectedFace: (faceIndex: number | null, vertexIndices?: number[]) => void;
   clearMeshSelection: () => void;
   setSculptMode: (mode: SculptMode) => void;
+  setSculptFalloff: (falloff: SculptFalloff) => void;
+  setSculptSymmetryX: (enabled: boolean) => void;
+  setSculptFrontFacesOnly: (enabled: boolean) => void;
+  setSculptAccumulate: (enabled: boolean) => void;
+  setSculptSpacing: (spacing: number) => void;
   setSculptRadius: (radius: number) => void;
   setSculptStrength: (strength: number) => void;
   setShowGrid: (showGrid: boolean) => void;
@@ -35,6 +45,11 @@ export const useEditorStore = create<EditorState>((set) => ({
   selectedVertexIndices: [],
   selectedFaceIndex: null,
   sculptMode: 'push',
+  sculptFalloff: 'smooth',
+  sculptSymmetryX: false,
+  sculptFrontFacesOnly: false,
+  sculptAccumulate: true,
+  sculptSpacing: 0.2,
   sculptRadius: 0.45,
   sculptStrength: 0.18,
   showGrid: true,
@@ -81,6 +96,11 @@ export const useEditorStore = create<EditorState>((set) => ({
   setSelectedFace: (selectedFaceIndex, selectedVertexIndices = []) => set({ selectedFaceIndex, selectedVertexIndices }),
   clearMeshSelection: () => set({ selectedVertexIndices: [], selectedFaceIndex: null }),
   setSculptMode: (sculptMode) => set({ sculptMode }),
+  setSculptFalloff: (sculptFalloff) => set({ sculptFalloff }),
+  setSculptSymmetryX: (sculptSymmetryX) => set({ sculptSymmetryX }),
+  setSculptFrontFacesOnly: (sculptFrontFacesOnly) => set({ sculptFrontFacesOnly }),
+  setSculptAccumulate: (sculptAccumulate) => set({ sculptAccumulate }),
+  setSculptSpacing: (sculptSpacing) => set({ sculptSpacing: Math.max(0, Math.min(1, sculptSpacing)) }),
   setSculptRadius: (sculptRadius) => set({ sculptRadius: Math.max(0.05, Math.min(5, sculptRadius)) }),
   setSculptStrength: (sculptStrength) => set({ sculptStrength: Math.max(0.01, Math.min(1, sculptStrength)) }),
   setShowGrid: (showGrid) => set({ showGrid }),

@@ -6,7 +6,18 @@ export type ActiveTool = 'select' | 'translate' | 'rotate' | 'scale' | 'edit' | 
 
 export type MeshSelectionMode = 'vertex' | 'face';
 
-export type SculptMode = 'push' | 'pull' | 'inflate' | 'smooth';
+export type SculptMode =
+  | 'push'
+  | 'pull'
+  | 'inflate'
+  | 'smooth'
+  | 'clay'
+  | 'crease'
+  | 'flatten'
+  | 'pinch'
+  | 'mask';
+
+export type SculptFalloff = 'smooth' | 'sphere' | 'sharp' | 'linear';
 
 export type PrimitiveKind = 'box' | 'sphere' | 'cylinder' | 'cone' | 'torus' | 'plane';
 
@@ -31,6 +42,7 @@ export type EditableMesh = {
   vertices: Vec3[];
   indices: number[];
   uvs?: Vec2[];
+  mask?: number[];
 };
 
 export type SceneObject = {
@@ -90,6 +102,7 @@ export const cloneEditableMesh = (mesh: EditableMesh): EditableMesh => ({
   vertices: mesh.vertices.map(cloneVec3),
   indices: [...mesh.indices],
   uvs: mesh.uvs?.map((uv) => [uv[0], uv[1]]),
+  mask: mesh.mask ? [...mesh.mask] : undefined,
 });
 
 export const cloneSceneObject = (object: SceneObject): SceneObject => ({

@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import { mergePrimitiveGeometry } from './geometryOps';
-import type { EditableMesh, PrimitiveGeometry, PrimitiveKind, SculptMode, Vec2, Vec3 } from '@/store/types';
+import type { EditableMesh, PrimitiveGeometry, PrimitiveKind, SculptFalloff, SculptMode, Vec2, Vec3 } from '@/store/types';
 
 const WELD_PRECISION = 100000;
 
@@ -182,6 +182,7 @@ export const translateMeshVertices = (mesh: EditableMesh, vertexIndices: number[
     ),
     indices: [...mesh.indices],
     uvs: mesh.uvs?.map((uv) => [uv[0], uv[1]]),
+    mask: mesh.mask ? [...mesh.mask] : undefined,
   };
 };
 
@@ -219,6 +220,7 @@ export const extrudeFace = (mesh: EditableMesh, faceIndex: number, distance = 0.
   const normal = getFaceNormal(mesh, faceIndex).multiplyScalar(distance);
   const nextVertices = mesh.vertices.map((vertex) => [...vertex] as Vec3);
   const nextUvs = mesh.uvs?.map((uv) => [uv[0], uv[1]] as Vec2);
+  const nextMask = mesh.mask ? [...mesh.mask] : undefined;
   const newFace: number[] = [];
 
   for (const index of face) {
@@ -232,6 +234,7 @@ export const extrudeFace = (mesh: EditableMesh, faceIndex: number, distance = 0.
       Number((vertex[2] + normal.z).toFixed(5)),
     ]);
     nextUvs?.push(uvAt(mesh, index));
+    nextMask?.push(mesh.mask?.[index] ?? 0);
   }
 
   const nextIndices = [...mesh.indices, newFace[0], newFace[1], newFace[2]];
@@ -249,6 +252,7 @@ export const extrudeFace = (mesh: EditableMesh, faceIndex: number, distance = 0.
     vertices: nextVertices,
     indices: nextIndices,
     uvs: nextUvs,
+    mask: nextMask,
   };
 };
 
@@ -260,6 +264,7 @@ export const deleteFace = (mesh: EditableMesh, faceIndex: number): EditableMesh 
     vertices: mesh.vertices.map((vertex) => [...vertex] as Vec3),
     indices: mesh.indices.filter((_, index) => index < start || index >= start + 3),
     uvs: mesh.uvs?.map((uv) => [uv[0], uv[1]] as Vec2),
+    mask: mesh.mask ? [...mesh.mask] : undefined,
   };
 };
 
@@ -273,6 +278,7 @@ export const subdivideFace = (mesh: EditableMesh, faceIndex: number): EditableMe
 
   const nextVertices = mesh.vertices.map((vertex) => [...vertex] as Vec3);
   const nextUvs = mesh.uvs?.map((uv) => [uv[0], uv[1]] as Vec2);
+  const nextMask = mesh.mask ? [...mesh.mask] : undefined;
   const addMidpoint = (firstIndex: number, secondIndex: number) => {
     const first = mesh.vertices[firstIndex];
     const second = mesh.vertices[secondIndex];
@@ -283,6 +289,11 @@ export const subdivideFace = (mesh: EditableMesh, faceIndex: number): EditableMe
       Number(((first[2] + second[2]) / 2).toFixed(5)),
     ]);
     nextUvs?.push(midpointUv(uvAt(mesh, firstIndex), uvAt(mesh, secondIndex)));
+    if (nextMask) {
+      const firstMask = mesh.mask?.[firstIndex] ?? 0;
+      const secondMask = mesh.mask?.[secondIndex] ?? 0;
+      nextMask.push(Number((((firstMask + secondMask) / 2)).toFixed(5)));
+    }
     return index;
   };
 
@@ -295,6 +306,7 @@ export const subdivideFace = (mesh: EditableMesh, faceIndex: number): EditableMe
     vertices: nextVertices,
     indices: [...mesh.indices.slice(0, start), ...replacement, ...mesh.indices.slice(start + 3)],
     uvs: nextUvs,
+    mask: nextMask,
   };
 };
 
@@ -314,13 +326,51 @@ export const weldVertices = (mesh: EditableMesh, vertexIndices: number[]): Edita
     ),
     indices: [...mesh.indices],
     uvs: mesh.uvs?.map((uv) => [uv[0], uv[1]] as Vec2),
+    mask: mesh.mask ? [...mesh.mask] : undefined,
   };
 };
 
-const getBrushWeight = (distance: number, radius: number) => {
+const getVertexNormals = (mesh: EditableMesh) => {
+  const normals = Array.from({ length: mesh.vertices.length }, () => new THREE.Vector3());
+
+  for (let cursor = 0; cursor < mesh.indices.length; cursor += 3) {
+    const aIndex = mesh.indices[cursor];
+    const bIndex = mesh.indices[cursor + 1];
+    const cIndex = mesh.indices[cursor + 2];
+    const a = mesh.vertices[aIndex];
+    const b = mesh.vertices[bIndex];
+    const c = mesh.vertices[cIndex];
+    if (!a || !b || !c) continue;
+
+    const normal = vectorFromVertex(b)
+      .sub(vectorFromVertex(a))
+      .cross(vectorFromVertex(c).sub(vectorFromVertex(a)));
+
+    normals[aIndex].add(normal);
+    normals[bIndex].add(normal);
+    normals[cIndex].add(normal);
+  }
+
+  normals.forEach((normal) => {
+    if (normal.lengthSq() === 0) {
+      normal.set(0, 1, 0);
+    } else {
+      normal.normalize();
+    }
+  });
+
+  return normals;
+};
+
+const getBrushWeight = (distance: number, radius: number, falloff: SculptFalloff) => {
   if (distance > radius) return 0;
-  const falloff = 1 - distance / radius;
-  return falloff * falloff * (3 - 2 * falloff);
+  const t = 1 - distance / radius;
+
+  if (falloff === 'linear') return t;
+  if (falloff === 'sharp') return t * t;
+  if (falloff === 'sphere') return Math.sqrt(Math.max(0, 1 - (distance / radius) ** 2));
+
+  return t * t * (3 - 2 * t);
 };
 
 const getNeighborMap = (mesh: EditableMesh) => {
@@ -353,6 +403,12 @@ export const sculptMesh = ({
   radius,
   strength,
   mode,
+  falloff,
+  symmetryX,
+  frontFacesOnly,
+  viewDirection,
+  accumulate,
+  paintedVertices,
 }: {
   mesh: EditableMesh;
   center: THREE.Vector3;
@@ -360,17 +416,64 @@ export const sculptMesh = ({
   radius: number;
   strength: number;
   mode: SculptMode;
+  falloff: SculptFalloff;
+  symmetryX: boolean;
+  frontFacesOnly: boolean;
+  viewDirection: THREE.Vector3;
+  accumulate: boolean;
+  paintedVertices?: Set<number>;
 }): EditableMesh => {
   const brushNormal = normal.lengthSq() > 0 ? normal.clone().normalize() : new THREE.Vector3(0, 1, 0);
   const neighbors = mode === 'smooth' ? getNeighborMap(mesh) : null;
+  const maskValues = mesh.mask ? [...mesh.mask] : new Array(mesh.vertices.length).fill(0);
+  const normals = frontFacesOnly ? getVertexNormals(mesh) : null;
+  const viewDir = viewDirection.lengthSq() > 0 ? viewDirection.clone().normalize() : new THREE.Vector3(0, 0, 1);
+  const strokeCenters = [
+    {
+      center: center.clone(),
+      normal: brushNormal.clone(),
+    },
+  ];
+
+  if (symmetryX) {
+    strokeCenters.push({
+      center: new THREE.Vector3(-center.x, center.y, center.z),
+      normal: new THREE.Vector3(-brushNormal.x, brushNormal.y, brushNormal.z),
+    });
+  }
 
   return {
     ...mesh,
     vertices: mesh.vertices.map((vertex, index) => {
       const current = vectorFromVertex(vertex);
-      const distance = current.distanceTo(center);
-      const weight = getBrushWeight(distance, radius);
-      if (weight === 0) return [...vertex] as Vec3;
+      if (frontFacesOnly && normals && normals[index].dot(viewDir) <= 0) {
+        return [...vertex] as Vec3;
+      }
+
+      if (!accumulate && paintedVertices?.has(index)) {
+        return [...vertex] as Vec3;
+      }
+
+      const influences = strokeCenters
+        .map((stroke) => ({
+          ...stroke,
+          weight: getBrushWeight(current.distanceTo(stroke.center), radius, falloff),
+        }))
+        .filter((stroke) => stroke.weight > 0);
+
+      if (influences.length === 0) return [...vertex] as Vec3;
+
+      paintedVertices?.add(index);
+
+      if (mode === 'mask') {
+        const maxWeight = influences.reduce((max, stroke) => Math.max(max, stroke.weight), 0);
+        const nextMask = Math.max(0, Math.min(1, maskValues[index] + strength * maxWeight));
+        maskValues[index] = Number(nextMask.toFixed(5));
+        return [...vertex] as Vec3;
+      }
+
+      const maskFactor = 1 - (maskValues[index] ?? 0);
+      if (maskFactor <= 0) return [...vertex] as Vec3;
 
       if (mode === 'smooth') {
         const neighborIndices = neighbors?.get(index);
@@ -383,23 +486,148 @@ export const sculptMesh = ({
         }
         average.multiplyScalar(1 / neighborIndices.size);
 
-        return toVec3(current.lerp(average, strength * weight));
+        const maxWeight = influences.reduce((max, stroke) => Math.max(max, stroke.weight), 0);
+        return toVec3(current.lerp(average, Math.min(1, strength * maxWeight * maskFactor)));
       }
 
       if (mode === 'inflate') {
-        const direction = current.clone().sub(center);
-        if (direction.lengthSq() === 0) direction.copy(brushNormal);
-        current.add(direction.normalize().multiplyScalar(strength * weight));
+        for (const stroke of influences) {
+          const direction = current.clone().sub(stroke.center);
+          if (direction.lengthSq() === 0) direction.copy(stroke.normal);
+          current.add(direction.normalize().multiplyScalar(strength * stroke.weight * maskFactor));
+        }
         return toVec3(current);
       }
 
-      const direction = mode === 'pull' ? brushNormal : brushNormal.clone().multiplyScalar(-1);
-      current.add(direction.multiplyScalar(strength * weight));
+      if (mode === 'flatten') {
+        for (const stroke of influences) {
+          const offset = current.clone().sub(stroke.center).dot(stroke.normal);
+          current.add(stroke.normal.clone().multiplyScalar(-offset * stroke.weight * 0.9 * maskFactor));
+        }
+        return toVec3(current);
+      }
+
+      if (mode === 'pinch') {
+        for (const stroke of influences) {
+          const toCenter = stroke.center.clone().sub(current);
+          if (toCenter.lengthSq() > 0) {
+            current.add(toCenter.normalize().multiplyScalar(strength * stroke.weight * 0.55 * maskFactor));
+          }
+        }
+        return toVec3(current);
+      }
+
+      if (mode === 'crease') {
+        for (const stroke of influences) {
+          const toCenter = stroke.center.clone().sub(current);
+          if (toCenter.lengthSq() > 0) {
+            current.add(toCenter.normalize().multiplyScalar(strength * stroke.weight * 0.35 * maskFactor));
+          }
+          current.add(stroke.normal.clone().multiplyScalar(-strength * stroke.weight * 0.9 * maskFactor));
+        }
+        return toVec3(current);
+      }
+
+      if (mode === 'clay') {
+        for (const stroke of influences) {
+          current.add(stroke.normal.clone().multiplyScalar(strength * stroke.weight * 0.7 * maskFactor));
+        }
+        return toVec3(current);
+      }
+
+      for (const stroke of influences) {
+        const direction = mode === 'pull' ? stroke.normal : stroke.normal.clone().multiplyScalar(-1);
+        current.add(direction.multiplyScalar(strength * stroke.weight * maskFactor));
+      }
       return toVec3(current);
     }),
     indices: [...mesh.indices],
     uvs: mesh.uvs?.map((uv) => [uv[0], uv[1]] as Vec2),
+    mask: maskValues,
   };
+};
+
+export const clearMask = (mesh: EditableMesh): EditableMesh => ({
+  ...mesh,
+  vertices: mesh.vertices.map((vertex) => [...vertex] as Vec3),
+  indices: [...mesh.indices],
+  uvs: mesh.uvs?.map((uv) => [uv[0], uv[1]] as Vec2),
+  mask: new Array(mesh.vertices.length).fill(0),
+});
+
+export const invertMask = (mesh: EditableMesh): EditableMesh => {
+  const mask = mesh.mask ?? new Array(mesh.vertices.length).fill(0);
+  return {
+    ...mesh,
+    vertices: mesh.vertices.map((vertex) => [...vertex] as Vec3),
+    indices: [...mesh.indices],
+    uvs: mesh.uvs?.map((uv) => [uv[0], uv[1]] as Vec2),
+    mask: mask.map((value) => Number((1 - value).toFixed(5))),
+  };
+};
+
+export const remeshDyntopoLite = (mesh: EditableMesh, passes = 2, targetEdgeLength = 0.45): EditableMesh => {
+  let current = {
+    ...mesh,
+    vertices: mesh.vertices.map((vertex) => [...vertex] as Vec3),
+    indices: [...mesh.indices],
+    uvs: mesh.uvs?.map((uv) => [uv[0], uv[1]] as Vec2),
+    mask: mesh.mask ? [...mesh.mask] : undefined,
+  } as EditableMesh;
+
+  const distanceAt = (aIndex: number, bIndex: number) => {
+    const a = current.vertices[aIndex];
+    const b = current.vertices[bIndex];
+    if (!a || !b) return 0;
+    return vectorFromVertex(a).distanceTo(vectorFromVertex(b));
+  };
+
+  for (let pass = 0; pass < passes; pass += 1) {
+    let refinedAny = false;
+
+    for (let faceIndex = 0; faceIndex < current.indices.length / 3; faceIndex += 1) {
+      const start = faceIndex * 3;
+      const a = current.indices[start];
+      const b = current.indices[start + 1];
+      const c = current.indices[start + 2];
+      const maxEdge = Math.max(distanceAt(a, b), distanceAt(b, c), distanceAt(c, a));
+
+      if (maxEdge > targetEdgeLength) {
+        current = subdivideFace(current, faceIndex);
+        refinedAny = true;
+        break;
+      }
+    }
+
+    if (!refinedAny) break;
+  }
+
+  return current;
+};
+
+export const subdivideMesh = (mesh: EditableMesh, iterations = 1, maxFaces = 120000): EditableMesh => {
+  let current: EditableMesh = {
+    ...mesh,
+    vertices: mesh.vertices.map((vertex) => [...vertex] as Vec3),
+    indices: [...mesh.indices],
+    uvs: mesh.uvs?.map((uv) => [uv[0], uv[1]] as Vec2),
+    mask: mesh.mask ? [...mesh.mask] : undefined,
+  };
+
+  const safeIterations = Math.max(1, Math.min(4, Math.round(iterations)));
+  const safeMaxFaces = Math.max(2000, Math.min(200000, Math.round(maxFaces)));
+
+  for (let pass = 0; pass < safeIterations; pass += 1) {
+    const faceCount = Math.floor(current.indices.length / 3);
+    if (faceCount >= safeMaxFaces) break;
+    if (faceCount * 4 > safeMaxFaces) break;
+
+    for (let faceIndex = faceCount - 1; faceIndex >= 0; faceIndex -= 1) {
+      current = subdivideFace(current, faceIndex);
+    }
+  }
+
+  return current;
 };
 
 export const createSelectedFaceGeometry = (mesh: EditableMesh, faceIndex: number) => {

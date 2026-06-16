@@ -5,6 +5,8 @@ import { Box, Eye, EyeOff, Move3D, PanelRight, Rotate3D, Scale3D, SlidersHorizon
 import * as THREE from 'three';
 import MaterialEditor from './MaterialEditor';
 import ModelingTools from './ModelingTools';
+import { primitiveKinds, primitiveLabels } from '@/lib/geometryOps';
+import { createPrimitiveEditableMesh } from '@/lib/meshOps';
 import { useEditorStore } from '@/store/editorStore';
 import { useHistoryStore } from '@/store/historyStore';
 import { useMaterialStore } from '@/store/materialStore';
@@ -98,6 +100,7 @@ export default function Properties() {
   const pushSnapshot = useHistoryStore((state) => state.pushSnapshot);
   const object = objects.find((item) => item.uuid === selectedObjectId);
   const material = object ? materials[object.materialId] : null;
+  const primitive = object?.kind === 'primitive' ? object.primitive ?? 'box' : null;
 
   if (!object || !material) {
     return (
@@ -146,9 +149,31 @@ export default function Properties() {
             <div className="grid grid-cols-2 gap-3 text-xs">
               <div className="grid gap-1">
                 <span className={labelClass}>Tipo</span>
-                <span className="rounded-md border border-neutral-800 bg-neutral-950 px-2.5 py-2.5 text-neutral-300">
-                  {object.kind === 'model' ? 'Modelo' : 'Primitiva'}
-                </span>
+                {object.kind === 'primitive' ? (
+                  <select
+                    value={primitive ?? 'box'}
+                    onFocus={pushSnapshot}
+                    onChange={(event) => {
+                      const nextPrimitive = event.target.value as SceneObject['primitive'];
+                      if (!nextPrimitive || nextPrimitive === object.primitive) return;
+
+                      updateObject(object.uuid, {
+                        primitive: nextPrimitive,
+                        geometry: undefined,
+                        editableMesh: object.editableMesh ? createPrimitiveEditableMesh(nextPrimitive) : undefined,
+                      });
+                    }}
+                    className={inputClass}
+                  >
+                    {primitiveKinds.map((kind) => (
+                      <option key={kind} value={kind}>
+                        {primitiveLabels[kind]}
+                      </option>
+                    ))}
+                  </select>
+                ) : (
+                  <span className="rounded-md border border-neutral-800 bg-neutral-950 px-2.5 py-2.5 text-neutral-300">Modelo</span>
+                )}
               </div>
               <div className="grid gap-1">
                 <span className={labelClass}>Visivel</span>
