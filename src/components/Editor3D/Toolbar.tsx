@@ -1,8 +1,9 @@
 'use client';
 
-import { useRef, useState, type MutableRefObject } from 'react';
+import { useRef, useState, type MutableRefObject, useCallback } from 'react';
 import {
   Box,
+  Bot,
   Brush,
   ChevronDown,
   Download,
@@ -18,6 +19,7 @@ import {
   Undo2,
   type LucideIcon,
 } from 'lucide-react';
+import AiPromptModal from './AiPromptModal';
 import * as THREE from 'three';
 import { exportObjectAsGLB, isModelFile, MODEL_FILE_ACCEPT } from '@/lib/fileOps';
 import { primitiveKinds, primitiveLabels } from '@/lib/geometryOps';
@@ -26,7 +28,7 @@ import { useEditorStore } from '@/store/editorStore';
 import { useHistoryStore } from '@/store/historyStore';
 import { useMaterialStore } from '@/store/materialStore';
 import { useSceneStore } from '@/store/sceneStore';
-import type { ActiveTool, PrimitiveKind } from '@/store/types';
+import type { ActiveTool, PrimitiveGeometry, PrimitiveKind } from '@/store/types';
 
 type ToolbarProps = {
   sceneRootRef: MutableRefObject<THREE.Group | null>;
@@ -58,6 +60,35 @@ const buttonClass =
 const iconButtonClass =
   'inline-flex h-11 w-11 shrink-0 cursor-pointer items-center justify-center rounded-md border border-neutral-700/80 bg-[#111315] p-2.5 text-neutral-400 shadow-[inset_0_1px_0_rgba(255,255,255,0.04)] transition hover:border-emerald-400/70 hover:bg-[#151918] hover:text-emerald-100 disabled:cursor-not-allowed disabled:opacity-35';
 
+type AiPrimitiveDraft = {
+  name: string;
+  primitive: PrimitiveKind;
+  position?: [number, number, number];
+  rotation?: [number, number, number];
+  scale?: [number, number, number];
+  visible?: boolean;
+  parentName?: string;
+  editableMesh?: boolean;
+  geometry?: PrimitiveGeometry;
+  material?: Partial<{
+    color: string;
+    metalness: number;
+    roughness: number;
+    emissive: string;
+    emissiveIntensity: number;
+    opacity: number;
+    textureRepeatX: number;
+    textureRepeatY: number;
+    textureOffsetX: number;
+    textureOffsetY: number;
+    textureRotation: number;
+  }>;
+};
+
+type AiGenerateResponse = {
+  objects: AiPrimitiveDraft[];
+};
+
 function ToolbarDivider() {
   return <div className="mx-1 h-7 w-px bg-neutral-800" />;
 }
@@ -65,6 +96,9 @@ function ToolbarDivider() {
 export default function Toolbar({ sceneRootRef }: ToolbarProps) {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [exporting, setExporting] = useState(false);
+  const [generatingAi, setGeneratingAi] = useState(false);
+  const [aiModalOpen, setAiModalOpen] = useState(false);
+  const [aiError, setAiError] = useState<string | null>(null);
   const activeTool = useEditorStore((state) => state.activeTool);
   const setActiveTool = useEditorStore((state) => state.setActiveTool);
   const showGrid = useEditorStore((state) => state.showGrid);
@@ -79,6 +113,7 @@ export default function Toolbar({ sceneRootRef }: ToolbarProps) {
   const updateObject = useSceneStore((state) => state.updateObject);
   const resetScene = useSceneStore((state) => state.resetScene);
   const createMaterialForObject = useMaterialStore((state) => state.createMaterialForObject);
+  const updateMaterial = useMaterialStore((state) => state.updateMaterial);
   const resetMaterials = useMaterialStore((state) => state.resetMaterials);
   const undo = useHistoryStore((state) => state.undo);
   const redo = useHistoryStore((state) => state.redo);
@@ -148,6 +183,97 @@ export default function Toolbar({ sceneRootRef }: ToolbarProps) {
     resetMaterials();
     setSelectedObject(null);
     setActiveTool('select');
+  };
+
+  const runAiGenerate = useCallback(async (prompt: string) => {
+    setGeneratingAi(true);
+    setAiError(null);
+    try {
+      const response = await fetch('/api/ai/generate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ prompt }),
+      });
+
+      if (!response.ok) {
+        const payload = await response.json().catch(() => null);
+        const message = typeof payload?.error === 'string' ? payload.error : 'Falha ao gerar cena com IA.';
+        throw new Error(message);
+      }
+
+      const payload = (await response.json()) as AiGenerateResponse;
+      if (!Array.isArray(payload.objects) || payload.objects.length === 0) {
+        throw new Error('A IA nao retornou objetos para montar a cena.');
+      }
+
+      pushSnapshot();
+
+      let lastObjectId: string | null = null;
+      const createdObjects: Array<{ uuid: string; name: string; parentName?: string }> = [];
+
+      payload.objects.forEach((item) => {
+        const object = addObject({
+          name: item.name,
+          kind: 'primitive',
+          primitive: item.primitive,
+          geometry: item.geometry,
+          position: item.position ?? [0, 0.5, 0],
+          rotation: item.rotation ?? [0, 0, 0],
+          scale: item.scale ?? [1, 1, 1],
+          visible: item.visible ?? true,
+          editableMesh: item.editableMesh ? createPrimitiveEditableMesh(item.primitive, item.geometry) : undefined,
+        });
+
+        createMaterialForObject(object.uuid, object.materialId, `Material ${item.name}`);
+
+        const materialPatch = {
+          color: item.material?.color,
+          metalness: item.material?.metalness,
+          roughness: item.material?.roughness,
+          emissive: item.material?.emissive,
+          emissiveIntensity: item.material?.emissiveIntensity,
+          opacity: item.material?.opacity,
+          textureRepeatX: item.material?.textureRepeatX,
+          textureRepeatY: item.material?.textureRepeatY,
+          textureOffsetX: item.material?.textureOffsetX,
+          textureOffsetY: item.material?.textureOffsetY,
+          textureRotation: item.material?.textureRotation,
+        };
+
+        updateMaterial(
+          object.materialId,
+          Object.fromEntries(Object.entries(materialPatch).filter(([, value]) => value !== undefined)),
+        );
+
+        createdObjects.push({ uuid: object.uuid, name: item.name, parentName: item.parentName });
+        lastObjectId = object.uuid;
+      });
+
+      const nameToId = new Map(createdObjects.map((item) => [item.name.toLowerCase(), item.uuid]));
+      createdObjects.forEach((item) => {
+        if (!item.parentName) return;
+        const parentId = nameToId.get(item.parentName.toLowerCase());
+        if (!parentId || parentId === item.uuid) return;
+        updateObject(item.uuid, { parent: parentId });
+      });
+
+      setAiModalOpen(false);
+
+      if (lastObjectId) {
+        setSelectedObject(lastObjectId);
+        setActiveTool('translate');
+      }
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Falha ao gerar cena com IA.';
+      setAiError(message);
+    } finally {
+      setGeneratingAi(false);
+    }
+  }, [addObject, createMaterialForObject, pushSnapshot, setSelectedObject, setActiveTool, updateMaterial, updateObject]);
+
+  const handleAiGenerate = () => {
+    setAiError(null);
+    setAiModalOpen(true);
   };
 
   return (
@@ -251,6 +377,10 @@ export default function Toolbar({ sceneRootRef }: ToolbarProps) {
           <Upload size={14} />
           <span className="hidden sm:inline">Importar</span>
         </button>
+        <button type="button" onClick={handleAiGenerate} disabled={generatingAi} className={buttonClass}>
+          <Bot size={14} />
+          <span className="hidden sm:inline">{generatingAi ? 'Gerando' : 'Modelar com IA'}</span>
+        </button>
         <button type="button" onClick={handleExport} disabled={exporting} className={buttonClass}>
           <Download size={14} />
           <span className="hidden sm:inline">{exporting ? 'Exportando' : 'Exportar'}</span>
@@ -260,6 +390,14 @@ export default function Toolbar({ sceneRootRef }: ToolbarProps) {
           <span className="hidden sm:inline">Reset</span>
         </button>
       </div>
+
+      <AiPromptModal
+        open={aiModalOpen}
+        generating={generatingAi}
+        error={aiError}
+        onSubmit={runAiGenerate}
+        onClose={() => { setAiModalOpen(false); setAiError(null); }}
+      />
     </header>
   );
 }

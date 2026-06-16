@@ -23,6 +23,11 @@ const createDefaultMaterial = (objectId: string, materialId = `material-${object
   opacity: 1,
   textureUrl: null,
   textureName: null,
+  textureRepeatX: 1,
+  textureRepeatY: 1,
+  textureOffsetX: 0,
+  textureOffsetY: 0,
+  textureRotation: 0,
 });
 
 const cloneMaterials = (materials: Record<string, EditorMaterial>) =>

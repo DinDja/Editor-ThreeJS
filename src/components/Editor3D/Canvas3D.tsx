@@ -23,7 +23,8 @@ type ObjectRefRegistry = (uuid: string, object: THREE.Object3D | null) => void;
 const EMPTY_TEXTURE_URL =
   'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAFgwJ/luz5SAAAAABJRU5ErkJggg==';
 
-const useMaterialTexture = (textureUrl: string | null) => {
+const useMaterialTexture = (material: EditorMaterial) => {
+  const { textureUrl, textureRepeatX, textureRepeatY, textureOffsetX, textureOffsetY, textureRotation } = material;
   const gl = useThree((state) => state.gl);
   const texture = useLoader(THREE.TextureLoader, textureUrl ?? EMPTY_TEXTURE_URL);
   const configuredTexture = useMemo(() => {
@@ -34,10 +35,14 @@ const useMaterialTexture = (textureUrl: string | null) => {
     nextTexture.colorSpace = THREE.SRGBColorSpace;
     nextTexture.wrapS = THREE.RepeatWrapping;
     nextTexture.wrapT = THREE.RepeatWrapping;
+    nextTexture.repeat.set(textureRepeatX, textureRepeatY);
+    nextTexture.offset.set(textureOffsetX, textureOffsetY);
+    nextTexture.center.set(0.5, 0.5);
+    nextTexture.rotation = textureRotation;
     nextTexture.anisotropy = Math.min(8, gl.capabilities.getMaxAnisotropy());
     nextTexture.needsUpdate = true;
     return nextTexture;
-  }, [gl, texture, textureUrl]);
+  }, [gl, texture, textureOffsetX, textureOffsetY, textureRepeatX, textureRepeatY, textureRotation, textureUrl]);
 
   useEffect(() => () => configuredTexture?.dispose(), [configuredTexture]);
 
@@ -75,7 +80,7 @@ const cloneMaterialAsStandard = (source: THREE.Material | null | undefined) => {
 
 function ModelAsset({ object, material }: { object: SceneObject; material: EditorMaterial }) {
   const gltf = useGLTF(object.source ?? '');
-  const texture = useMaterialTexture(material.textureUrl);
+  const texture = useMaterialTexture(material);
   const activeTool = useEditorStore((state) => state.activeTool);
   const selectedObjectId = useEditorStore((state) => state.selectedObjectId);
   const updateObject = useSceneStore((state) => state.updateObject);
@@ -116,7 +121,7 @@ function ModelAsset({ object, material }: { object: SceneObject; material: Edito
 
 function EditableMeshAsset({ object, material }: { object: SceneObject; material: EditorMaterial }) {
   const meshRef = useRef<THREE.Mesh>(null);
-  const texture = useMaterialTexture(material.textureUrl);
+  const texture = useMaterialTexture(material);
   const activeTool = useEditorStore((state) => state.activeTool);
   const selectedObjectId = useEditorStore((state) => state.selectedObjectId);
   const sculptMode = useEditorStore((state) => state.sculptMode);
@@ -208,7 +213,7 @@ function EditableMeshAsset({ object, material }: { object: SceneObject; material
 }
 
 function PrimitiveAsset({ object, material }: { object: SceneObject; material: EditorMaterial }) {
-  const texture = useMaterialTexture(material.textureUrl);
+  const texture = useMaterialTexture(material);
   const primitive = object.primitive ?? 'box';
   const geometry = mergePrimitiveGeometry(primitive, object.geometry);
   const geometryKey = JSON.stringify([primitive, geometry]);

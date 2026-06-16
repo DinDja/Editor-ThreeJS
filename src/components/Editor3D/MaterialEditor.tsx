@@ -84,6 +84,7 @@ export default function MaterialEditor({ material }: MaterialEditorProps) {
   const textureInputRef = useRef<HTMLInputElement>(null);
   const updateMaterial = useMaterialStore((state) => state.updateMaterial);
   const pushSnapshot = useHistoryStore((state) => state.pushSnapshot);
+  const hasTexture = Boolean(material.textureUrl);
 
   const update = (patch: Partial<Omit<EditorMaterial, 'uuid' | 'objectId'>>) => {
     updateMaterial(material.uuid, patch);
@@ -101,7 +102,15 @@ export default function MaterialEditor({ material }: MaterialEditorProps) {
 
   const clearTexture = () => {
     pushSnapshot();
-    update({ textureUrl: null, textureName: null });
+    update({
+      textureUrl: null,
+      textureName: null,
+      textureRepeatX: 1,
+      textureRepeatY: 1,
+      textureOffsetX: 0,
+      textureOffsetY: 0,
+      textureRotation: 0,
+    });
   };
 
   return (
@@ -142,12 +151,48 @@ export default function MaterialEditor({ material }: MaterialEditorProps) {
             title="Limpar textura"
             aria-label="Limpar textura"
             onClick={clearTexture}
-            disabled={!material.textureUrl}
+            disabled={!hasTexture}
             className="grid h-11 w-11 cursor-pointer place-items-center rounded-md border border-neutral-700/80 text-neutral-400 transition hover:border-red-400/70 hover:text-red-200 disabled:cursor-not-allowed disabled:opacity-35"
           >
             <Trash2 size={14} />
           </button>
         </div>
+      </div>
+
+      <div className="grid gap-3 rounded-md border border-neutral-800 bg-[#0d0f10]/60 p-3">
+        <div className="flex items-center justify-between gap-2">
+          <span className={labelClass}>Mapeamento da textura</span>
+          <button
+            type="button"
+            onClick={() => {
+              pushSnapshot();
+              update({
+                textureRepeatX: 1,
+                textureRepeatY: 1,
+                textureOffsetX: 0,
+                textureOffsetY: 0,
+                textureRotation: 0,
+              });
+            }}
+            disabled={!hasTexture}
+            className="rounded border border-neutral-700/80 px-2 py-1 text-[10px] uppercase tracking-[0.14em] text-neutral-400 transition hover:border-emerald-400/70 hover:text-emerald-100 disabled:cursor-not-allowed disabled:opacity-35"
+          >
+            Reset UV
+          </button>
+        </div>
+
+        <SliderRow label="Tile X" min={0.1} max={8} step={0.1} value={material.textureRepeatX} onChange={(value) => update({ textureRepeatX: value })} />
+        <SliderRow label="Tile Y" min={0.1} max={8} step={0.1} value={material.textureRepeatY} onChange={(value) => update({ textureRepeatY: value })} />
+        <SliderRow label="Offset X" min={-2} max={2} step={0.01} value={material.textureOffsetX} onChange={(value) => update({ textureOffsetX: value })} />
+        <SliderRow label="Offset Y" min={-2} max={2} step={0.01} value={material.textureOffsetY} onChange={(value) => update({ textureOffsetY: value })} />
+        <SliderRow
+          label="Rotacao"
+          min={-180}
+          max={180}
+          step={1}
+          value={material.textureRotation * (180 / Math.PI)}
+          onChange={(value) => update({ textureRotation: (value * Math.PI) / 180 })}
+        />
       </div>
     </section>
   );

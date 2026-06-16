@@ -190,6 +190,69 @@ Os atalhos nao disparam enquanto voce esta digitando em inputs, selects ou texta
 
 Modelos colocados em `public/` podem ser servidos diretamente pelo app. A rota `src/app/api/models/route.ts` lista arquivos `.glb` e `.gltf` encontrados nessa pasta.
 
+## Agente IA (NVIDIA NIM)
+
+O editor agora tem um agente para gerar cenas com primitivas via NVIDIA NIM usando o modelo `meta/llama-3.1-8b-instruct`.
+
+### Variaveis de ambiente
+
+Crie o arquivo `.env` (ou use `.env.local`) com:
+
+```env
+NVIDIA_NIM_API_KEY=your_nvidia_nim_api_key
+NVIDIA_NIM_MODEL=meta/llama-3.1-8b-instruct
+NVIDIA_NIM_BASE_URL=https://integrate.api.nvidia.com/v1
+```
+
+No Vercel, configure as mesmas variaveis no projeto:
+
+- `NVIDIA_NIM_API_KEY`
+- `NVIDIA_NIM_MODEL`
+- `NVIDIA_NIM_BASE_URL`
+
+Depois, faca redeploy para aplicar.
+
+### Endpoint
+
+`POST /api/ai/generate`
+
+Body:
+
+```json
+{
+  "prompt": "cidade sci-fi com torres e uma plataforma central"
+}
+```
+
+Resposta:
+
+```json
+{
+  "objects": [
+    {
+      "name": "Torre Central",
+      "primitive": "cylinder",
+      "position": [0, 1.5, 0],
+      "rotation": [0, 0, 0],
+      "scale": [1, 1, 1],
+      "geometry": { "radiusTop": 0.8, "radiusBottom": 1.1, "height": 3 },
+      "material": {
+        "color": "#9fb3ff",
+        "metalness": 0.45,
+        "roughness": 0.3,
+        "emissive": "#101a4d",
+        "emissiveIntensity": 0.25,
+        "opacity": 1
+      }
+    }
+  ]
+}
+```
+
+### Uso no editor
+
+Na toolbar, use o botao `Gerar IA`, descreva a cena e o app cria automaticamente primitivas e materiais.
+
 ## Troubleshooting
 
 ### A textura deixou o viewport escuro

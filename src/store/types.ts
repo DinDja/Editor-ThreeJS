@@ -63,6 +63,11 @@ export type EditorMaterial = {
   opacity: number;
   textureUrl: string | null;
   textureName: string | null;
+  textureRepeatX: number;
+  textureRepeatY: number;
+  textureOffsetX: number;
+  textureOffsetY: number;
+  textureRotation: number;
 };
 
 export type SceneObjectInput = Partial<
