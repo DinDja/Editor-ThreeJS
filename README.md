@@ -1,19 +1,29 @@
-# Brain App
+# Editor ThreeJS
 
-Editor 3D experimental feito com Next.js, React Three Fiber e Three.js. O projeto saiu de um visualizador de modelos e agora funciona como uma base de editor de cena: objetos selecionaveis, transformacoes, materiais, import/export de GLB/GLTF e estrutura preparada para animacao e modelagem.
+Editor 3D experimental feito com Next.js, React Three Fiber e Three.js. O app funciona como uma base de editor de cena e modelagem: projeto em branco, primitivas, import/export GLB/GLTF, materiais com textura, edicao de malha, sculpt e atalhos de produtividade.
+
+[![Abrir Tutorial](https://img.shields.io/badge/Abrir-Tutorial-10b981?style=for-the-badge)](./TUTORIAL.md)
 
 ## Recursos
 
+- Projeto inicia em branco, sem objetos pre-carregados.
 - Viewport 3D com `@react-three/fiber`, `@react-three/drei` e controles de orbita.
 - Scene Graph para selecionar, ocultar e remover objetos.
-- Ferramentas de transform: Select, Mover, Girar e Escalar.
-- Gizmo com `TransformControls`.
+- Ferramentas de objeto: Select, Mover, Girar, Escalar, Editar e Sculpt.
+- Gizmo com `TransformControls` para transforms e selecoes de malha.
 - Painel de propriedades com nome, tipo, visibilidade, posicao, rotacao e escala.
 - Editor de material com cor, emissive, metalness, roughness, opacidade e textura.
+- Texturas carregadas no viewport e preservadas no export GLB.
 - Importacao de modelos `.glb` e `.gltf`.
 - Exportacao da cena editada em `.glb`.
-- Undo/Redo basico por snapshots.
-- Primitivas iniciais: cubo, esfera, cilindro, cone, toro e plano.
+- Undo/Redo por snapshots.
+- Copiar, colar, duplicar e apagar objetos por atalhos.
+- Primitivas: cubo, esfera, cilindro, cone, toro e plano.
+- Modelagem de primitivas com dimensoes e segmentos configuraveis.
+- Conversao de primitivas e modelos importados para malha editavel.
+- Edit Mode com selecao e movimento de vertices e faces.
+- Operacoes de malha: extrudar face, subdividir face, apagar face e soldar vertices.
+- Sculpt com pincel para amassar, puxar, inflar e suavizar a malha.
 - Layout responsivo para desktop, tablet e mobile.
 - Base tecnica para raycasting acelerado com `three-mesh-bvh`.
 
@@ -89,7 +99,10 @@ src/
   components/
     Editor3D/
       Canvas3D.tsx
+      EditorShortcuts.tsx
       MaterialEditor.tsx
+      MeshEditOverlay.tsx
+      ModelingTools.tsx
       Properties.tsx
       SceneGraph.tsx
       Timeline.tsx
@@ -102,6 +115,7 @@ src/
     animation.ts
     fileOps.ts
     geometryOps.ts
+    meshOps.ts
 
   store/
     editorStore.ts
@@ -114,44 +128,73 @@ src/
 
 ## Fluxo de Uso
 
-1. Selecione um objeto no Scene Graph ou diretamente no viewport.
-2. Escolha uma ferramenta na toolbar: Select, Mover, Girar ou Escalar.
-3. Edite transforms e material no painel Properties.
-4. Use Add para inserir primitivas.
-5. Use Importar para carregar `.glb` ou `.gltf`.
-6. Use Exportar para baixar a cena atual como `.glb`.
+1. Use Add para inserir uma primitiva ou Importar para carregar `.glb`/`.gltf`.
+2. Selecione um objeto no Scene Graph ou diretamente no viewport.
+3. Use Mover, Girar e Escalar para transformar o objeto.
+4. Edite transforms, modelagem e material no painel Properties.
+5. Use Editar para selecionar vertices ou faces e mover a selecao com o gizmo.
+6. Use Sculpt para deformar a malha com pincel.
+7. Use Exportar para baixar a cena atual como `.glb`.
+
+## Modelagem
+
+### Edit Mode
+
+O modo Editar converte primitivas e modelos importados para uma malha editavel. Em modelos importados, a geometria e achatada em uma malha unica para permitir edicao direta.
+
+No painel Modelagem:
+
+- Vertices: seleciona pontos individuais; use Shift para selecao multipla.
+- Faces: seleciona triangulos da malha.
+- Extrudar: cria volume a partir da face selecionada.
+- Subdividir: divide uma face selecionada em triangulos menores.
+- Soldar: junta vertices selecionados no centro da selecao.
+- Face: apaga a face selecionada.
+
+### Sculpt
+
+O modo Sculpt deforma a malha com um pincel:
+
+- Amassar: empurra a superficie para dentro.
+- Puxar: puxa a superficie para fora.
+- Inflar: expande a regiao ao redor do ponto do pincel.
+- Suavizar: aproxima vertices dos vizinhos para suavizar a forma.
+
+Use os controles Raio e Forca no painel Modelagem para ajustar o pincel.
+
+## Atalhos
+
+| Atalho | Acao |
+| --- | --- |
+| `Ctrl+Z` | Desfazer |
+| `Ctrl+Y` | Refazer |
+| `Ctrl+Shift+Z` | Refazer |
+| `Ctrl+C` | Copiar objeto selecionado |
+| `Ctrl+V` | Colar objeto copiado |
+| `Ctrl+D` | Duplicar objeto selecionado |
+| `Delete` / `Backspace` | Apagar objeto ou face selecionada |
+| `G` | Mover |
+| `R` | Girar |
+| `S` | Escalar |
+| `E` | Entrar em Edit Mode ou extrudar face selecionada |
+| `V` | Selecao de vertices |
+| `F` | Selecao de faces |
+| `B` | Sculpt |
+| `Esc` | Limpar selecao e voltar para Select |
+| `[` | Diminuir raio do pincel |
+| `]` | Aumentar raio do pincel |
+
+Os atalhos nao disparam enquanto voce esta digitando em inputs, selects ou textareas.
 
 ## Modelos
 
 Modelos colocados em `public/` podem ser servidos diretamente pelo app. A rota `src/app/api/models/route.ts` lista arquivos `.glb` e `.gltf` encontrados nessa pasta.
 
-## Roadmap
-
-### Animacao
-
-- Timeline com playhead arrastavel.
-- Keyframes de posicao, rotacao e escala.
-- Playback com `THREE.AnimationMixer`.
-- Exportacao de `AnimationClip` dentro do GLB.
-
-### Modelagem
-
-- Selecao de vertices, arestas e faces.
-- Raycasting acelerado com BVH.
-- Operacoes de malha: subdivisao, extrusao, bevel, delete, smooth e decimate.
-- Booleanos com CSG.
-
 ## Troubleshooting
 
-### A tela ficou escura ou sem estilos
+### A textura deixou o viewport escuro
 
-Reinicie o servidor de desenvolvimento:
-
-```bash
-npm run dev
-```
-
-Depois faca um hard refresh no navegador:
+As texturas agora sao carregadas pelo cache do React Three Fiber e aplicadas em uma copia configurada para o material. Se o navegador ainda mostrar estado antigo, faca um hard refresh:
 
 ```text
 Ctrl + Shift + R
@@ -167,5 +210,4 @@ Confira se existe algum objeto na cena e tente novamente em um navegador moderno
 
 ## Status
 
-Este projeto ainda esta em desenvolvimento. A fundacao do editor de cena e materiais ja esta implementada; animacao e modelagem avancada estao preparadas no roadmap.
-# Editor-ThreeJS
+Este projeto ainda esta em desenvolvimento. A base atual ja cobre cena, materiais, import/export, atalhos, edicao de malha e sculpt. Proximas evolucoes naturais incluem arestas, bevel, loop cut, booleanos, multi-materiais por face e timeline com keyframes reais.
