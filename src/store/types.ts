@@ -1,0 +1,62 @@
+export type Vec3 = [number, number, number];
+
+export type ActiveTool = 'select' | 'translate' | 'rotate' | 'scale';
+
+export type PrimitiveKind = 'box' | 'sphere' | 'cylinder' | 'cone' | 'torus' | 'plane';
+
+export type SceneObjectKind = 'model' | 'primitive';
+
+export type SceneObject = {
+  uuid: string;
+  name: string;
+  kind: SceneObjectKind;
+  source?: string;
+  sourceType?: 'public' | 'upload';
+  primitive?: PrimitiveKind;
+  position: Vec3;
+  rotation: Vec3;
+  scale: Vec3;
+  visible: boolean;
+  parent: string | null;
+  materialId: string;
+  createdAt: number;
+};
+
+export type EditorMaterial = {
+  uuid: string;
+  objectId: string;
+  name: string;
+  color: string;
+  metalness: number;
+  roughness: number;
+  emissive: string;
+  emissiveIntensity: number;
+  opacity: number;
+  textureUrl: string | null;
+  textureName: string | null;
+};
+
+export type SceneObjectInput = Partial<
+  Pick<SceneObject, 'uuid' | 'position' | 'rotation' | 'scale' | 'visible' | 'parent' | 'materialId' | 'createdAt'>
+> &
+  Pick<SceneObject, 'name' | 'kind'> &
+  Pick<SceneObject, 'source' | 'sourceType' | 'primitive'>;
+
+export const createId = () => {
+  if (typeof crypto !== 'undefined' && 'randomUUID' in crypto) {
+    return crypto.randomUUID();
+  }
+
+  return `id-${Date.now()}-${Math.random().toString(16).slice(2)}`;
+};
+
+export const cloneVec3 = (value: Vec3): Vec3 => [value[0], value[1], value[2]];
+
+export const cloneSceneObject = (object: SceneObject): SceneObject => ({
+  ...object,
+  position: cloneVec3(object.position),
+  rotation: cloneVec3(object.rotation),
+  scale: cloneVec3(object.scale),
+});
+
+export const cloneMaterial = (material: EditorMaterial): EditorMaterial => ({ ...material });
