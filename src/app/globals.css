@@ -10,7 +10,15 @@
   box-sizing: border-box;
 }
 
-html, body {
+html {
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  background: #1a1a1a;
+  color-scheme: dark;
+}
+
+body {
   width: 100%;
   height: 100%;
   overflow: hidden;
@@ -28,4 +36,15 @@ button:disabled,
 select:disabled,
 input:disabled {
   cursor: not-allowed;
+}
+
+* {
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+
+*::-webkit-scrollbar {
+  width: 0;
+  height: 0;
+  display: none;
 }

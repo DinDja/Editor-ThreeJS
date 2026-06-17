@@ -226,7 +226,9 @@ export default function TutorialSpotlight({ open, onClose }: TutorialSpotlightPr
 
   useEffect(() => {
     if (!open) return;
-    setStepIndex(0);
+
+    const frameId = window.requestAnimationFrame(() => setStepIndex(0));
+    return () => window.cancelAnimationFrame(frameId);
   }, [open]);
 
   useEffect(() => {

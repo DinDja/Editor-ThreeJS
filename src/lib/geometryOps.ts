@@ -51,9 +51,9 @@ export const primitiveGeometryDefaults: Record<PrimitiveKind, Required<Primitive
     tube: 0.16,
     radialSegments: 24,
     tubularSegments: 64,
-    widthSegments: 1,
-    heightSegments: 1,
-    depthSegments: 1,
+    widthSegments: 6,
+    heightSegments: 6,
+    depthSegments: 6,
   },
   sphere: {
     width: 1,

@@ -6,6 +6,7 @@ import * as THREE from 'three';
 import { useEditorStore } from '@/store/editorStore';
 import { useHistoryStore } from '@/store/historyStore';
 import { useSceneStore } from '@/store/sceneStore';
+import { useTimelineStore } from '@/store/timelineStore';
 
 type TransformGizmoProps = {
   objectId: string | null;
@@ -20,16 +21,25 @@ export default function TransformGizmo({ objectId, object }: TransformGizmoProps
   const snapStep = useEditorStore((state) => state.snapStep);
   const updateObject = useSceneStore((state) => state.updateObject);
   const pushSnapshot = useHistoryStore((state) => state.pushSnapshot);
+  const autoKey = useTimelineStore((state) => state.autoKey);
+  const addTransformKeyframe = useTimelineStore((state) => state.addTransformKeyframe);
 
   const syncTransform = useCallback(() => {
     if (!object || !objectId) return;
 
-    updateObject(objectId, {
+    const transform = {
       position: toVec3(object.position),
       rotation: toVec3(object.rotation),
       scale: toVec3(object.scale),
-    });
-  }, [object, objectId, updateObject]);
+    };
+
+    updateObject(objectId, transform);
+
+    if (autoKey) {
+      const sceneObject = useSceneStore.getState().objects.find((item) => item.uuid === objectId);
+      if (sceneObject) addTransformKeyframe({ ...sceneObject, ...transform });
+    }
+  }, [addTransformKeyframe, autoKey, object, objectId, updateObject]);
 
   if (!object || !objectId || activeTool === 'select' || activeTool === 'edit' || activeTool === 'sculpt') return null;
 

@@ -1,6 +1,6 @@
 'use client';
 
-import { useRef, useState, type MutableRefObject, useCallback } from 'react';
+import { useEffect, useRef, useState, type MutableRefObject, useCallback } from 'react';
 import {
   Box,
   Brush,
@@ -20,6 +20,7 @@ import {
   type LucideIcon,
 } from 'lucide-react';
 import AiPromptModal from './AiPromptModal';
+import AssetBrowserModal from './AssetBrowserModal';
 import * as THREE from 'three';
 import { exportObjectAsGLB, isModelFile, MODEL_FILE_ACCEPT } from '@/lib/fileOps';
 import { primitiveKinds, primitiveLabels } from '@/lib/geometryOps';
@@ -28,7 +29,10 @@ import { useEditorStore } from '@/store/editorStore';
 import { useHistoryStore } from '@/store/historyStore';
 import { useMaterialStore } from '@/store/materialStore';
 import { useSceneStore } from '@/store/sceneStore';
-import type { ActiveTool, PrimitiveGeometry, PrimitiveKind } from '@/store/types';
+import { useTimelineStore } from '@/store/timelineStore';
+import type { ActiveTool, EffectKind, PrimitiveGeometry, PrimitiveKind, ViewportDisplayMode 
+} from '@/store/types';
+import { EFFECT_KINDS, EFFECT_LABELS, EFFECT_PRESETS } from '@/lib/effects';
 
 type ToolbarProps = {
   sceneRootRef: MutableRefObject<THREE.Group | null>;
@@ -54,6 +58,17 @@ const toolIcons: Record<ActiveTool, LucideIcon> = {
 };
 
 const tools: ActiveTool[] = ['select', 'translate', 'rotate', 'scale', 'edit', 'sculpt'];
+
+const viewportDisplayLabels: Record<ViewportDisplayMode, string> = {
+  textured: 'Textura',
+  solid: 'Solido',
+  wireframe: 'Wire',
+  vertices: 'Vertices',
+  polygons: 'Poligonos',
+  primitive: 'Primitiva',
+};
+
+const viewportDisplayModes = Object.keys(viewportDisplayLabels) as ViewportDisplayMode[];
 
 const buttonClass =
   'inline-flex min-h-11 shrink-0 cursor-pointer items-center justify-center gap-2 rounded-md border border-neutral-700/80 bg-[#111315] px-5 py-2.5 text-xs font-medium text-neutral-300 shadow-[inset_0_1px_0_rgba(255,255,255,0.04)] transition hover:border-emerald-400/70 hover:bg-[#151918] hover:text-emerald-100 disabled:cursor-not-allowed disabled:opacity-35';
@@ -96,9 +111,19 @@ function ToolbarDivider() {
 
 export default function Toolbar({ sceneRootRef, onOpenTutorial }: ToolbarProps) {
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const toolbarRef = useRef<HTMLElement>(null);
+  const toolbarDragRef = useRef({
+    pointerId: -1,
+    startX: 0,
+    startScrollLeft: 0,
+    moved: false,
+    blockClick: false,
+  });
   const [exporting, setExporting] = useState(false);
   const [generatingAi, setGeneratingAi] = useState(false);
   const [aiModalOpen, setAiModalOpen] = useState(false);
+  const [assetBrowserOpen, setAssetBrowserOpen] = useState(false);
+  const [toolbarDragging, setToolbarDragging] = useState(false);
   const [aiError, setAiError] = useState<string | null>(null);
   const activeTool = useEditorStore((state) => state.activeTool);
   const setActiveTool = useEditorStore((state) => state.setActiveTool);
@@ -106,6 +131,8 @@ export default function Toolbar({ sceneRootRef, onOpenTutorial }: ToolbarProps) 
   const setShowGrid = useEditorStore((state) => state.setShowGrid);
   const snapping = useEditorStore((state) => state.snapping);
   const setSnapping = useEditorStore((state) => state.setSnapping);
+  const viewportDisplayMode = useEditorStore((state) => state.viewportDisplayMode);
+  const setViewportDisplayMode = useEditorStore((state) => state.setViewportDisplayMode);
   const setSelectedObject = useEditorStore((state) => state.setSelectedObject);
   const selectedObjectId = useEditorStore((state) => state.selectedObjectId);
   const objects = useSceneStore((state) => state.objects);
@@ -131,6 +158,20 @@ export default function Toolbar({ sceneRootRef, onOpenTutorial }: ToolbarProps) 
     setActiveTool('translate');
   };
 
+  const handleAddEffect = (kind: EffectKind) => {
+    pushSnapshot();
+    const preset = EFFECT_PRESETS[kind];
+    const object = addObject({
+      name: EFFECT_LABELS[kind],
+      kind: 'effect',
+      effect: { ...preset },
+      position: [0, 0.5, 0],
+    });
+    createMaterialForObject(object.uuid, object.materialId, `Material ${object.name}`);
+    setSelectedObject(object.uuid);
+    setActiveTool('translate');
+  };
+
   const handleModelFile = (file: File | undefined) => {
     if (!file || !isModelFile(file)) return;
 
@@ -148,12 +189,19 @@ export default function Toolbar({ sceneRootRef, onOpenTutorial }: ToolbarProps) 
     setActiveTool('translate');
   };
 
+  const keyframes = useTimelineStore((state) => state.keyframes);
+  const fps = useTimelineStore((state) => state.fps);
+
   const handleExport = async () => {
     if (!sceneRootRef.current || exporting) return;
 
     setExporting(true);
     try {
-      await exportObjectAsGLB(sceneRootRef.current, 'editor-scene.glb');
+      await exportObjectAsGLB(sceneRootRef.current, 'editor-scene.glb', {
+        keyframes,
+        objects,
+        fps,
+      });
     } finally {
       setExporting(false);
     }
@@ -184,6 +232,68 @@ export default function Toolbar({ sceneRootRef, onOpenTutorial }: ToolbarProps) 
     resetMaterials();
     setSelectedObject(null);
     setActiveTool('select');
+  };
+
+  useEffect(() => {
+    const handlePointerMove = (event: globalThis.PointerEvent) => {
+      const drag = toolbarDragRef.current;
+      const toolbar = toolbarRef.current;
+      if (!toolbar || drag.pointerId !== event.pointerId) return;
+
+      const deltaX = event.clientX - drag.startX;
+      if (Math.abs(deltaX) > 4) {
+        drag.moved = true;
+      }
+
+      if (!drag.moved) return;
+      event.preventDefault();
+      toolbar.scrollLeft = drag.startScrollLeft - deltaX;
+    };
+
+    const handlePointerUp = (event: globalThis.PointerEvent) => {
+      const drag = toolbarDragRef.current;
+      if (drag.pointerId !== event.pointerId) return;
+
+      if (!drag.moved) {
+        drag.pointerId = -1;
+        setToolbarDragging(false);
+        return;
+      }
+
+      drag.blockClick = true;
+      drag.pointerId = -1;
+      setToolbarDragging(false);
+    };
+
+    document.addEventListener('pointermove', handlePointerMove);
+    document.addEventListener('pointerup', handlePointerUp);
+
+    return () => {
+      document.removeEventListener('pointermove', handlePointerMove);
+      document.removeEventListener('pointerup', handlePointerUp);
+    };
+  }, []);
+
+  const handleToolbarPointerDown = (event: React.PointerEvent<HTMLElement>) => {
+    if (event.button !== 0) return;
+    if ((event.target as HTMLElement).closest('input, select, textarea, option')) return;
+
+    const toolbar = toolbarRef.current;
+    if (!toolbar || toolbar.scrollWidth <= toolbar.clientWidth) return;
+
+    toolbarDragRef.current.pointerId = event.pointerId;
+    toolbarDragRef.current.startX = event.clientX;
+    toolbarDragRef.current.startScrollLeft = toolbar.scrollLeft;
+    toolbarDragRef.current.moved = false;
+    toolbarDragRef.current.blockClick = false;
+    setToolbarDragging(true);
+  };
+
+  const handleToolbarClickCapture = (event: React.MouseEvent<HTMLElement>) => {
+    if (!toolbarDragRef.current.blockClick) return;
+    toolbarDragRef.current.blockClick = false;
+    event.preventDefault();
+    event.stopPropagation();
   };
 
   const runAiGenerate = useCallback(async (prompt: string) => {
@@ -273,7 +383,14 @@ export default function Toolbar({ sceneRootRef, onOpenTutorial }: ToolbarProps) 
   }, [addObject, createMaterialForObject, pushSnapshot, setSelectedObject, setActiveTool, updateMaterial, updateObject]);
 
   return (
-    <header className="flex min-h-[72px] items-center gap-2.5 overflow-x-auto overflow-y-hidden border-b border-neutral-800 bg-[#17191b] px-3 py-2.5 text-neutral-100 shadow-[0_1px_0_rgba(255,255,255,0.03)] max-sm:min-h-[64px]">
+    <header
+      ref={toolbarRef}
+      onPointerDown={handleToolbarPointerDown}
+      onClickCapture={handleToolbarClickCapture}
+      className={`flex min-h-[72px] select-none items-center gap-2.5 overflow-x-auto overflow-y-hidden border-b border-neutral-800 bg-[#17191b] px-3 py-2.5 text-neutral-100 shadow-[0_1px_0_rgba(255,255,255,0.03)] max-sm:min-h-[64px] ${
+        toolbarDragging ? 'cursor-grabbing' : 'cursor-grab'
+      }`}
+    >
       <div data-tutorial="tools-group" className="flex shrink-0 items-center gap-1 rounded-lg border border-neutral-800 bg-neutral-950/80 p-1">
         {tools.map((tool) => (
           (() => {
@@ -339,6 +456,23 @@ export default function Toolbar({ sceneRootRef, onOpenTutorial }: ToolbarProps) 
 
       <div className="relative shrink-0">
         <select
+          aria-label="Modo de visualizacao"
+          value={viewportDisplayMode}
+          onChange={(event) => setViewportDisplayMode(event.target.value as ViewportDisplayMode)}
+          className="h-11 cursor-pointer appearance-none rounded-md border border-neutral-700/80 bg-[#111315] py-0 pl-11 pr-10 text-xs font-medium text-neutral-300 outline-none transition hover:border-emerald-400/70 focus:border-emerald-400"
+        >
+          {viewportDisplayModes.map((mode) => (
+            <option key={mode} value={mode}>
+              {viewportDisplayLabels[mode]}
+            </option>
+          ))}
+        </select>
+        <Grid3X3 size={14} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-neutral-500" />
+        <ChevronDown size={14} className="pointer-events-none absolute right-2.5 top-1/2 -translate-y-1/2 text-neutral-500" />
+      </div>
+
+      <div className="relative shrink-0">
+        <select
           aria-label="Adicionar primitiva"
           data-tutorial="add-primitive"
           defaultValue=""
@@ -362,6 +496,30 @@ export default function Toolbar({ sceneRootRef, onOpenTutorial }: ToolbarProps) 
         <ChevronDown size={14} className="pointer-events-none absolute right-2.5 top-1/2 -translate-y-1/2 text-neutral-500" />
       </div>
 
+      <div className="relative shrink-0">
+        <select
+          aria-label="Adicionar efeito"
+          defaultValue=""
+          onChange={(event) => {
+            const kind = event.target.value as EffectKind;
+            if (kind) handleAddEffect(kind);
+            event.currentTarget.value = '';
+          }}
+          className="h-11 cursor-pointer appearance-none rounded-md border border-neutral-700/80 bg-[#111315] py-0 pl-11 pr-10 text-xs font-medium text-neutral-300 outline-none transition hover:border-emerald-400/70 focus:border-emerald-400"
+        >
+          <option value="" disabled>
+            Efeito
+          </option>
+          {EFFECT_KINDS.map((kind) => (
+            <option key={kind} value={kind}>
+              {EFFECT_LABELS[kind]}
+            </option>
+          ))}
+        </select>
+        <Box size={14} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-neutral-500" />
+        <ChevronDown size={14} className="pointer-events-none absolute right-2.5 top-1/2 -translate-y-1/2 text-neutral-500" />
+      </div>
+
       <div className="ml-auto flex shrink-0 items-center gap-2 max-md:ml-0">
         <input
           ref={fileInputRef}
@@ -373,6 +531,10 @@ export default function Toolbar({ sceneRootRef, onOpenTutorial }: ToolbarProps) 
             event.currentTarget.value = '';
           }}
         />
+        <button type="button" onClick={() => setAssetBrowserOpen(true)} className={buttonClass}>
+          <Box size={14} />
+          <span className="hidden sm:inline">Assets</span>
+        </button>
         <button type="button" data-tutorial="import" onClick={() => fileInputRef.current?.click()} className={buttonClass}>
           <Upload size={14} />
           <span className="hidden sm:inline">Importar</span>
@@ -402,6 +564,7 @@ export default function Toolbar({ sceneRootRef, onOpenTutorial }: ToolbarProps) 
         onSubmit={runAiGenerate}
         onClose={() => { setAiModalOpen(false); setAiError(null); }}
       />
+      <AssetBrowserModal open={assetBrowserOpen} onClose={() => setAssetBrowserOpen(false)} />
     </header>
   );
 }

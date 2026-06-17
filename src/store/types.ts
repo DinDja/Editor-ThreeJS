@@ -4,11 +4,14 @@ export type Vec2 = [number, number];
 
 export type ActiveTool = 'select' | 'translate' | 'rotate' | 'scale' | 'edit' | 'sculpt';
 
-export type MeshSelectionMode = 'vertex' | 'face';
+export type ViewportDisplayMode = 'textured' | 'solid' | 'wireframe' | 'vertices' | 'polygons' | 'primitive';
+
+export type MeshSelectionMode = 'vertex' | 'edge' | 'face';
 
 export type SculptMode =
   | 'push'
   | 'pull'
+  | 'grab'
   | 'inflate'
   | 'smooth'
   | 'clay'
@@ -21,7 +24,17 @@ export type SculptFalloff = 'smooth' | 'sphere' | 'sharp' | 'linear';
 
 export type PrimitiveKind = 'box' | 'sphere' | 'cylinder' | 'cone' | 'torus' | 'plane';
 
-export type SceneObjectKind = 'model' | 'primitive';
+export type EffectKind = 'fireworks' | 'fire' | 'smoke' | 'sparkle' | 'lightGlow';
+
+export type EffectConfig = {
+  kind: EffectKind;
+  color: string;
+  intensity: number;
+  size: number;
+  count: number;
+};
+
+export type SceneObjectKind = 'model' | 'primitive' | 'effect';
 
 export type PrimitiveGeometry = Partial<{
   width: number;
@@ -43,6 +56,29 @@ export type EditableMesh = {
   indices: number[];
   uvs?: Vec2[];
   mask?: number[];
+  faceMaterialIds?: Array<string | null>;
+};
+
+export type BehaviorKind = 'jump' | 'walk' | 'accelerate' | 'roll' | 'gravity' | 'bubble' | 'massDeform';
+
+export type BehaviorConfig = {
+  type: BehaviorKind;
+  enabled: boolean;
+  jumpHeight?: number;
+  jumpCooldown?: number;
+  walkSpeed?: number;
+  walkAmplitude?: number;
+  walkFrequency?: number;
+  acceleration?: number;
+  maxSpeed?: number;
+  rollSpeed?: number;
+  rollAxis?: 'x' | 'z';
+  gravityStrength?: number;
+  groundY?: number;
+  bubbleAmplitude?: number;
+  bubbleFrequency?: number;
+  deformStrength?: number;
+  deformReturnSpeed?: number;
 };
 
 export type SceneObject = {
@@ -54,6 +90,8 @@ export type SceneObject = {
   primitive?: PrimitiveKind;
   geometry?: PrimitiveGeometry;
   editableMesh?: EditableMesh;
+  effect?: EffectConfig;
+  behaviors?: BehaviorConfig[];
   position: Vec3;
   rotation: Vec3;
   scale: Vec3;
@@ -75,6 +113,9 @@ export type EditorMaterial = {
   opacity: number;
   textureUrl: string | null;
   textureName: string | null;
+  normalMapUrl: string | null;
+  roughnessMapUrl: string | null;
+  displacementMapUrl: string | null;
   textureRepeatX: number;
   textureRepeatY: number;
   textureOffsetX: number;
@@ -86,7 +127,7 @@ export type SceneObjectInput = Partial<
   Pick<SceneObject, 'uuid' | 'position' | 'rotation' | 'scale' | 'visible' | 'parent' | 'materialId' | 'createdAt'>
 > &
   Pick<SceneObject, 'name' | 'kind'> &
-  Pick<SceneObject, 'source' | 'sourceType' | 'primitive' | 'geometry' | 'editableMesh'>;
+  Pick<SceneObject, 'source' | 'sourceType' | 'primitive' | 'geometry' | 'editableMesh' | 'effect' | 'behaviors'>;
 
 export const createId = () => {
   if (typeof crypto !== 'undefined' && 'randomUUID' in crypto) {
@@ -103,12 +144,15 @@ export const cloneEditableMesh = (mesh: EditableMesh): EditableMesh => ({
   indices: [...mesh.indices],
   uvs: mesh.uvs?.map((uv) => [uv[0], uv[1]]),
   mask: mesh.mask ? [...mesh.mask] : undefined,
+  faceMaterialIds: mesh.faceMaterialIds ? [...mesh.faceMaterialIds] : undefined,
 });
 
 export const cloneSceneObject = (object: SceneObject): SceneObject => ({
   ...object,
   geometry: object.geometry ? { ...object.geometry } : undefined,
   editableMesh: object.editableMesh ? cloneEditableMesh(object.editableMesh) : undefined,
+  effect: object.effect ? { ...object.effect } : undefined,
+  behaviors: object.behaviors ? object.behaviors.map((b) => ({ ...b })) : undefined,
   position: cloneVec3(object.position),
   rotation: cloneVec3(object.rotation),
   scale: cloneVec3(object.scale),

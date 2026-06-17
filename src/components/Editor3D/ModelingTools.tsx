@@ -4,12 +4,17 @@ import { useMemo, useState } from 'react';
 import { Brush, Check, Copy, Crosshair, FlipHorizontal2, Grid3X3, Layers, RotateCcw, Trash2 } from 'lucide-react';
 import { applyScaleToPrimitiveGeometry, mergePrimitiveGeometry } from '@/lib/geometryOps';
 import {
+  bevelEdge,
+  booleanEditableMeshes,
   clearMask,
+  clearFaceMaterials,
   createPrimitiveEditableMesh,
   deleteFace,
   extrudeFace,
   invertMask,
+  loopCutMesh,
   remeshDyntopoLite,
+  setFaceMaterial,
   subdivideMesh,
   subdivideFace,
   weldVertices,
@@ -120,6 +125,7 @@ const geometryFieldsByPrimitive: Record<PrimitiveKind, GeometryField[]> = {
 const sculptModes: { label: string; value: SculptMode }[] = [
   { label: 'Amassar', value: 'push' },
   { label: 'Puxar', value: 'pull' },
+  { label: 'Grab', value: 'grab' },
   { label: 'Inflar', value: 'inflate' },
   { label: 'Suavizar', value: 'smooth' },
   { label: 'Clay', value: 'clay' },
@@ -153,6 +159,9 @@ const cloneMaterialPatch = (material: EditorMaterial): Partial<Omit<EditorMateri
   opacity: material.opacity,
   textureUrl: material.textureUrl,
   textureName: material.textureName,
+  normalMapUrl: material.normalMapUrl,
+  roughnessMapUrl: material.roughnessMapUrl,
+  displacementMapUrl: material.displacementMapUrl,
 });
 
 const offsetPosition = (position: Vec3, offset: number): Vec3 => [position[0] + offset, position[1], position[2]];
@@ -163,15 +172,21 @@ export default function ModelingTools({ object, material }: ModelingToolsProps) 
   const [subdividePasses, setSubdividePasses] = useState(1);
   const [dyntopoPasses, setDyntopoPasses] = useState(6);
   const [dyntopoEdgeLength, setDyntopoEdgeLength] = useState(0.32);
+  const [bevelAmount, setBevelAmount] = useState(0.12);
+  const [faceMaterialColor, setFaceMaterialColor] = useState(material.color);
+  const [booleanTargetId, setBooleanTargetId] = useState('');
+  const objects = useSceneStore((state) => state.objects);
   const addObject = useSceneStore((state) => state.addObject);
   const updateObject = useSceneStore((state) => state.updateObject);
   const removeObject = useSceneStore((state) => state.removeObject);
+  const materials = useMaterialStore((state) => state.materials);
   const createMaterialForObject = useMaterialStore((state) => state.createMaterialForObject);
   const updateMaterial = useMaterialStore((state) => state.updateMaterial);
   const removeMaterial = useMaterialStore((state) => state.removeMaterial);
   const activeTool = useEditorStore((state) => state.activeTool);
   const meshSelectionMode = useEditorStore((state) => state.meshSelectionMode);
   const selectedVertexIndices = useEditorStore((state) => state.selectedVertexIndices);
+  const selectedEdgeVertexIndices = useEditorStore((state) => state.selectedEdgeVertexIndices);
   const selectedFaceIndex = useEditorStore((state) => state.selectedFaceIndex);
   const sculptMode = useEditorStore((state) => state.sculptMode);
   const sculptFalloff = useEditorStore((state) => state.sculptFalloff);
@@ -195,6 +210,14 @@ export default function ModelingTools({ object, material }: ModelingToolsProps) 
   const setSculptStrength = useEditorStore((state) => state.setSculptStrength);
   const pushSnapshot = useHistoryStore((state) => state.pushSnapshot);
   const primitive = object.kind === 'primitive' ? object.primitive ?? 'box' : null;
+  const objectMaterials = useMemo(
+    () =>
+      Object.values(materials)
+        .filter((item) => item.objectId === object.uuid)
+        .sort((a, b) => (a.uuid === object.materialId ? -1 : b.uuid === object.materialId ? 1 : a.name.localeCompare(b.name))),
+    [materials, object.materialId, object.uuid],
+  );
+  const booleanTargets = objects.filter((item) => item.uuid !== object.uuid && item.visible && (item.editableMesh || item.primitive));
   const geometry = useMemo(
     () => (primitive ? mergePrimitiveGeometry(primitive, object.geometry) : null),
     [object.geometry, primitive],
@@ -357,6 +380,79 @@ export default function ModelingTools({ object, material }: ModelingToolsProps) 
     updateObject(object.uuid, { editableMesh: weldVertices(object.editableMesh, selectedVertexIndices) });
   };
 
+  const handleBevelEdge = () => {
+    if (!object.editableMesh || !selectedEdgeVertexIndices) return;
+
+    pushSnapshot();
+    updateObject(object.uuid, {
+      editableMesh: bevelEdge(object.editableMesh, selectedEdgeVertexIndices, Math.max(0.01, Math.min(0.45, bevelAmount))),
+    });
+  };
+
+  const handleLoopCut = () => {
+    if (!object.editableMesh || !selectedEdgeVertexIndices) return;
+
+    pushSnapshot();
+    updateObject(object.uuid, { editableMesh: loopCutMesh(object.editableMesh, selectedEdgeVertexIndices) });
+  };
+
+  const handleAssignFaceMaterial = (materialId: string) => {
+    if (!object.editableMesh || selectedFaceIndex === null) return;
+
+    pushSnapshot();
+    updateObject(object.uuid, {
+      editableMesh: setFaceMaterial(object.editableMesh, selectedFaceIndex, materialId === object.materialId ? null : materialId),
+    });
+  };
+
+  const handleCreateFaceMaterial = () => {
+    if (!object.editableMesh || selectedFaceIndex === null) return;
+
+    pushSnapshot();
+    const nextMaterial = createMaterialForObject(object.uuid, undefined, `Face ${objectMaterials.length}`);
+    updateMaterial(nextMaterial.uuid, {
+      ...cloneMaterialPatch(material),
+      name: nextMaterial.name,
+      color: faceMaterialColor,
+    });
+    updateObject(object.uuid, { editableMesh: setFaceMaterial(object.editableMesh, selectedFaceIndex, nextMaterial.uuid) });
+  };
+
+  const handleClearFaceMaterials = () => {
+    if (!object.editableMesh) return;
+
+    pushSnapshot();
+    updateObject(object.uuid, { editableMesh: clearFaceMaterials(object.editableMesh) });
+  };
+
+  const getBooleanMesh = (target: SceneObject) => {
+    if (target.editableMesh) return target.editableMesh;
+    if (target.kind === 'primitive' && target.primitive) return createPrimitiveEditableMesh(target.primitive, target.geometry);
+    return null;
+  };
+
+  const handleBoolean = (operation: 'union' | 'subtract' | 'intersect') => {
+    if (!object.editableMesh || !booleanTargetId) return;
+
+    const target = objects.find((item) => item.uuid === booleanTargetId);
+    if (!target) return;
+
+    const cutterMesh = getBooleanMesh(target);
+    if (!cutterMesh) return;
+
+    pushSnapshot();
+    updateObject(object.uuid, {
+      editableMesh: booleanEditableMeshes({
+        baseMesh: object.editableMesh,
+        cutterMesh,
+        baseTransform: object,
+        cutterTransform: target,
+        operation,
+        appendMaterialId: target.materialId,
+      }),
+    });
+  };
+
   const handleRemeshLite = () => {
     if (!object.editableMesh) return;
 
@@ -412,6 +508,14 @@ export default function ModelingTools({ object, material }: ModelingToolsProps) 
         >
           <Grid3X3 size={13} />
           Vertices
+        </button>
+        <button
+          type="button"
+          onClick={() => enterEditMode('edge')}
+          className={`${buttonClass} ${activeTool === 'edit' && meshSelectionMode === 'edge' ? activeButtonClass : ''}`}
+        >
+          <Grid3X3 size={13} />
+          Arestas
         </button>
         <button
           type="button"
@@ -601,6 +705,97 @@ export default function ModelingTools({ object, material }: ModelingToolsProps) 
                   className={inputClass}
                 />
               </label>
+            </div>
+          </div>
+
+          <div className="grid gap-2 rounded-md border border-neutral-800 bg-neutral-950/50 p-2.5">
+            <div className="grid grid-cols-[minmax(0,1fr)_auto] gap-2">
+              <label className="grid gap-1">
+                <span className={labelClass}>Bevel</span>
+                <input
+                  type="number"
+                  min={0.01}
+                  max={0.45}
+                  step={0.01}
+                  value={bevelAmount}
+                  onChange={(event) => setBevelAmount(Number.isFinite(event.target.valueAsNumber) ? event.target.valueAsNumber : 0.12)}
+                  className={inputClass}
+                />
+              </label>
+              <button type="button" onClick={handleBevelEdge} disabled={!selectedEdgeVertexIndices} className={buttonClass}>
+                <Grid3X3 size={13} />
+                Bevel
+              </button>
+            </div>
+            <button type="button" onClick={handleLoopCut} disabled={!selectedEdgeVertexIndices} className={buttonClass}>
+              <Grid3X3 size={13} />
+              Loop Cut
+            </button>
+          </div>
+
+          <div className="grid gap-2 rounded-md border border-neutral-800 bg-neutral-950/50 p-2.5">
+            <div className="grid grid-cols-2 gap-2">
+              <label className="grid gap-1">
+                <span className={labelClass}>Material da face</span>
+                <select
+                  value={
+                    selectedFaceIndex === null
+                      ? object.materialId
+                      : object.editableMesh.faceMaterialIds?.[selectedFaceIndex] ?? object.materialId
+                  }
+                  onChange={(event) => handleAssignFaceMaterial(event.target.value)}
+                  disabled={selectedFaceIndex === null}
+                  className={inputClass}
+                >
+                  {objectMaterials.map((item) => (
+                    <option key={item.uuid} value={item.uuid}>
+                      {item.name}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <label className="grid gap-1">
+                <span className={labelClass}>Nova cor</span>
+                <input
+                  type="color"
+                  value={faceMaterialColor}
+                  onChange={(event) => setFaceMaterialColor(event.target.value)}
+                  className="h-9 w-full cursor-pointer rounded-md border border-neutral-700/80 bg-[#0d0f10] p-1"
+                />
+              </label>
+            </div>
+            <div className="grid grid-cols-2 gap-2">
+              <button type="button" onClick={handleCreateFaceMaterial} disabled={selectedFaceIndex === null} className={buttonClass}>
+                Face Mat
+              </button>
+              <button type="button" onClick={handleClearFaceMaterials} className={buttonClass}>
+                Limpar Mats
+              </button>
+            </div>
+          </div>
+
+          <div className="grid gap-2 rounded-md border border-neutral-800 bg-neutral-950/50 p-2.5">
+            <label className="grid gap-1">
+              <span className={labelClass}>Booleano alvo</span>
+              <select value={booleanTargetId} onChange={(event) => setBooleanTargetId(event.target.value)} className={inputClass}>
+                <option value="">Selecionar</option>
+                {booleanTargets.map((target) => (
+                  <option key={target.uuid} value={target.uuid}>
+                    {target.name}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <div className="grid grid-cols-3 gap-2">
+              <button type="button" onClick={() => handleBoolean('union')} disabled={!booleanTargetId} className={buttonClass}>
+                Union
+              </button>
+              <button type="button" onClick={() => handleBoolean('subtract')} disabled={!booleanTargetId} className={buttonClass}>
+                Subtrair
+              </button>
+              <button type="button" onClick={() => handleBoolean('intersect')} disabled={!booleanTargetId} className={buttonClass}>
+                Intersect
+              </button>
             </div>
           </div>
 

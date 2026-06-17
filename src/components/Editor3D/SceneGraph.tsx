@@ -1,7 +1,7 @@
 'use client';
 
 import { useMemo } from 'react';
-import { Box, Boxes, Eye, EyeOff, FileBox, Trash2 } from 'lucide-react';
+import { Box, Boxes, Brush, ChevronLeft, Eye, EyeOff, FileBox, Trash2 } from 'lucide-react';
 import { useEditorStore } from '@/store/editorStore';
 import { useHistoryStore } from '@/store/historyStore';
 import { useMaterialStore } from '@/store/materialStore';
@@ -44,7 +44,7 @@ function SceneRow({ object, depth, childObjects }: { object: SceneObject; depth:
         style={{ paddingLeft: 8 + depth * 14 }}
       >
         <div className={`grid h-6 w-6 place-items-center rounded border ${selected ? 'border-amber-300/35 bg-amber-300/10 text-amber-100' : 'border-neutral-800 bg-neutral-950 text-neutral-500'}`}>
-          {object.kind === 'model' ? <FileBox size={13} /> : <Box size={13} />}
+          {object.effect ? <Brush size={13} /> : object.kind === 'model' ? <FileBox size={13} /> : <Box size={13} />}
         </div>
         <button
           type="button"
@@ -95,31 +95,58 @@ export default function SceneGraph() {
     }
     return map;
   }, [objects]);
+  const leftPanelCollapsed = useEditorStore((state) => state.leftPanelCollapsed);
+  const setLeftPanelCollapsed = useEditorStore((state) => state.setLeftPanelCollapsed);
 
   return (
     <aside className="flex h-full min-h-0 flex-col border-r border-neutral-800 bg-[#151719] max-lg:border-b max-lg:border-r-0">
-      <div className="flex items-center justify-between border-b border-neutral-800 px-4 py-3 max-sm:px-3 max-sm:py-2">
-        <div className="flex items-center gap-2">
-          <Boxes size={15} className="text-emerald-300" />
-          <h2 className="text-xs font-semibold uppercase tracking-[0.18em] text-neutral-400">Scene</h2>
+      {leftPanelCollapsed ? (
+        <div className="flex items-center justify-center border-b border-neutral-800 py-3">
+          <button
+            type="button"
+            onClick={() => setLeftPanelCollapsed(false)}
+            className="grid h-7 w-7 cursor-pointer place-items-center rounded text-neutral-500 transition hover:bg-neutral-700/80 hover:text-neutral-100"
+            title="Expandir"
+          >
+            <ChevronLeft size={14} className="rotate-180" />
+          </button>
         </div>
-        <span className="rounded-full border border-neutral-800 bg-neutral-950 px-2 py-0.5 text-[11px] tabular-nums text-neutral-500">
-          {objects.length}
-        </span>
-      </div>
-      <div className="min-h-0 flex-1 overflow-auto p-3 max-sm:p-2">
-        {roots.length > 0 ? (
-          <div className="space-y-1">
-            {roots.map((object) => (
-              <SceneRow key={object.uuid} object={object} depth={0} childObjects={childrenByParent.get(object.uuid) ?? []} />
-            ))}
+      ) : (
+        <>
+          <div className="flex items-center justify-between border-b border-neutral-800 px-4 py-3 max-sm:px-3 max-sm:py-2">
+            <div className="flex items-center gap-2">
+              <Boxes size={15} className="text-emerald-300" />
+              <h2 className="text-xs font-semibold uppercase tracking-[0.18em] text-neutral-400">Scene</h2>
+            </div>
+            <div className="flex items-center gap-2">
+              <span className="rounded-full border border-neutral-800 bg-neutral-950 px-2 py-0.5 text-[11px] tabular-nums text-neutral-500">
+                {objects.length}
+              </span>
+              <button
+                type="button"
+                onClick={() => setLeftPanelCollapsed(true)}
+                className="grid h-7 w-7 cursor-pointer place-items-center rounded text-neutral-500 transition hover:bg-neutral-700/80 hover:text-neutral-100"
+                title="Recolher"
+              >
+                <ChevronLeft size={14} />
+              </button>
+            </div>
           </div>
-        ) : (
-          <div className="grid h-full place-items-center text-center text-sm text-neutral-500">
-            Cena vazia
+          <div className="min-h-0 flex-1 overflow-auto p-3 max-sm:p-2">
+            {roots.length > 0 ? (
+              <div className="space-y-1">
+                {roots.map((object) => (
+                  <SceneRow key={object.uuid} object={object} depth={0} childObjects={childrenByParent.get(object.uuid) ?? []} />
+                ))}
+              </div>
+            ) : (
+              <div className="grid h-full place-items-center text-center text-sm text-neutral-500">
+                Cena vazia
+              </div>
+            )}
           </div>
-        )}
-      </div>
+        </>
+      )}
     </aside>
   );
 }

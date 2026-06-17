@@ -7,12 +7,16 @@ import * as THREE from 'three';
 import MeshEditOverlay from './MeshEditOverlay';
 import TransformGizmo from './TransformGizmo';
 import { installMeshBVH, mergePrimitiveGeometry } from '@/lib/geometryOps';
-import { editableMeshFromObject3D, editableMeshToBufferGeometry, sculptMesh } from '@/lib/meshOps';
+import { editableMeshFromObject3D, editableMeshToBufferGeometry, grabMeshVertices, sculptMesh } from '@/lib/meshOps';
 import { useEditorStore } from '@/store/editorStore';
 import { useHistoryStore } from '@/store/historyStore';
 import { useMaterialStore } from '@/store/materialStore';
 import { useSceneStore } from '@/store/sceneStore';
-import type { EditableMesh, EditorMaterial, SceneObject } from '@/store/types';
+import { useContextMenu } from '@/store/contextMenuStore';
+import ContextMenu from './ContextMenu';
+import type { EditableMesh, EditorMaterial, SceneObject, ViewportDisplayMode } from '@/store/types';
+import { EffectAsset } from '@/lib/effects';
+import { BehaviorEngine } from '@/lib/behaviors';
 
 type Canvas3DProps = {
   sceneRootRef: MutableRefObject<THREE.Group | null>;
@@ -23,33 +27,107 @@ type ObjectRefRegistry = (uuid: string, object: THREE.Object3D | null) => void;
 const EMPTY_TEXTURE_URL =
   'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAFgwJ/luz5SAAAAABJRU5ErkJggg==';
 
-const useMaterialTexture = (material: EditorMaterial) => {
-  const { textureUrl, textureRepeatX, textureRepeatY, textureOffsetX, textureOffsetY, textureRotation } = material;
-  const gl = useThree((state) => state.gl);
-  const texture = useLoader(THREE.TextureLoader, textureUrl ?? EMPTY_TEXTURE_URL);
-  const configuredTexture = useMemo(() => {
-    if (!textureUrl) return null;
-
-    const nextTexture = texture.clone();
-    nextTexture.image = texture.image;
-    nextTexture.colorSpace = THREE.SRGBColorSpace;
-    nextTexture.wrapS = THREE.RepeatWrapping;
-    nextTexture.wrapT = THREE.RepeatWrapping;
-    nextTexture.repeat.set(textureRepeatX, textureRepeatY);
-    nextTexture.offset.set(textureOffsetX, textureOffsetY);
-    nextTexture.center.set(0.5, 0.5);
-    nextTexture.rotation = textureRotation;
-    nextTexture.anisotropy = Math.min(8, gl.capabilities.getMaxAnisotropy());
-    nextTexture.needsUpdate = true;
-    return nextTexture;
-  }, [gl, texture, textureOffsetX, textureOffsetY, textureRepeatX, textureRepeatY, textureRotation, textureUrl]);
-
-  useEffect(() => () => configuredTexture?.dispose(), [configuredTexture]);
-
-  return configuredTexture;
+type MaterialTextureSet = {
+  map: THREE.Texture | null;
+  normalMap: THREE.Texture | null;
+  roughnessMap: THREE.Texture | null;
+  displacementMap: THREE.Texture | null;
 };
 
-const applyMaterialProps = (material: THREE.MeshStandardMaterial, editorMaterial: EditorMaterial, texture: THREE.Texture | null) => {
+const EMPTY_TEXTURE_SET: MaterialTextureSet = {
+  map: null,
+  normalMap: null,
+  roughnessMap: null,
+  displacementMap: null,
+};
+
+const hasTextureSet = (textureSet: MaterialTextureSet) =>
+  Boolean(textureSet.map || textureSet.normalMap || textureSet.roughnessMap || textureSet.displacementMap);
+
+const materialTextureKey = (material: EditorMaterial) =>
+  [
+    material.textureUrl ?? 'no-diffuse',
+    material.normalMapUrl ?? 'no-normal',
+    material.roughnessMapUrl ?? 'no-roughness',
+    material.displacementMapUrl ?? 'no-displacement',
+  ].join('|');
+
+const useMaterialTextures = (material: EditorMaterial) => {
+  const {
+    textureUrl,
+    normalMapUrl,
+    roughnessMapUrl,
+    displacementMapUrl,
+    textureRepeatX,
+    textureRepeatY,
+    textureOffsetX,
+    textureOffsetY,
+    textureRotation,
+  } = material;
+  const gl = useThree((state) => state.gl);
+  const [baseTexture, normalTexture, roughnessTexture, displacementTexture] = useLoader(THREE.TextureLoader, [
+    textureUrl ?? EMPTY_TEXTURE_URL,
+    normalMapUrl ?? EMPTY_TEXTURE_URL,
+    roughnessMapUrl ?? EMPTY_TEXTURE_URL,
+    displacementMapUrl ?? EMPTY_TEXTURE_URL,
+  ]) as THREE.Texture[];
+
+  const configuredTextures = useMemo(() => {
+    const configureTexture = (source: THREE.Texture, url: string | null, colorSpace: THREE.ColorSpace) => {
+      if (!url) return null;
+
+      const nextTexture = source.clone();
+      nextTexture.image = source.image;
+      nextTexture.colorSpace = colorSpace;
+      nextTexture.wrapS = THREE.RepeatWrapping;
+      nextTexture.wrapT = THREE.RepeatWrapping;
+      nextTexture.repeat.set(textureRepeatX, textureRepeatY);
+      nextTexture.offset.set(textureOffsetX, textureOffsetY);
+      nextTexture.center.set(0.5, 0.5);
+      nextTexture.rotation = textureRotation;
+      nextTexture.anisotropy = Math.min(8, gl.capabilities.getMaxAnisotropy());
+      nextTexture.needsUpdate = true;
+      return nextTexture;
+    };
+
+    return {
+      map: configureTexture(baseTexture, textureUrl, THREE.SRGBColorSpace),
+      normalMap: configureTexture(normalTexture, normalMapUrl ?? null, THREE.NoColorSpace),
+      roughnessMap: configureTexture(roughnessTexture, roughnessMapUrl ?? null, THREE.NoColorSpace),
+      displacementMap: configureTexture(displacementTexture, displacementMapUrl ?? null, THREE.NoColorSpace),
+    };
+  }, [
+    baseTexture,
+    displacementMapUrl,
+    displacementTexture,
+    gl,
+    normalMapUrl,
+    normalTexture,
+    roughnessMapUrl,
+    roughnessTexture,
+    textureOffsetX,
+    textureOffsetY,
+    textureRepeatX,
+    textureRepeatY,
+    textureRotation,
+    textureUrl,
+  ]);
+
+  useEffect(
+    () => () => {
+      Object.values(configuredTextures).forEach((texture) => texture?.dispose());
+    },
+    [configuredTextures],
+  );
+
+  return configuredTextures;
+};
+
+const applyMaterialProps = (
+  material: THREE.MeshStandardMaterial,
+  editorMaterial: EditorMaterial,
+  textureSet: MaterialTextureSet,
+) => {
   material.color.set(editorMaterial.color);
   material.metalness = editorMaterial.metalness;
   material.roughness = editorMaterial.roughness;
@@ -58,8 +136,38 @@ const applyMaterialProps = (material: THREE.MeshStandardMaterial, editorMaterial
   material.opacity = editorMaterial.opacity;
   material.transparent = editorMaterial.opacity < 1;
   material.depthWrite = editorMaterial.opacity >= 1;
-  material.map = texture;
+  material.map = textureSet.map;
+  material.normalMap = textureSet.normalMap;
+  material.normalScale.set(1, 1);
+  material.roughnessMap = textureSet.roughnessMap;
+  material.displacementMap = textureSet.displacementMap;
+  material.displacementScale = textureSet.displacementMap ? 0.015 : 0;
   material.side = THREE.DoubleSide;
+  material.needsUpdate = true;
+};
+
+const applyViewportMaterialProps = (
+  material: THREE.MeshStandardMaterial,
+  editorMaterial: EditorMaterial,
+  textureSet: MaterialTextureSet,
+  displayMode: ViewportDisplayMode,
+) => {
+  const textured = displayMode === 'textured';
+  applyMaterialProps(material, editorMaterial, textured ? textureSet : EMPTY_TEXTURE_SET);
+
+  material.wireframe = displayMode === 'wireframe';
+  material.opacity = displayMode === 'wireframe' ? 1 : editorMaterial.opacity;
+  material.transparent = displayMode === 'wireframe' ? false : editorMaterial.opacity < 1;
+  material.depthWrite = material.opacity >= 1;
+
+  if (!textured) {
+    material.map = null;
+    material.normalMap = null;
+    material.roughnessMap = null;
+    material.displacementMap = null;
+    material.displacementScale = 0;
+  }
+
   material.needsUpdate = true;
 };
 
@@ -80,8 +188,9 @@ const cloneMaterialAsStandard = (source: THREE.Material | null | undefined) => {
 
 function ModelAsset({ object, material }: { object: SceneObject; material: EditorMaterial }) {
   const gltf = useGLTF(object.source ?? '');
-  const texture = useMaterialTexture(material);
+  const textureSet = useMaterialTextures(material);
   const activeTool = useEditorStore((state) => state.activeTool);
+  const viewportDisplayMode = useEditorStore((state) => state.viewportDisplayMode);
   const selectedObjectId = useEditorStore((state) => state.selectedObjectId);
   const updateObject = useSceneStore((state) => state.updateObject);
   const clone = useMemo(() => gltf.scene.clone(true), [gltf.scene]);
@@ -96,33 +205,46 @@ function ModelAsset({ object, material }: { object: SceneObject; material: Edito
   }, [activeTool, clone, object.editableMesh, object.uuid, selectedObjectId, updateObject]);
 
   useEffect(() => {
+    const preserveSourceMaterial =
+      viewportDisplayMode === 'textured' && !hasTextureSet(textureSet) && object.source?.startsWith('/api/assets/polyhaven/');
+    const prepareMaterial = (sourceMaterial: THREE.Material | null | undefined) => {
+      const nextMaterial = cloneMaterialAsStandard(sourceMaterial);
+
+      if (preserveSourceMaterial) {
+        nextMaterial.side = THREE.DoubleSide;
+        nextMaterial.wireframe = false;
+        nextMaterial.needsUpdate = true;
+        return nextMaterial;
+      }
+
+      applyViewportMaterialProps(nextMaterial, material, textureSet, viewportDisplayMode);
+      return nextMaterial;
+    };
+
     clone.traverse((node) => {
       if (!(node instanceof THREE.Mesh)) return;
 
+      node.castShadow = true;
+      node.receiveShadow = true;
+
       if (Array.isArray(node.material)) {
-        node.material = node.material.map((sourceMaterial) => {
-          const nextMaterial = cloneMaterialAsStandard(sourceMaterial);
-          applyMaterialProps(nextMaterial, material, texture);
-          return nextMaterial;
-        });
+        node.material = node.material.map((sourceMaterial) => prepareMaterial(sourceMaterial));
         return;
       }
 
-      const nextMaterial = cloneMaterialAsStandard(node.material);
-      applyMaterialProps(nextMaterial, material, texture);
-      node.material = nextMaterial;
-      node.castShadow = true;
-      node.receiveShadow = true;
+      node.material = prepareMaterial(node.material);
     });
-  }, [clone, material, texture]);
+  }, [clone, material, object.source, textureSet, viewportDisplayMode]);
 
   return <primitive object={clone} />;
 }
 
 function EditableMeshAsset({ object, material }: { object: SceneObject; material: EditorMaterial }) {
   const meshRef = useRef<THREE.Mesh>(null);
-  const texture = useMaterialTexture(material);
+  const allMaterials = useMaterialStore((state) => state.materials);
+  const textureSet = useMaterialTextures(material);
   const activeTool = useEditorStore((state) => state.activeTool);
+  const viewportDisplayMode = useEditorStore((state) => state.viewportDisplayMode);
   const selectedObjectId = useEditorStore((state) => state.selectedObjectId);
   const sculptMode = useEditorStore((state) => state.sculptMode);
   const sculptFalloff = useEditorStore((state) => state.sculptFalloff);
@@ -132,21 +254,59 @@ function EditableMeshAsset({ object, material }: { object: SceneObject; material
   const sculptSpacing = useEditorStore((state) => state.sculptSpacing);
   const sculptRadius = useEditorStore((state) => state.sculptRadius);
   const sculptStrength = useEditorStore((state) => state.sculptStrength);
+  const setSculptBrushPreview = useEditorStore((state) => state.setSculptBrushPreview);
+  const clearSculptBrushPreview = useEditorStore((state) => state.clearSculptBrushPreview);
   const camera = useThree((state) => state.camera);
   const updateObject = useSceneStore((state) => state.updateObject);
   const pushSnapshot = useHistoryStore((state) => state.pushSnapshot);
   const sculptingRef = useRef(false);
   const strokeMeshRef = useRef<EditableMesh | null>(null);
+  const strokeGrabStartMeshRef = useRef<EditableMesh | null>(null);
+  const strokeGrabStartPointRef = useRef<THREE.Vector3 | null>(null);
   const strokeLastPointRef = useRef<THREE.Vector3 | null>(null);
   const strokePaintedVerticesRef = useRef<Set<number>>(new Set());
+  const objectMaterials = useMemo(() => {
+    const baseMaterial = allMaterials[object.materialId] ?? material;
+    const extraMaterials = Object.values(allMaterials)
+      .filter((item) => item.objectId === object.uuid && item.uuid !== baseMaterial.uuid)
+      .sort((a, b) => a.name.localeCompare(b.name) || a.uuid.localeCompare(b.uuid));
+
+    return [baseMaterial, ...extraMaterials];
+  }, [allMaterials, material, object.materialId, object.uuid]);
+  const materialIdsKey = objectMaterials.map((item) => item.uuid).join('|');
+  const materialIds = useMemo(() => materialIdsKey.split('|').filter(Boolean), [materialIdsKey]);
   const geometry = useMemo(
-    () => (object.editableMesh ? editableMeshToBufferGeometry(object.editableMesh) : null),
-    [object.editableMesh],
+    () => (object.editableMesh ? editableMeshToBufferGeometry(object.editableMesh, materialIds) : null),
+    [materialIds, object.editableMesh],
   );
+  const meshMaterials = useMemo(() => {
+    if (viewportDisplayMode !== 'textured' || objectMaterials.length < 2) return null;
+
+    return objectMaterials.map((editorMaterial, index) => {
+      const nextMaterial = new THREE.MeshStandardMaterial();
+      applyViewportMaterialProps(nextMaterial, editorMaterial, index === 0 ? textureSet : EMPTY_TEXTURE_SET, viewportDisplayMode);
+      return nextMaterial;
+    });
+  }, [objectMaterials, textureSet, viewportDisplayMode]);
 
   useEffect(() => () => geometry?.dispose(), [geometry]);
+  useEffect(
+    () => () => {
+      meshMaterials?.forEach((item) => item.dispose());
+    },
+    [meshMaterials],
+  );
 
   if (!geometry) return null;
+
+  const updateBrushPreview = (event: ThreeEvent<PointerEvent>) => {
+    if (activeTool !== 'sculpt' || selectedObjectId !== object.uuid || !meshRef.current || !event.face) return null;
+
+    const localPoint = meshRef.current.worldToLocal(event.point.clone());
+    const localNormal = event.face.normal.clone().normalize();
+    setSculptBrushPreview(object.uuid, [localPoint.x, localPoint.y, localPoint.z], [localNormal.x, localNormal.y, localNormal.z]);
+    return { localPoint, localNormal };
+  };
 
   const applySculptStroke = (event: ThreeEvent<PointerEvent>) => {
     if (activeTool !== 'sculpt' || selectedObjectId !== object.uuid || !meshRef.current || !event.face) return;
@@ -155,31 +315,55 @@ function EditableMeshAsset({ object, material }: { object: SceneObject; material
     if (!sourceMesh) return;
 
     event.stopPropagation();
-    const localPoint = meshRef.current.worldToLocal(event.point.clone());
+    const preview = updateBrushPreview(event);
+    if (!preview) return;
+
+    const { localPoint, localNormal } = preview;
 
     if (strokeLastPointRef.current) {
       const spacingDistance = sculptRadius * sculptSpacing;
-      if (localPoint.distanceTo(strokeLastPointRef.current) < spacingDistance) return;
+      if (sculptMode !== 'grab' && localPoint.distanceTo(strokeLastPointRef.current) < spacingDistance) return;
     }
 
     strokeLastPointRef.current = localPoint.clone();
-    const localNormal = event.face.normal.clone().normalize();
     const localCamera = meshRef.current.worldToLocal(camera.position.clone());
     const localViewDirection = localCamera.sub(localPoint).normalize();
-    const nextMesh = sculptMesh({
-      mesh: sourceMesh,
-      center: localPoint,
-      normal: localNormal,
-      radius: sculptRadius,
-      strength: sculptStrength,
-      mode: sculptMode,
-      falloff: sculptFalloff,
-      symmetryX: sculptSymmetryX,
-      frontFacesOnly: sculptFrontFacesOnly,
-      viewDirection: localViewDirection,
-      accumulate: sculptAccumulate,
-      paintedVertices: strokePaintedVerticesRef.current,
-    });
+    const nextMesh =
+      sculptMode === 'grab'
+        ? (() => {
+            if (!strokeGrabStartPointRef.current) {
+              strokeGrabStartPointRef.current = localPoint.clone();
+              strokeGrabStartMeshRef.current = sourceMesh;
+              return sourceMesh;
+            }
+
+            return grabMeshVertices({
+              mesh: strokeGrabStartMeshRef.current ?? sourceMesh,
+              center: strokeGrabStartPointRef.current,
+              delta: localPoint.clone().sub(strokeGrabStartPointRef.current),
+              radius: sculptRadius,
+              falloff: sculptFalloff,
+              symmetryX: sculptSymmetryX,
+              frontFacesOnly: sculptFrontFacesOnly,
+              viewDirection: localViewDirection,
+            });
+          })()
+        : sculptMesh({
+            mesh: sourceMesh,
+            center: localPoint,
+            normal: localNormal,
+            radius: sculptRadius,
+            strength: sculptStrength,
+            mode: sculptMode,
+            falloff: sculptFalloff,
+            symmetryX: sculptSymmetryX,
+            frontFacesOnly: sculptFrontFacesOnly,
+            viewDirection: localViewDirection,
+            accumulate: sculptAccumulate,
+            paintedVertices: strokePaintedVerticesRef.current,
+          });
+
+    if (nextMesh === sourceMesh && sculptMode === 'grab') return;
 
     strokeMeshRef.current = nextMesh;
     updateObject(object.uuid, { editableMesh: nextMesh });
@@ -188,22 +372,34 @@ function EditableMeshAsset({ object, material }: { object: SceneObject; material
   const startSculpt = (event: ThreeEvent<PointerEvent>) => {
     if (activeTool !== 'sculpt' || selectedObjectId !== object.uuid || !object.editableMesh) return;
 
+    event.stopPropagation();
+    if (event.nativeEvent.target instanceof Element) {
+      event.nativeEvent.target.setPointerCapture?.(event.pointerId);
+    }
     pushSnapshot();
     sculptingRef.current = true;
     strokeMeshRef.current = object.editableMesh;
+    strokeGrabStartMeshRef.current = object.editableMesh;
+    strokeGrabStartPointRef.current = null;
     strokeLastPointRef.current = null;
     strokePaintedVerticesRef.current = new Set();
     applySculptStroke(event);
   };
 
   const updateSculpt = (event: ThreeEvent<PointerEvent>) => {
-    if (!sculptingRef.current) return;
+    if (!sculptingRef.current) {
+      updateBrushPreview(event);
+      return;
+    }
+
     applySculptStroke(event);
   };
 
   const endSculpt = () => {
     sculptingRef.current = false;
     strokeMeshRef.current = null;
+    strokeGrabStartMeshRef.current = null;
+    strokeGrabStartPointRef.current = null;
     strokeLastPointRef.current = null;
     strokePaintedVerticesRef.current.clear();
   };
@@ -212,35 +408,47 @@ function EditableMeshAsset({ object, material }: { object: SceneObject; material
     <mesh
       ref={meshRef}
       geometry={geometry}
+      material={meshMaterials ?? undefined}
       castShadow
       receiveShadow
       onPointerDown={startSculpt}
       onPointerMove={updateSculpt}
       onPointerUp={endSculpt}
-      onPointerLeave={endSculpt}
+      onPointerLeave={() => {
+        endSculpt();
+        clearSculptBrushPreview();
+      }}
     >
-      <meshStandardMaterial
-        key={material.textureUrl ?? 'no-texture'}
-        color={material.color}
-        metalness={material.metalness}
-        roughness={material.roughness}
-        emissive={material.emissive}
-        emissiveIntensity={material.emissiveIntensity}
-        opacity={material.opacity}
-        transparent={material.opacity < 1}
-        depthWrite={material.opacity >= 1}
-        map={texture}
-        side={THREE.DoubleSide}
-        onUpdate={(nextMaterial) => {
-          nextMaterial.needsUpdate = true;
-        }}
-      />
+      {!meshMaterials && (
+        <meshStandardMaterial
+          key={`${viewportDisplayMode}-${materialTextureKey(material)}`}
+          color={material.color}
+          metalness={material.metalness}
+          roughness={material.roughness}
+          emissive={material.emissive}
+          emissiveIntensity={material.emissiveIntensity}
+          opacity={viewportDisplayMode === 'wireframe' ? 1 : material.opacity}
+          transparent={viewportDisplayMode === 'wireframe' ? false : material.opacity < 1}
+          depthWrite={viewportDisplayMode === 'wireframe' || material.opacity >= 1}
+          map={viewportDisplayMode === 'textured' ? textureSet.map : null}
+          normalMap={viewportDisplayMode === 'textured' ? textureSet.normalMap : null}
+          roughnessMap={viewportDisplayMode === 'textured' ? textureSet.roughnessMap : null}
+          displacementMap={viewportDisplayMode === 'textured' ? textureSet.displacementMap : null}
+          displacementScale={viewportDisplayMode === 'textured' && textureSet.displacementMap ? 0.015 : 0}
+          side={THREE.DoubleSide}
+          wireframe={viewportDisplayMode === 'wireframe'}
+          onUpdate={(nextMaterial) => {
+            applyViewportMaterialProps(nextMaterial, material, textureSet, viewportDisplayMode);
+          }}
+        />
+      )}
     </mesh>
   );
 }
 
 function PrimitiveAsset({ object, material }: { object: SceneObject; material: EditorMaterial }) {
-  const texture = useMaterialTexture(material);
+  const textureSet = useMaterialTextures(material);
+  const viewportDisplayMode = useEditorStore((state) => state.viewportDisplayMode);
   const primitive = object.primitive ?? 'box';
   const geometry = mergePrimitiveGeometry(primitive, object.geometry);
   const geometryKey = JSON.stringify([primitive, geometry]);
@@ -269,19 +477,24 @@ function PrimitiveAsset({ object, material }: { object: SceneObject; material: E
         <boxGeometry key={geometryKey} args={[geometry.width, geometry.height, geometry.depth, geometry.widthSegments, geometry.heightSegments, geometry.depthSegments]} />
       )}
       <meshStandardMaterial
-        key={material.textureUrl ?? 'no-texture'}
+        key={`${viewportDisplayMode}-${materialTextureKey(material)}`}
         color={material.color}
         metalness={material.metalness}
         roughness={material.roughness}
         emissive={material.emissive}
         emissiveIntensity={material.emissiveIntensity}
-        opacity={material.opacity}
-        transparent={material.opacity < 1}
-        depthWrite={material.opacity >= 1}
-        map={texture}
+        opacity={viewportDisplayMode === 'wireframe' ? 1 : material.opacity}
+        transparent={viewportDisplayMode === 'wireframe' ? false : material.opacity < 1}
+        depthWrite={viewportDisplayMode === 'wireframe' || material.opacity >= 1}
+        map={viewportDisplayMode === 'textured' ? textureSet.map : null}
+        normalMap={viewportDisplayMode === 'textured' ? textureSet.normalMap : null}
+        roughnessMap={viewportDisplayMode === 'textured' ? textureSet.roughnessMap : null}
+        displacementMap={viewportDisplayMode === 'textured' ? textureSet.displacementMap : null}
+        displacementScale={viewportDisplayMode === 'textured' && textureSet.displacementMap ? 0.015 : 0}
         side={THREE.DoubleSide}
+        wireframe={viewportDisplayMode === 'wireframe'}
         onUpdate={(nextMaterial) => {
-          nextMaterial.needsUpdate = true;
+          applyViewportMaterialProps(nextMaterial, material, textureSet, viewportDisplayMode);
         }}
       />
     </mesh>
@@ -299,6 +512,9 @@ function ObjectNode({
 }) {
   const groupRef = useRef<THREE.Group>(null);
   const setSelectedObject = useEditorStore((state) => state.setSelectedObject);
+  const viewportDisplayMode = useEditorStore((state) => state.viewportDisplayMode);
+  const showPrimitiveShape = viewportDisplayMode === 'primitive' && object.kind === 'primitive';
+  const showContextMenu = useContextMenu((state) => state.show);
 
   useEffect(() => {
     registerObjectRef(object.uuid, groupRef.current);
@@ -320,6 +536,11 @@ function ObjectNode({
         event.stopPropagation();
         setSelectedObject(object.uuid);
       }}
+      onContextMenu={(event) => {
+        event.stopPropagation();
+        const e = event.nativeEvent as MouseEvent;
+        showContextMenu(e.clientX, e.clientY, object.uuid);
+      }}
       onPointerOver={(event) => {
         event.stopPropagation();
         document.body.style.cursor = 'pointer';
@@ -328,14 +549,19 @@ function ObjectNode({
         document.body.style.cursor = 'default';
       }}
     >
-      {object.editableMesh ? (
+      {object.effect ? (
+        <EffectAsset effect={object.effect} />
+      ) : showPrimitiveShape ? (
+        <PrimitiveAsset object={object} material={material} />
+      ) : object.editableMesh ? (
         <EditableMeshAsset object={object} material={material} />
       ) : object.kind === 'model' ? (
         <ModelAsset object={object} material={material} />
       ) : (
         <PrimitiveAsset object={object} material={material} />
       )}
-      <MeshEditOverlay object={object} />
+      {!object.effect && <MeshEditOverlay object={object} />}
+      <BehaviorEngine object={object} groupRef={groupRef} />
     </group>
   );
 }
@@ -381,6 +607,38 @@ function ObjectLoading({ object }: { object: SceneObject }) {
   );
 }
 
+function GridHelper({ show }: { show: boolean }) {
+  const { scene } = useThree();
+  const gridRef = useRef<THREE.GridHelper | null>(null);
+
+  useEffect(() => {
+    if (show && !gridRef.current) {
+      const grid = new THREE.GridHelper(20, 20, '#3dd6b5', '#30363d');
+      grid.position.set(0, 0, 0);
+      gridRef.current = grid;
+      scene.add(grid);
+    }
+
+    if (!show && gridRef.current) {
+      scene.remove(gridRef.current);
+      gridRef.current.geometry.dispose();
+      (gridRef.current.material as THREE.Material).dispose();
+      gridRef.current = null;
+    }
+
+    return () => {
+      if (gridRef.current) {
+        scene.remove(gridRef.current);
+        gridRef.current.geometry.dispose();
+        (gridRef.current.material as THREE.Material).dispose();
+        gridRef.current = null;
+      }
+    };
+  }, [show, scene]);
+
+  return null;
+}
+
 function EditorScene({ sceneRootRef }: Canvas3DProps) {
   const objects = useSceneStore((state) => state.objects);
   const materials = useMaterialStore((state) => state.materials);
@@ -388,6 +646,7 @@ function EditorScene({ sceneRootRef }: Canvas3DProps) {
   const showGrid = useEditorStore((state) => state.showGrid);
   const activeTool = useEditorStore((state) => state.activeTool);
   const setSelectedObject = useEditorStore((state) => state.setSelectedObject);
+  const showContextMenu = useContextMenu((state) => state.show);
   const objectRefs = useRef(new Map<string, THREE.Object3D>());
   const rootRef = useRef<THREE.Group>(null);
   const [selectedObject, setSelectedObject3D] = useState<THREE.Object3D | null>(null);
@@ -419,7 +678,7 @@ function EditorScene({ sceneRootRef }: Canvas3DProps) {
   }, []);
 
   const modifierNavigation = altPressed ? 'zoom' : ctrlPressed ? 'pan' : null;
-  const controlsEnabled = activeTool === 'select' || modifierNavigation !== null;
+  const controlsEnabled = true;
 
   const mouseButtons = useMemo(() => {
     if (modifierNavigation === 'zoom') {
@@ -438,12 +697,20 @@ function EditorScene({ sceneRootRef }: Canvas3DProps) {
       };
     }
 
+    if (activeTool === 'sculpt' || activeTool === 'edit') {
+      return {
+        LEFT: null as unknown as THREE.MOUSE,
+        MIDDLE: THREE.MOUSE.DOLLY,
+        RIGHT: THREE.MOUSE.PAN,
+      };
+    }
+
     return {
       LEFT: THREE.MOUSE.ROTATE,
       MIDDLE: THREE.MOUSE.DOLLY,
       RIGHT: THREE.MOUSE.PAN,
     };
-  }, [modifierNavigation]);
+  }, [modifierNavigation, activeTool]);
 
   useEffect(() => {
     installMeshBVH();
@@ -481,7 +748,7 @@ function EditorScene({ sceneRootRef }: Canvas3DProps) {
       <directionalLight position={[5, 7, 4]} intensity={1.7} castShadow />
       <directionalLight position={[-4, 3, -5]} intensity={0.45} />
       <hemisphereLight args={['#dbeafe', '#1f2937', 0.75]} />
-      {showGrid && <gridHelper args={[20, 20, '#3dd6b5', '#30363d']} position={[0, 0, 0]} />}
+      <GridHelper show={showGrid} />
 
       <group ref={rootRef}>
         {objects.map((object) => {
@@ -513,6 +780,11 @@ function EditorScene({ sceneRootRef }: Canvas3DProps) {
         position={[0, -0.015, 0]}
         visible={false}
         onClick={() => setSelectedObject(null)}
+        onContextMenu={(event) => {
+          event.stopPropagation();
+          const e = event.nativeEvent as MouseEvent;
+          showContextMenu(e.clientX, e.clientY, null);
+        }}
       >
         <planeGeometry args={[200, 200]} />
         <meshBasicMaterial transparent opacity={0} />
@@ -524,12 +796,14 @@ function EditorScene({ sceneRootRef }: Canvas3DProps) {
 export default function Canvas3D({ sceneRootRef }: Canvas3DProps) {
   const setSelectedObject = useEditorStore((state) => state.setSelectedObject);
   const activeTool = useEditorStore((state) => state.activeTool);
+  const viewportDisplayMode = useEditorStore((state) => state.viewportDisplayMode);
   const selectedObjectId = useEditorStore((state) => state.selectedObjectId);
   const objects = useSceneStore((state) => state.objects);
   const selectedObject = objects.find((object) => object.uuid === selectedObjectId);
 
   return (
-    <div className="relative h-full min-h-[320px] w-full overflow-hidden bg-[#101214] max-sm:min-h-[300px]">
+    <div className="relative h-full min-h-[320px] w-full overflow-hidden bg-[#101214] max-sm:min-h-[300px]" onContextMenu={(e) => e.preventDefault()}>
+      <ContextMenu />
       <Canvas
         shadows
         dpr={[1, 2]}
@@ -543,6 +817,8 @@ export default function Canvas3D({ sceneRootRef }: Canvas3DProps) {
       </Canvas>
       <div className="pointer-events-none absolute left-4 top-4 flex max-w-[calc(100%-2rem)] items-center gap-2 rounded-md border border-neutral-800/90 bg-neutral-950/70 px-3 py-2 text-[11px] uppercase tracking-[0.14em] text-neutral-400 shadow-lg backdrop-blur max-sm:left-2 max-sm:top-2 max-sm:px-2 max-sm:py-1.5 max-sm:text-[10px]">
         <span className="text-emerald-300">{activeTool}</span>
+        <span className="h-3 w-px bg-neutral-700" />
+        <span className="text-sky-300">{viewportDisplayMode}</span>
         <span className="h-3 w-px bg-neutral-700" />
         <span className="max-w-48 truncate">{selectedObject?.name ?? 'Sem selecao'}</span>
       </div>

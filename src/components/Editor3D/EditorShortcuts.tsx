@@ -1,11 +1,13 @@
 'use client';
 
 import { useEffect, useRef } from 'react';
+import { sampleObjectTransform } from '@/lib/animation';
 import { createPrimitiveEditableMesh, deleteFace, extrudeFace } from '@/lib/meshOps';
 import { useEditorStore } from '@/store/editorStore';
 import { useHistoryStore } from '@/store/historyStore';
 import { useMaterialStore } from '@/store/materialStore';
 import { useSceneStore } from '@/store/sceneStore';
+import { useTimelineStore } from '@/store/timelineStore';
 import { cloneEditableMesh, type EditorMaterial, type SceneObject, type Vec3 } from '@/store/types';
 
 type ClipboardObject = {
@@ -29,9 +31,24 @@ const cloneMaterialPatch = (material: EditorMaterial): Partial<Omit<EditorMateri
   opacity: material.opacity,
   textureUrl: material.textureUrl,
   textureName: material.textureName,
+  normalMapUrl: material.normalMapUrl,
+  roughnessMapUrl: material.roughnessMapUrl,
+  displacementMapUrl: material.displacementMapUrl,
 });
 
 const offsetPosition = (position: Vec3, offset = 0.45): Vec3 => [position[0] + offset, position[1], position[2]];
+
+const applyTimelineFrame = (frame: number) => {
+  const timeline = useTimelineStore.getState();
+  const scene = useSceneStore.getState();
+  const animatedObjectIds = Array.from(new Set(timeline.keyframes.map((keyframe) => keyframe.objectId)));
+
+  timeline.setPlayheadFrame(frame);
+  animatedObjectIds.forEach((objectId) => {
+    const sample = sampleObjectTransform(timeline.keyframes, objectId, frame);
+    if (sample) scene.updateObject(objectId, sample);
+  });
+};
 
 const duplicateObject = (object: SceneObject, material: EditorMaterial | null) => {
   const scene = useSceneStore.getState();
@@ -74,8 +91,28 @@ export default function EditorShortcuts() {
       const scene = useSceneStore.getState();
       const materials = useMaterialStore.getState();
       const history = useHistoryStore.getState();
+      const timeline = useTimelineStore.getState();
       const selectedObject = scene.objects.find((object) => object.uuid === editor.selectedObjectId) ?? null;
       const selectedMaterial = selectedObject ? materials.materials[selectedObject.materialId] ?? null : null;
+
+      if (key === ' ') {
+        event.preventDefault();
+        timeline.togglePlayback();
+        return;
+      }
+
+      if (key === 'arrowleft' || key === 'arrowright') {
+        event.preventDefault();
+        const direction = key === 'arrowleft' ? -1 : 1;
+        applyTimelineFrame(timeline.playheadFrame + direction * (event.shiftKey ? 10 : 1));
+        return;
+      }
+
+      if (key === 'i' && selectedObject) {
+        event.preventDefault();
+        timeline.addTransformKeyframe(selectedObject);
+        return;
+      }
 
       if (meta && key === 'z' && !event.shiftKey) {
         event.preventDefault();
@@ -128,6 +165,12 @@ export default function EditorShortcuts() {
       }
 
       if (key === 'delete' || key === 'backspace') {
+        if (timeline.selectedKeyframeIds.length > 0) {
+          event.preventDefault();
+          timeline.removeSelectedKeyframes();
+          return;
+        }
+
         if (!selectedObject) return;
         event.preventDefault();
         history.pushSnapshot();

@@ -97,6 +97,9 @@ export default function MaterialEditor({ material }: MaterialEditorProps) {
     update({
       textureUrl: URL.createObjectURL(file),
       textureName: file.name,
+      normalMapUrl: null,
+      roughnessMapUrl: null,
+      displacementMapUrl: null,
     });
   };
 
@@ -105,6 +108,9 @@ export default function MaterialEditor({ material }: MaterialEditorProps) {
     update({
       textureUrl: null,
       textureName: null,
+      normalMapUrl: null,
+      roughnessMapUrl: null,
+      displacementMapUrl: null,
       textureRepeatX: 1,
       textureRepeatY: 1,
       textureOffsetX: 0,
@@ -157,6 +163,14 @@ export default function MaterialEditor({ material }: MaterialEditorProps) {
             <Trash2 size={14} />
           </button>
         </div>
+        {hasTexture && (
+          <div className="flex flex-wrap gap-1.5 text-[10px] uppercase tracking-[0.12em] text-neutral-500">
+            <span className="rounded border border-neutral-800 px-1.5 py-0.5">Diffuse</span>
+            {material.normalMapUrl && <span className="rounded border border-neutral-800 px-1.5 py-0.5">Normal</span>}
+            {material.roughnessMapUrl && <span className="rounded border border-neutral-800 px-1.5 py-0.5">Roughness</span>}
+            {material.displacementMapUrl && <span className="rounded border border-neutral-800 px-1.5 py-0.5">Displace</span>}
+          </div>
+        )}
       </div>
 
       <div className="grid gap-3 rounded-md border border-neutral-800 bg-[#0d0f10]/60 p-3">

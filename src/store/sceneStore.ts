@@ -24,6 +24,8 @@ const createSceneObject = (input: SceneObjectInput): SceneObject => {
     primitive: input.primitive,
     geometry: input.geometry ? { ...input.geometry } : undefined,
     editableMesh: input.editableMesh ? cloneEditableMesh(input.editableMesh) : undefined,
+    effect: input.effect ? { ...input.effect } : undefined,
+    behaviors: input.behaviors ? input.behaviors.map((b) => ({ ...b })) : undefined,
     position: input.position ?? [0, 0, 0],
     rotation: input.rotation ?? [0, 0, 0],
     scale: input.scale ?? [1, 1, 1],

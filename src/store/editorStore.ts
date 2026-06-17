@@ -1,11 +1,13 @@
 import { create } from 'zustand';
-import type { ActiveTool, MeshSelectionMode, SculptFalloff, SculptMode } from './types';
+import type { ActiveTool, MeshSelectionMode, SculptFalloff, SculptMode, Vec3, ViewportDisplayMode } from './types';
 
 type EditorState = {
   selectedObjectId: string | null;
   activeTool: ActiveTool;
+  viewportDisplayMode: ViewportDisplayMode;
   meshSelectionMode: MeshSelectionMode;
   selectedVertexIndices: number[];
+  selectedEdgeVertexIndices: [number, number] | null;
   selectedFaceIndex: number | null;
   sculptMode: SculptMode;
   sculptFalloff: SculptFalloff;
@@ -15,14 +17,24 @@ type EditorState = {
   sculptSpacing: number;
   sculptRadius: number;
   sculptStrength: number;
+  sculptBrushObjectId: string | null;
+  sculptBrushCenter: Vec3 | null;
+  sculptBrushNormal: Vec3 | null;
   showGrid: boolean;
   snapping: boolean;
   snapStep: number;
+  leftPanelCollapsed: boolean;
+  rightPanelCollapsed: boolean;
+  timelineCollapsed: boolean;
+  leftPanelWidth: number;
+  rightPanelWidth: number;
   setSelectedObject: (uuid: string | null) => void;
   setActiveTool: (tool: ActiveTool) => void;
+  setViewportDisplayMode: (mode: ViewportDisplayMode) => void;
   setMeshSelectionMode: (mode: MeshSelectionMode) => void;
   setSelectedVertices: (indices: number[]) => void;
   toggleVertexSelection: (index: number, additive?: boolean) => void;
+  setSelectedEdge: (edge: [number, number] | null) => void;
   setSelectedFace: (faceIndex: number | null, vertexIndices?: number[]) => void;
   clearMeshSelection: () => void;
   setSculptMode: (mode: SculptMode) => void;
@@ -33,16 +45,25 @@ type EditorState = {
   setSculptSpacing: (spacing: number) => void;
   setSculptRadius: (radius: number) => void;
   setSculptStrength: (strength: number) => void;
+  setSculptBrushPreview: (objectId: string, center: Vec3, normal: Vec3) => void;
+  clearSculptBrushPreview: () => void;
   setShowGrid: (showGrid: boolean) => void;
   setSnapping: (snapping: boolean) => void;
   setSnapStep: (snapStep: number) => void;
+  setLeftPanelCollapsed: (collapsed: boolean) => void;
+  setRightPanelCollapsed: (collapsed: boolean) => void;
+  setTimelineCollapsed: (collapsed: boolean) => void;
+  setLeftPanelWidth: (width: number) => void;
+  setRightPanelWidth: (width: number) => void;
 };
 
 export const useEditorStore = create<EditorState>((set) => ({
   selectedObjectId: null,
   activeTool: 'select',
+  viewportDisplayMode: 'textured',
   meshSelectionMode: 'vertex',
   selectedVertexIndices: [],
+  selectedEdgeVertexIndices: null,
   selectedFaceIndex: null,
   sculptMode: 'push',
   sculptFalloff: 'smooth',
@@ -52,14 +73,23 @@ export const useEditorStore = create<EditorState>((set) => ({
   sculptSpacing: 0.2,
   sculptRadius: 0.45,
   sculptStrength: 0.18,
+  sculptBrushObjectId: null,
+  sculptBrushCenter: null,
+  sculptBrushNormal: null,
   showGrid: true,
   snapping: false,
   snapStep: 0.25,
+  leftPanelCollapsed: false,
+  rightPanelCollapsed: false,
+  timelineCollapsed: false,
+  leftPanelWidth: 280,
+  rightPanelWidth: 360,
 
   setSelectedObject: (selectedObjectId) =>
     set({
       selectedObjectId,
       selectedVertexIndices: [],
+      selectedEdgeVertexIndices: null,
       selectedFaceIndex: null,
     }),
   setActiveTool: (activeTool) =>
@@ -69,20 +99,27 @@ export const useEditorStore = create<EditorState>((set) => ({
         : {
             activeTool,
             selectedVertexIndices: [],
+            selectedEdgeVertexIndices: null,
             selectedFaceIndex: null,
+            sculptBrushObjectId: null,
+            sculptBrushCenter: null,
+            sculptBrushNormal: null,
           },
     ),
+  setViewportDisplayMode: (viewportDisplayMode) => set({ viewportDisplayMode }),
   setMeshSelectionMode: (meshSelectionMode) =>
     set({
       meshSelectionMode,
       selectedVertexIndices: [],
+      selectedEdgeVertexIndices: null,
       selectedFaceIndex: null,
     }),
-  setSelectedVertices: (selectedVertexIndices) => set({ selectedVertexIndices, selectedFaceIndex: null }),
+  setSelectedVertices: (selectedVertexIndices) =>
+    set({ selectedVertexIndices, selectedEdgeVertexIndices: null, selectedFaceIndex: null }),
   toggleVertexSelection: (index, additive = false) =>
     set((state) => {
       if (!additive) {
-        return { selectedVertexIndices: [index], selectedFaceIndex: null };
+        return { selectedVertexIndices: [index], selectedEdgeVertexIndices: null, selectedFaceIndex: null };
       }
 
       const exists = state.selectedVertexIndices.includes(index);
@@ -90,11 +127,19 @@ export const useEditorStore = create<EditorState>((set) => ({
         selectedVertexIndices: exists
           ? state.selectedVertexIndices.filter((item) => item !== index)
           : [...state.selectedVertexIndices, index],
+        selectedEdgeVertexIndices: null,
         selectedFaceIndex: null,
       };
     }),
-  setSelectedFace: (selectedFaceIndex, selectedVertexIndices = []) => set({ selectedFaceIndex, selectedVertexIndices }),
-  clearMeshSelection: () => set({ selectedVertexIndices: [], selectedFaceIndex: null }),
+  setSelectedEdge: (selectedEdgeVertexIndices) =>
+    set({
+      selectedEdgeVertexIndices,
+      selectedVertexIndices: selectedEdgeVertexIndices ? [...selectedEdgeVertexIndices] : [],
+      selectedFaceIndex: null,
+    }),
+  setSelectedFace: (selectedFaceIndex, selectedVertexIndices = []) =>
+    set({ selectedFaceIndex, selectedVertexIndices, selectedEdgeVertexIndices: null }),
+  clearMeshSelection: () => set({ selectedVertexIndices: [], selectedEdgeVertexIndices: null, selectedFaceIndex: null }),
   setSculptMode: (sculptMode) => set({ sculptMode }),
   setSculptFalloff: (sculptFalloff) => set({ sculptFalloff }),
   setSculptSymmetryX: (sculptSymmetryX) => set({ sculptSymmetryX }),
@@ -103,7 +148,24 @@ export const useEditorStore = create<EditorState>((set) => ({
   setSculptSpacing: (sculptSpacing) => set({ sculptSpacing: Math.max(0, Math.min(1, sculptSpacing)) }),
   setSculptRadius: (sculptRadius) => set({ sculptRadius: Math.max(0.05, Math.min(5, sculptRadius)) }),
   setSculptStrength: (sculptStrength) => set({ sculptStrength: Math.max(0.01, Math.min(1, sculptStrength)) }),
+  setSculptBrushPreview: (sculptBrushObjectId, sculptBrushCenter, sculptBrushNormal) =>
+    set({
+      sculptBrushObjectId,
+      sculptBrushCenter: [...sculptBrushCenter],
+      sculptBrushNormal: [...sculptBrushNormal],
+    }),
+  clearSculptBrushPreview: () =>
+    set({
+      sculptBrushObjectId: null,
+      sculptBrushCenter: null,
+      sculptBrushNormal: null,
+    }),
   setShowGrid: (showGrid) => set({ showGrid }),
   setSnapping: (snapping) => set({ snapping }),
   setSnapStep: (snapStep) => set({ snapStep }),
+  setLeftPanelCollapsed: (leftPanelCollapsed) => set({ leftPanelCollapsed }),
+  setRightPanelCollapsed: (rightPanelCollapsed) => set({ rightPanelCollapsed }),
+  setTimelineCollapsed: (timelineCollapsed) => set({ timelineCollapsed }),
+  setLeftPanelWidth: (leftPanelWidth) => set({ leftPanelWidth: Math.max(180, Math.min(480, leftPanelWidth)) }),
+  setRightPanelWidth: (rightPanelWidth) => set({ rightPanelWidth: Math.max(220, Math.min(600, rightPanelWidth)) }),
 }));
