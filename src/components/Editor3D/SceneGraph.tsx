@@ -5,129 +5,206 @@ import {
   Box,
   Boxes,
   Brush,
+  Camera,
+  ChevronDown,
   ChevronLeft,
   ChevronUp,
-  ChevronDown,
   Eye,
   EyeOff,
   FileBox,
+  Folder,
   Lock,
   LockOpen,
   Plus,
+  Sun,
   Trash2,
 } from 'lucide-react';
 import { useEditorStore } from '@/store/editorStore';
 import { useHistoryStore } from '@/store/historyStore';
 import { useMaterialStore } from '@/store/materialStore';
 import { useSceneStore } from '@/store/sceneStore';
+import { buildSceneTree, getSubtreeIds, type SceneTreeNode } from '@/store/sceneTree';
 import type { Layer, SceneObject } from '@/store/types';
 
 const rowButton =
-  'grid min-w-0 grid-cols-[24px_minmax(0,1fr)_80px] items-center gap-2 rounded-md px-2 py-2.5 text-left text-sm transition sm:py-2';
+  'grid min-w-0 grid-cols-[24px_24px_minmax(0,1fr)_88px] items-center gap-1.5 rounded-md px-2 py-2.5 text-left text-sm transition sm:py-2';
 
-function SceneRow({ object, layer }: { object: SceneObject; layer: Layer }) {
+const objectIcon = (object: SceneObject) => {
+  if (object.effect) return <Brush size={13} />;
+  if (object.lightConfig || object.type === 'Light') return <Sun size={13} className="text-yellow-400" />;
+  if (object.type === 'Camera') return <Camera size={13} className="text-sky-400" />;
+  if (object.type === 'Group' || object.kind === 'group') return <Folder size={13} />;
+  if (object.kind === 'model') return <FileBox size={13} />;
+  return <Box size={13} />;
+};
+
+function SceneRow({
+  node,
+  layer,
+  collapsedIds,
+  onToggle,
+}: {
+  node: SceneTreeNode;
+  layer: Layer;
+  collapsedIds: Set<string>;
+  onToggle: (id: string) => void;
+}) {
+  const object = node.object;
   const selectedObjectId = useEditorStore((state) => state.selectedObjectId);
   const setSelectedObject = useEditorStore((state) => state.setSelectedObject);
   const updateObject = useSceneStore((state) => state.updateObject);
   const removeObject = useSceneStore((state) => state.removeObject);
-  const removeMaterial = useMaterialStore((state) => state.removeMaterial);
+  const objects = useSceneStore((state) => state.objects);
+  const removeMaterialsForObjects = useMaterialStore((state) => state.removeMaterialsForObjects);
   const pushSnapshot = useHistoryStore((state) => state.pushSnapshot);
 
   const selected = selectedObjectId === object.uuid;
-  const layerHidden = !layer.visible;
-  const rowHidden = layerHidden || !object.visible;
+  const hasChildren = node.children.length > 0;
+  const expanded = !collapsedIds.has(object.uuid);
+  const rowHidden = !layer.visible || !object.visible;
+  const locked = layer.locked || object.locked;
 
   const handleVisibility = () => {
     pushSnapshot();
     updateObject(object.uuid, { visible: !object.visible });
   };
 
+  const handleLock = () => {
+    pushSnapshot();
+    updateObject(object.uuid, { locked: !object.locked });
+  };
+
   const handleRemove = () => {
     pushSnapshot();
+    const ids = getSubtreeIds(objects, object.uuid);
     removeObject(object.uuid);
-    removeMaterial(object.materialId);
-    if (selected) setSelectedObject(null);
+    removeMaterialsForObjects(ids);
+    if (selectedObjectId && ids.includes(selectedObjectId)) setSelectedObject(null);
   };
 
   return (
-    <div
-      className={`${rowButton} ${
-        selected
-          ? 'bg-amber-300/10 text-amber-100 outline outline-1 outline-amber-300/45'
-          : rowHidden
-            ? 'text-neutral-600 hover:bg-neutral-800/45'
-            : 'text-neutral-300 hover:bg-neutral-800/75'
-      }`}
-      style={{ paddingLeft: 20 }}
-    >
+    <div>
       <div
-        className={`grid h-6 w-6 place-items-center rounded border ${
+        className={`${rowButton} ${
           selected
-            ? 'border-amber-300/35 bg-amber-300/10 text-amber-100'
-            : 'border-neutral-800 bg-neutral-950 text-neutral-500'
+            ? 'bg-amber-300/10 text-amber-100 outline outline-1 outline-amber-300/45'
+            : rowHidden
+              ? 'text-neutral-600 hover:bg-neutral-800/45'
+              : 'text-neutral-300 hover:bg-neutral-800/75'
         }`}
+        style={{ paddingLeft: 8 + node.depth * 16 }}
       >
-        {object.effect ? <Brush size={13} /> : object.kind === 'model' ? <FileBox size={13} /> : <Box size={13} />}
-      </div>
-      <button
-        type="button"
-        onClick={() => setSelectedObject(object.uuid)}
-        className="min-w-0 truncate text-left"
-        title={object.name}
-      >
-        {object.name}
-      </button>
-      <div className="flex justify-end gap-0.5">
         <button
           type="button"
-          title={object.visible ? 'Ocultar' : 'Mostrar'}
-          aria-label={`Visibilidade ${object.name}`}
-          onClick={handleVisibility}
-          className={`grid min-h-10 min-w-10 cursor-pointer place-items-center rounded transition hover:bg-neutral-700/80 hover:text-neutral-100 touch-manipulation ${
-            object.visible ? 'text-emerald-300' : 'text-neutral-600'
+          onClick={() => hasChildren && onToggle(object.uuid)}
+          disabled={!hasChildren}
+          title={expanded ? 'Recolher' : 'Expandir'}
+          className="grid h-6 w-6 place-items-center rounded text-neutral-500 transition enabled:hover:bg-neutral-700 enabled:hover:text-neutral-100 disabled:opacity-20"
+        >
+          <ChevronDown size={14} className={`transition ${expanded ? 'rotate-0' : '-rotate-90'}`} />
+        </button>
+        <div
+          className={`grid h-6 w-6 place-items-center rounded border ${
+            selected
+              ? 'border-amber-300/35 bg-amber-300/10 text-amber-100'
+              : locked
+                ? 'border-neutral-800 bg-neutral-950 text-amber-300'
+                : 'border-neutral-800 bg-neutral-950 text-neutral-500'
           }`}
         >
-          {object.visible ? <Eye size={15} /> : <EyeOff size={15} />}
-        </button>
+          {objectIcon(object)}
+        </div>
         <button
           type="button"
-          title="Remover"
-          aria-label={`Remover ${object.name}`}
-          onClick={handleRemove}
-          className="grid min-h-10 min-w-10 cursor-pointer place-items-center rounded text-neutral-500 transition hover:bg-red-500/15 hover:text-red-200 touch-manipulation"
+          onClick={() => setSelectedObject(object.uuid)}
+          className="min-w-0 truncate text-left"
+          title={object.name}
         >
-          <Trash2 size={15} />
+          {object.name}
         </button>
+        <div className="flex justify-end gap-0.5">
+          <button
+            type="button"
+            title={object.visible ? 'Ocultar' : 'Mostrar'}
+            aria-label={`Visibilidade ${object.name}`}
+            onClick={handleVisibility}
+            className={`grid min-h-9 min-w-9 cursor-pointer place-items-center rounded transition hover:bg-neutral-700/80 hover:text-neutral-100 touch-manipulation ${
+              object.visible ? 'text-emerald-300' : 'text-neutral-600'
+            }`}
+          >
+            {object.visible ? <Eye size={14} /> : <EyeOff size={14} />}
+          </button>
+          <button
+            type="button"
+            title={object.locked ? 'Destravar' : 'Travar'}
+            aria-label={`Travar ${object.name}`}
+            onClick={handleLock}
+            className={`grid min-h-9 min-w-9 cursor-pointer place-items-center rounded transition hover:bg-neutral-700/80 hover:text-neutral-100 touch-manipulation ${
+              object.locked ? 'text-amber-300' : 'text-neutral-600'
+            }`}
+          >
+            {object.locked ? <Lock size={14} /> : <LockOpen size={14} />}
+          </button>
+          <button
+            type="button"
+            title="Remover"
+            aria-label={`Remover ${object.name}`}
+            onClick={handleRemove}
+            className="grid min-h-9 min-w-9 cursor-pointer place-items-center rounded text-neutral-500 transition hover:bg-red-500/15 hover:text-red-200 touch-manipulation"
+          >
+            <Trash2 size={14} />
+          </button>
+        </div>
       </div>
+      {hasChildren && expanded && (
+        <div className="space-y-px">
+          {node.children.map((child) => (
+            <SceneRow
+              key={child.object.uuid}
+              node={child}
+              layer={layer}
+              collapsedIds={collapsedIds}
+              onToggle={onToggle}
+            />
+          ))}
+        </div>
+      )}
     </div>
   );
 }
 
-function LayerRow({ layer, isLast }: { layer: Layer; isLast: boolean }) {
+function LayerRow({ layer }: { layer: Layer }) {
   const layers = useSceneStore((state) => state.layers);
   const objects = useSceneStore((state) => state.objects);
   const updateLayer = useSceneStore((state) => state.updateLayer);
   const removeLayer = useSceneStore((state) => state.removeLayer);
   const reorderLayers = useSceneStore((state) => state.reorderLayers);
-  const moveObjectsToLayer = useSceneStore((state) => state.moveObjectsToLayer);
   const selectedObjectId = useEditorStore((state) => state.selectedObjectId);
   const setSelectedObject = useEditorStore((state) => state.setSelectedObject);
   const pushSnapshot = useHistoryStore((state) => state.pushSnapshot);
   const [editingName, setEditingName] = useState(false);
   const [nameDraft, setNameDraft] = useState(layer.name);
+  const [collapsedIds, setCollapsedIds] = useState<Set<string>>(new Set());
 
   const sortedLayers = useMemo(
     () => [...layers].sort((a, b) => a.order - b.order),
     [layers],
   );
   const layerIndex = sortedLayers.findIndex((l) => l.id === layer.id);
-  const layerObjects = useMemo(
-    () =>
-      objects
-        .filter((o) => o.layerId === layer.id && o.parent === null)
-        .sort((a, b) => a.createdAt - b.createdAt),
+  const layerNodes = useMemo(
+    () => buildSceneTree(objects).filter((node) => node.object.layerId === layer.id),
     [objects, layer.id],
   );
+  const layerObjectCount = objects.filter((object) => object.layerId === layer.id).length;
+
+  const toggleNode = (id: string) => {
+    setCollapsedIds((current) => {
+      const next = new Set(current);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
 
   const handleToggleVisibility = () => {
     pushSnapshot();
@@ -174,7 +251,6 @@ function LayerRow({ layer, isLast }: { layer: Layer; isLast: boolean }) {
 
   return (
     <div className="rounded-md border border-neutral-800 bg-neutral-950/40">
-      {/* Layer Header */}
       <div className="flex items-center gap-2 px-2 py-1.5">
         <div className="flex flex-col gap-px">
           <button
@@ -196,10 +272,7 @@ function LayerRow({ layer, isLast }: { layer: Layer; isLast: boolean }) {
             <ChevronDown size={11} />
           </button>
         </div>
-        <div
-          className="h-5 w-1 shrink-0 rounded-full"
-          style={{ backgroundColor: layer.color }}
-        />
+        <div className="h-5 w-1 shrink-0 rounded-full" style={{ backgroundColor: layer.color }} />
         <div className="flex min-w-0 flex-1 items-center gap-2">
           {editingName ? (
             <input
@@ -209,7 +282,10 @@ function LayerRow({ layer, isLast }: { layer: Layer; isLast: boolean }) {
               onBlur={handleNameSubmit}
               onKeyDown={(e) => {
                 if (e.key === 'Enter') handleNameSubmit();
-                if (e.key === 'Escape') { setNameDraft(layer.name); setEditingName(false); }
+                if (e.key === 'Escape') {
+                  setNameDraft(layer.name);
+                  setEditingName(false);
+                }
               }}
               autoFocus
               className="h-6 min-w-0 flex-1 rounded border border-emerald-500/50 bg-[#0d0f10] px-1.5 text-xs text-neutral-100 outline-none"
@@ -217,7 +293,10 @@ function LayerRow({ layer, isLast }: { layer: Layer; isLast: boolean }) {
           ) : (
             <button
               type="button"
-              onClick={() => { setNameDraft(layer.name); setEditingName(true); }}
+              onClick={() => {
+                setNameDraft(layer.name);
+                setEditingName(true);
+              }}
               className="min-w-0 truncate text-left text-xs font-medium tracking-wide text-neutral-200 hover:text-emerald-300"
               title="Renomear camada"
             >
@@ -225,7 +304,7 @@ function LayerRow({ layer, isLast }: { layer: Layer; isLast: boolean }) {
             </button>
           )}
           <span className="shrink-0 rounded bg-neutral-800 px-1.5 py-0.5 text-[10px] tabular-nums text-neutral-500">
-            {layerObjects.length}
+            {layerObjectCount}
           </span>
         </div>
         <div className="flex items-center gap-0.5">
@@ -261,12 +340,11 @@ function LayerRow({ layer, isLast }: { layer: Layer; isLast: boolean }) {
         </div>
       </div>
 
-      {/* Objects in Layer */}
-      {layerObjects.length > 0 && (
+      {layerNodes.length > 0 && (
         <div className="border-t border-neutral-800/60 px-1 pb-1.5 pt-1">
           <div className="space-y-px">
-            {layerObjects.map((obj) => (
-              <SceneRow key={obj.uuid} object={obj} layer={layer} />
+            {layerNodes.map((node) => (
+              <SceneRow key={node.object.uuid} node={node} layer={layer} collapsedIds={collapsedIds} onToggle={toggleNode} />
             ))}
           </div>
         </div>
@@ -312,7 +390,7 @@ export default function SceneGraph() {
             <div className="flex items-center gap-2">
               <Boxes size={15} className="text-emerald-300" />
               <h2 className="text-xs font-semibold uppercase tracking-[0.18em] text-neutral-400">
-                Camadas
+                Scene Graph
               </h2>
             </div>
             <div className="flex items-center gap-2">
@@ -335,8 +413,8 @@ export default function SceneGraph() {
             </div>
           </div>
           <div className="min-h-0 flex-1 space-y-1 overflow-auto p-2 sm:p-3">
-            {sortedLayers.map((layer, i) => (
-              <LayerRow key={layer.id} layer={layer} isLast={i === sortedLayers.length - 1} />
+            {sortedLayers.map((layer) => (
+              <LayerRow key={layer.id} layer={layer} />
             ))}
             {objects.length === 0 && (
               <div className="grid h-full place-items-center text-center text-sm text-neutral-500">

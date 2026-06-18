@@ -2,7 +2,7 @@
 
 /* eslint-disable react-hooks/immutability, react-hooks/purity */
 
-import { useEffect, useMemo, useRef } from 'react';
+import { Suspense, lazy, useEffect, useMemo, useRef } from 'react';
 import { useFrame } from '@react-three/fiber';
 import * as THREE from 'three';
 import type { EffectConfig, EffectKind } from '@/store/types';
@@ -13,9 +13,10 @@ export const EFFECT_PRESETS: Record<EffectKind, EffectConfig> = {
   smoke: { kind: 'smoke', color: '#8b8f92', intensity: 0.8, size: 0.46, count: 130 },
   sparkle: { kind: 'sparkle', color: '#ffe08a', intensity: 0.95, size: 0.08, count: 120 },
   lightGlow: { kind: 'lightGlow', color: '#66c7ff', intensity: 1.1, size: 0.72, count: 1 },
+  fluid: { kind: 'fluid', color: '#4a90d9', intensity: 1, size: 5, count: 1 },
 };
 
-export const EFFECT_KINDS: EffectKind[] = ['fireworks', 'fire', 'smoke', 'sparkle', 'lightGlow'];
+export const EFFECT_KINDS: EffectKind[] = ['fireworks', 'fire', 'smoke', 'sparkle', 'lightGlow', 'fluid'];
 
 export const EFFECT_LABELS: Record<EffectKind, string> = {
   fireworks: 'Fogos',
@@ -23,6 +24,7 @@ export const EFFECT_LABELS: Record<EffectKind, string> = {
   smoke: 'Fumaca',
   sparkle: 'Brilho',
   lightGlow: 'Luz',
+  fluid: 'Superficie Liquida',
 };
 
 type ParticleBuffers = {
@@ -455,6 +457,23 @@ function LightGlowEffect({ config }: { config: EffectConfig }) {
   );
 }
 
+function FluidEffect({ config }: { config: EffectConfig }) {
+  const FluidSurface = lazy(() => import('@/lib/fluid').then((m) => ({ default: m.default })));
+  return (
+    <Suspense fallback={null}>
+      <FluidSurface
+        color={config.color}
+        metalness={0.75}
+        roughness={0.25}
+        displacementScale={config.intensity * 3}
+        rainEnabled={true}
+        size={[config.size, config.size]}
+        position={[0, 0, 0]}
+      />
+    </Suspense>
+  );
+}
+
 export function EffectAsset({ effect }: { effect: EffectConfig }) {
   switch (effect.kind) {
     case 'fireworks':
@@ -467,6 +486,8 @@ export function EffectAsset({ effect }: { effect: EffectConfig }) {
       return <SparkleEffect config={effect} />;
     case 'lightGlow':
       return <LightGlowEffect config={effect} />;
+    case 'fluid':
+      return <FluidEffect config={effect} />;
     default:
       return null;
   }

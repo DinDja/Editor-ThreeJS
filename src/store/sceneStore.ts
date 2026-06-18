@@ -12,6 +12,17 @@ import {
   type SceneObject,
   type SceneObjectInput,
 } from './types';
+import {
+  duplicateSceneSubtree,
+  getDescendantIds,
+  getLocalTransformForParent,
+  getSubtreeIds,
+  inferObjectType,
+  makeTransform,
+  normalizeSceneObjects,
+  removeSubtree,
+  type SceneDuplicateResult,
+} from './sceneTree';
 
 const DEFAULT_LAYER_ID = 'layer-default';
 
@@ -24,9 +35,13 @@ type SceneState = {
   layers: Layer[];
   referenceImages: ReferenceImage[];
   addObject: (input: SceneObjectInput) => SceneObject;
+  addObjects: (inputs: SceneObjectInput[]) => SceneObject[];
   addPrimitive: (primitive: PrimitiveKind) => SceneObject;
   updateObject: (uuid: string, patch: Partial<Omit<SceneObject, 'uuid'>>) => void;
   removeObject: (uuid: string) => void;
+  duplicateObject: (uuid: string) => SceneDuplicateResult | null;
+  groupObjects: (objectIds: string[], name?: string) => SceneObject | null;
+  ungroupObject: (uuid: string) => void;
   setObjects: (objects: SceneObject[]) => void;
   resetScene: () => void;
   addLayer: (name?: string) => Layer;
@@ -42,26 +57,43 @@ type SceneState = {
 };
 
 const createSceneObject = (input: SceneObjectInput): SceneObject => {
-  const uuid = input.uuid ?? createId();
+  const uuid = input.uuid ?? input.id ?? createId();
+  const parentId = input.parentId ?? input.parent ?? null;
+  const position = input.transform?.position ?? input.position ?? [0, 0, 0];
+  const rotation = input.transform?.rotation ?? input.rotation ?? [0, 0, 0];
+  const scale = input.transform?.scale ?? input.scale ?? [1, 1, 1];
+  const materialId = input.materialId ?? `material-${uuid}`;
 
   return {
+    id: input.id ?? uuid,
     uuid,
     name: input.name,
     kind: input.kind,
+    type: inferObjectType(input.kind, input.type),
     source: input.source,
     sourceType: input.sourceType,
     primitive: input.primitive,
     geometry: input.geometry ? { ...input.geometry } : undefined,
     editableMesh: input.editableMesh ? cloneEditableMesh(input.editableMesh) : undefined,
     effect: input.effect ? { ...input.effect } : undefined,
+    textConfig: input.textConfig ? { ...input.textConfig } : undefined,
+    svgConfig: input.svgConfig ? { ...input.svgConfig } : undefined,
+    lightConfig: input.lightConfig ? { ...input.lightConfig } : undefined,
     behaviors: input.behaviors ? input.behaviors.map((b) => ({ ...b })) : undefined,
-    position: input.position ?? [0, 0, 0],
-    rotation: input.rotation ?? [0, 0, 0],
-    scale: input.scale ?? [1, 1, 1],
+    scripts: input.scripts ? input.scripts.map((s) => ({ ...s })) : undefined,
+    position: [...position],
+    rotation: [...rotation],
+    scale: [...scale],
+    transform: makeTransform(position, rotation, scale),
     visible: input.visible ?? true,
-    parent: input.parent ?? null,
-    materialId: input.materialId ?? `material-${uuid}`,
+    locked: input.locked ?? false,
+    parent: parentId,
+    parentId,
+    children: input.children ? [...input.children] : [],
+    materialId,
+    materialIds: input.materialIds ? [...input.materialIds] : [materialId],
     layerId: input.layerId ?? DEFAULT_LAYER_ID,
+    metadata: { ...(input.metadata ?? {}) },
     createdAt: input.createdAt ?? Date.now(),
   };
 };
@@ -76,14 +108,30 @@ const primitiveNames: Record<PrimitiveKind, string> = {
 };
 
 export const useSceneStore = create<SceneState>((set) => ({
-  objects: INITIAL_OBJECTS.map(cloneSceneObject),
+  objects: normalizeSceneObjects(INITIAL_OBJECTS.map(cloneSceneObject)),
   layers: DEFAULT_LAYERS.map(cloneLayer),
   referenceImages: [],
 
   addObject: (input) => {
     const object = createSceneObject(input);
-    set((state) => ({ objects: [...state.objects, object] }));
-    return object;
+    let created = object;
+    set((state) => {
+      const nextObjects = normalizeSceneObjects([...state.objects, object]);
+      created = nextObjects.find((item) => item.uuid === object.uuid) ?? object;
+      return { objects: nextObjects };
+    });
+    return created;
+  },
+
+  addObjects: (inputs) => {
+    const objects = inputs.map(createSceneObject);
+    let created = objects;
+    set((state) => {
+      const nextObjects = normalizeSceneObjects([...state.objects, ...objects]);
+      created = objects.map((object) => nextObjects.find((item) => item.uuid === object.uuid) ?? object);
+      return { objects: nextObjects };
+    });
+    return created;
   },
 
   addPrimitive: (primitive) => {
@@ -95,23 +143,132 @@ export const useSceneStore = create<SceneState>((set) => ({
       position: [0, primitive === 'plane' ? -0.01 : 0.5, 0],
       rotation: primitive === 'plane' ? [-Math.PI / 2, 0, 0] : [0, 0, 0],
     });
-    set((s) => ({ objects: [...s.objects, object] }));
-    return object;
+    let created = object;
+    set((s) => {
+      const nextObjects = normalizeSceneObjects([...s.objects, object]);
+      created = nextObjects.find((item) => item.uuid === object.uuid) ?? object;
+      return { objects: nextObjects };
+    });
+    return created;
   },
 
   updateObject: (uuid, patch) =>
     set((state) => ({
-      objects: state.objects.map((object) => (object.uuid === uuid ? { ...object, ...patch } : object)),
+      objects: normalizeSceneObjects(
+        state.objects.map((object) => {
+          if (object.uuid !== uuid) return object;
+
+          const parentId = patch.parentId ?? patch.parent ?? object.parentId ?? object.parent ?? null;
+          const position = patch.transform?.position ?? patch.position ?? object.position;
+          const rotation = patch.transform?.rotation ?? patch.rotation ?? object.rotation;
+          const scale = patch.transform?.scale ?? patch.scale ?? object.scale;
+          const materialId = patch.materialId ?? object.materialId;
+
+          return {
+            ...object,
+            ...patch,
+            position,
+            rotation,
+            scale,
+            transform: makeTransform(position, rotation, scale),
+            parent: parentId,
+            parentId,
+            materialId,
+            materialIds: patch.materialIds ?? object.materialIds ?? [materialId],
+            metadata: patch.metadata ? { ...object.metadata, ...patch.metadata } : object.metadata,
+          };
+        }),
+      ),
     })),
 
   removeObject: (uuid) =>
     set((state) => ({
-      objects: state.objects.filter((object) => object.uuid !== uuid && object.parent !== uuid),
+      objects: removeSubtree(state.objects, uuid),
     })),
 
-  setObjects: (objects) => set({ objects: objects.map(cloneSceneObject) }),
+  duplicateObject: (uuid) => {
+    let result: SceneDuplicateResult | null = null;
+    set((state) => {
+      result = duplicateSceneSubtree(state.objects, uuid);
+      if (!result) return state;
+      return { objects: normalizeSceneObjects([...state.objects, ...result.objects]) };
+    });
+    return result;
+  },
 
-  resetScene: () => set({ objects: INITIAL_OBJECTS.map(cloneSceneObject), layers: DEFAULT_LAYERS.map(cloneLayer) }),
+  groupObjects: (objectIds, name = 'Grupo') => {
+    let group: SceneObject | null = null;
+    set((state) => {
+      const uniqueIds = Array.from(new Set(objectIds));
+      const selected = uniqueIds
+        .map((id) => state.objects.find((object) => object.uuid === id) ?? null)
+        .filter((object): object is SceneObject => Boolean(object));
+
+      if (selected.length === 0) return state;
+      const parentIds = new Set(selected.map((object) => object.parentId ?? null));
+      const parentId = parentIds.size === 1 ? selected[0].parentId ?? null : null;
+      const layerId = selected[0].layerId;
+      const createdAt = Date.now();
+      const groupObject = createSceneObject({
+        name,
+        kind: 'group',
+        type: 'Group',
+        parentId,
+        layerId,
+        position: [0, 0, 0],
+        rotation: [0, 0, 0],
+        scale: [1, 1, 1],
+        createdAt,
+        metadata: { groupedObjectIds: uniqueIds },
+      });
+
+      group = groupObject;
+      return {
+        objects: normalizeSceneObjects([
+          ...state.objects.map((object) =>
+            uniqueIds.includes(object.uuid) ? { ...object, parent: groupObject.uuid, parentId: groupObject.uuid } : object,
+          ),
+          groupObject,
+        ]),
+      };
+    });
+    return group;
+  },
+
+  ungroupObject: (uuid) =>
+    set((state) => {
+      const group = state.objects.find((object) => object.uuid === uuid);
+      if (!group) return state;
+      const childIds = getDescendantIds(state.objects, uuid).filter((id) => {
+        const object = state.objects.find((item) => item.uuid === id);
+        return object?.parentId === uuid;
+      });
+      const nextParentId = group.parentId ?? null;
+
+      return {
+        objects: normalizeSceneObjects(
+          state.objects
+            .filter((object) => object.uuid !== uuid)
+            .map((object) => {
+              if (!childIds.includes(object.uuid)) return object;
+              const transform = getLocalTransformForParent(state.objects, object.uuid, nextParentId);
+              return {
+                ...object,
+                parent: nextParentId,
+                parentId: nextParentId,
+                position: transform.position,
+                rotation: transform.rotation,
+                scale: transform.scale,
+                transform,
+              };
+            }),
+        ),
+      };
+    }),
+
+  setObjects: (objects) => set({ objects: normalizeSceneObjects(objects.map(cloneSceneObject)) }),
+
+  resetScene: () => set({ objects: normalizeSceneObjects(INITIAL_OBJECTS.map(cloneSceneObject)), layers: DEFAULT_LAYERS.map(cloneLayer) }),
 
   addLayer: (name) => {
     let created: Layer | null = null;
@@ -136,7 +293,7 @@ export const useSceneStore = create<SceneState>((set) => ({
       const fallbackId = remaining[0]?.id ?? DEFAULT_LAYER_ID;
       return {
         layers: remaining,
-        objects: state.objects.map((obj) => (obj.layerId === id ? { ...obj, layerId: fallbackId } : obj)),
+        objects: normalizeSceneObjects(state.objects.map((obj) => (obj.layerId === id ? { ...obj, layerId: fallbackId } : obj))),
       };
     }),
 
@@ -151,7 +308,13 @@ export const useSceneStore = create<SceneState>((set) => ({
 
   moveObjectsToLayer: (objectIds, layerId) =>
     set((state) => ({
-      objects: state.objects.map((obj) => (objectIds.includes(obj.uuid) ? { ...obj, layerId } : obj)),
+      objects: normalizeSceneObjects(
+        state.objects.map((obj) =>
+          objectIds.includes(obj.uuid) || objectIds.some((id) => getSubtreeIds(state.objects, id).includes(obj.uuid))
+            ? { ...obj, layerId }
+            : obj,
+        ),
+      ),
     })),
 
   setLayers: (layers) => set({ layers: layers.map(cloneLayer) }),

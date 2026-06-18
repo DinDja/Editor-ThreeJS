@@ -1,9 +1,10 @@
 import { create } from 'zustand';
-import type { ActiveTool, MeshSelectionMode, MobilePanel, PointerType, SculptFalloff, SculptMode, Vec3, ViewportDisplayMode } from './types';
+import type { ActiveTool, MeshSelectionMode, MobilePanel, ObjectSelectionMode, PointerType, SculptFalloff, SculptMode, Vec3, ViewportDisplayMode } from './types';
 
 type EditorState = {
   selectedObjectId: string | null;
   activeTool: ActiveTool;
+  objectSelectionMode: ObjectSelectionMode;
   viewportDisplayMode: ViewportDisplayMode;
   meshSelectionMode: MeshSelectionMode;
   selectedVertexIndices: number[];
@@ -37,6 +38,7 @@ type EditorState = {
   setSelectedObject: (uuid: string | null) => void;
   setSelectedReference: (id: string | null) => void;
   setActiveTool: (tool: ActiveTool) => void;
+  setObjectSelectionMode: (mode: ObjectSelectionMode) => void;
   setViewportDisplayMode: (mode: ViewportDisplayMode) => void;
   setMeshSelectionMode: (mode: MeshSelectionMode) => void;
   setSelectedVertices: (indices: number[]) => void;
@@ -72,6 +74,7 @@ type EditorState = {
 export const useEditorStore = create<EditorState>((set) => ({
   selectedObjectId: null,
   activeTool: 'select',
+  objectSelectionMode: 'subelement',
   viewportDisplayMode: 'textured',
   meshSelectionMode: 'vertex',
   selectedVertexIndices: [],
@@ -131,8 +134,9 @@ export const useEditorStore = create<EditorState>((set) => ({
             sculptBrushObjectId: null,
             sculptBrushCenter: null,
             sculptBrushNormal: null,
-          },
+        },
     ),
+  setObjectSelectionMode: (objectSelectionMode) => set({ objectSelectionMode }),
   setViewportDisplayMode: (viewportDisplayMode) => set({ viewportDisplayMode }),
   setMeshSelectionMode: (meshSelectionMode) =>
     set({

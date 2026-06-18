@@ -23,6 +23,7 @@ import { useEditorStore } from '@/store/editorStore';
 import { useHistoryStore } from '@/store/historyStore';
 import { useMaterialStore } from '@/store/materialStore';
 import { useSceneStore } from '@/store/sceneStore';
+import { getSubtreeIds } from '@/store/sceneTree';
 import {
   cloneEditableMesh,
   type EditorMaterial,
@@ -183,6 +184,7 @@ export default function ModelingTools({ object, material }: ModelingToolsProps) 
   const createMaterialForObject = useMaterialStore((state) => state.createMaterialForObject);
   const updateMaterial = useMaterialStore((state) => state.updateMaterial);
   const removeMaterial = useMaterialStore((state) => state.removeMaterial);
+  const removeMaterialsForObjects = useMaterialStore((state) => state.removeMaterialsForObjects);
   const activeTool = useEditorStore((state) => state.activeTool);
   const meshSelectionMode = useEditorStore((state) => state.meshSelectionMode);
   const selectedVertexIndices = useEditorStore((state) => state.selectedVertexIndices);
@@ -305,8 +307,9 @@ export default function ModelingTools({ object, material }: ModelingToolsProps) 
 
   const handleRemove = () => {
     pushSnapshot();
+    const ids = getSubtreeIds(objects, object.uuid);
     removeObject(object.uuid);
-    removeMaterial(object.materialId);
+    removeMaterialsForObjects(ids);
     setSelectedObject(null);
   };
 

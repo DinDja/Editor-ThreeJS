@@ -7,6 +7,7 @@ type MaterialState = {
   createMaterialForObject: (objectId: string, materialId?: string, name?: string) => EditorMaterial;
   updateMaterial: (materialId: string, patch: Partial<Omit<EditorMaterial, 'uuid' | 'objectId'>>) => void;
   removeMaterial: (materialId: string) => void;
+  removeMaterialsForObjects: (objectIds: string[]) => void;
   setMaterials: (materials: Record<string, EditorMaterial>) => void;
   resetMaterials: () => void;
 };
@@ -62,6 +63,15 @@ export const useMaterialStore = create<MaterialState>((set) => ({
     set((state) => {
       const next = { ...state.materials };
       delete next[materialId];
+      return { materials: next };
+    }),
+
+  removeMaterialsForObjects: (objectIds) =>
+    set((state) => {
+      const objectIdSet = new Set(objectIds);
+      const next = Object.fromEntries(
+        Object.entries(state.materials).filter(([, material]) => !objectIdSet.has(material.objectId)),
+      );
       return { materials: next };
     }),
 

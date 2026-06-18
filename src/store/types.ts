@@ -28,7 +28,7 @@ export type MobilePanel = 'scene' | 'properties' | 'timeline';
 
 export type PrimitiveKind = 'box' | 'sphere' | 'cylinder' | 'cone' | 'torus' | 'plane';
 
-export type EffectKind = 'fireworks' | 'fire' | 'smoke' | 'sparkle' | 'lightGlow';
+export type EffectKind = 'fireworks' | 'fire' | 'smoke' | 'sparkle' | 'lightGlow' | 'fluid';
 
 export type EffectConfig = {
   kind: EffectKind;
@@ -38,7 +38,95 @@ export type EffectConfig = {
   count: number;
 };
 
-export type SceneObjectKind = 'model' | 'primitive' | 'effect';
+export type LightKind = 'spot' | 'point' | 'directional' | 'ambient';
+
+export type LightConfig = {
+  kind: LightKind;
+  color: string;
+  intensity: number;
+  distance: number;
+  decay: number;
+  angle: number;
+  penumbra: number;
+  castShadow: boolean;
+  shadowBias: number;
+  shadowRadius: number;
+  target: Vec3;
+};
+
+export const DEFAULT_LIGHT_CONFIG: LightConfig = {
+  kind: 'spot',
+  color: '#ffffff',
+  intensity: 10,
+  distance: 15,
+  decay: 1,
+  angle: 0.5,
+  penumbra: 0.3,
+  castShadow: true,
+  shadowBias: -0.001,
+  shadowRadius: 2,
+  target: [0, 0, -3],
+};
+
+export type SceneObjectKind = 'group' | 'object3d' | 'mesh' | 'model' | 'primitive' | 'effect' | 'svg' | 'text' | 'light' | 'camera';
+
+export type SceneObjectType = 'Group' | 'Object3D' | 'Mesh' | 'Light' | 'Camera';
+
+export type ObjectSelectionMode = 'object' | 'subelement' | 'mesh';
+
+export type MaterialApplicationScope = 'self' | 'children' | 'subtree';
+
+export type SceneTransform = {
+  position: Vec3;
+  rotation: Vec3;
+  scale: Vec3;
+};
+
+export type SceneObjectMetadata = {
+  importRootId?: string;
+  gltfSource?: string;
+  gltfNodePath?: number[];
+  gltfNodeType?: string;
+  sourceMaterialNames?: string[];
+  materialOverrides?: Record<string, boolean>;
+  [key: string]: unknown;
+};
+
+export type Text3DConfig = {
+  text: string;
+  size: number;
+  depth: number;
+  curveSegments: number;
+  bevelEnabled: boolean;
+  bevelThickness: number;
+  bevelSize: number;
+  bevelSegments: number;
+};
+
+export const DEFAULT_TEXT_CONFIG: Text3DConfig = {
+  text: '3D',
+  size: 1,
+  depth: 0.3,
+  curveSegments: 8,
+  bevelEnabled: false,
+  bevelThickness: 0.05,
+  bevelSize: 0.05,
+  bevelSegments: 4,
+};
+
+export type SvgConfig = {
+  depth: number;
+  bevelEnabled: boolean;
+  bevelThickness: number;
+  bevelSize: number;
+};
+
+export const DEFAULT_SVG_CONFIG: SvgConfig = {
+  depth: 0.3,
+  bevelEnabled: false,
+  bevelThickness: 0.05,
+  bevelSize: 0.05,
+};
 
 export type PrimitiveGeometry = Partial<{
   width: number;
@@ -113,24 +201,35 @@ export type Layer = {
 };
 
 export type SceneObject = {
+  id: string;
   uuid: string;
   name: string;
   kind: SceneObjectKind;
+  type: SceneObjectType;
   source?: string;
   sourceType?: 'public' | 'upload';
   primitive?: PrimitiveKind;
   geometry?: PrimitiveGeometry;
   editableMesh?: EditableMesh;
+  svgConfig?: SvgConfig;
+  textConfig?: Text3DConfig;
   effect?: EffectConfig;
+  lightConfig?: LightConfig;
   behaviors?: BehaviorConfig[];
   scripts?: Script[];
   position: Vec3;
   rotation: Vec3;
   scale: Vec3;
+  transform: SceneTransform;
   visible: boolean;
+  locked: boolean;
   parent: string | null;
+  parentId: string | null;
+  children: string[];
   materialId: string;
+  materialIds?: string[];
   layerId: string;
+  metadata: SceneObjectMetadata;
   createdAt: number;
 };
 
@@ -157,10 +256,29 @@ export type EditorMaterial = {
 };
 
 export type SceneObjectInput = Partial<
-  Pick<SceneObject, 'uuid' | 'position' | 'rotation' | 'scale' | 'visible' | 'parent' | 'materialId' | 'layerId' | 'createdAt'>
+  Pick<
+    SceneObject,
+    | 'id'
+    | 'uuid'
+    | 'type'
+    | 'position'
+    | 'rotation'
+    | 'scale'
+    | 'transform'
+    | 'visible'
+    | 'locked'
+    | 'parent'
+    | 'parentId'
+    | 'children'
+    | 'materialId'
+    | 'materialIds'
+    | 'layerId'
+    | 'metadata'
+    | 'createdAt'
+  >
 > &
   Pick<SceneObject, 'name' | 'kind'> &
-  Pick<SceneObject, 'source' | 'sourceType' | 'primitive' | 'geometry' | 'editableMesh' | 'effect' | 'behaviors' | 'scripts'>;
+  Pick<SceneObject, 'source' | 'sourceType' | 'primitive' | 'geometry' | 'editableMesh' | 'svgConfig' | 'textConfig' | 'effect' | 'lightConfig' | 'behaviors' | 'scripts'>;
 
 export const createId = () => {
   if (typeof crypto !== 'undefined' && 'randomUUID' in crypto) {
@@ -172,6 +290,12 @@ export const createId = () => {
 
 export const cloneVec3 = (value: Vec3): Vec3 => [value[0], value[1], value[2]];
 
+export const cloneTransform = (transform: SceneTransform): SceneTransform => ({
+  position: cloneVec3(transform.position),
+  rotation: cloneVec3(transform.rotation),
+  scale: cloneVec3(transform.scale),
+});
+
 export const cloneEditableMesh = (mesh: EditableMesh): EditableMesh => ({
   vertices: mesh.vertices.map(cloneVec3),
   indices: [...mesh.indices],
@@ -182,14 +306,24 @@ export const cloneEditableMesh = (mesh: EditableMesh): EditableMesh => ({
 
 export const cloneSceneObject = (object: SceneObject): SceneObject => ({
   ...object,
+  id: object.id ?? object.uuid,
   geometry: object.geometry ? { ...object.geometry } : undefined,
   editableMesh: object.editableMesh ? cloneEditableMesh(object.editableMesh) : undefined,
+  svgConfig: object.svgConfig ? { ...object.svgConfig } : undefined,
+  textConfig: object.textConfig ? { ...object.textConfig } : undefined,
   effect: object.effect ? { ...object.effect } : undefined,
+  lightConfig: object.lightConfig ? { ...object.lightConfig } : undefined,
   behaviors: object.behaviors ? object.behaviors.map((b) => ({ ...b })) : undefined,
   scripts: object.scripts ? object.scripts.map((s) => ({ ...s })) : undefined,
   position: cloneVec3(object.position),
   rotation: cloneVec3(object.rotation),
   scale: cloneVec3(object.scale),
+  transform: cloneTransform(object.transform ?? { position: object.position, rotation: object.rotation, scale: object.scale }),
+  parent: object.parentId ?? object.parent ?? null,
+  parentId: object.parentId ?? object.parent ?? null,
+  children: [...(object.children ?? [])],
+  materialIds: object.materialIds ? [...object.materialIds] : undefined,
+  metadata: { ...(object.metadata ?? {}) },
   layerId: object.layerId,
 });
 

@@ -16,6 +16,7 @@ import {
   type SceneObject,
   type Vec3,
 } from '@/store/types';
+import { getSubtreeIds, type SceneDuplicateResult } from '@/store/sceneTree';
 import {
   Copy,
   Trash2,
@@ -50,6 +51,21 @@ const cloneMaterialPatch = (material: EditorMaterial): Partial<Omit<EditorMateri
   roughnessMapUrl: material.roughnessMapUrl,
   displacementMapUrl: material.displacementMapUrl,
 });
+
+const cloneDuplicateMaterials = (
+  duplicate: SceneDuplicateResult,
+  materials: ReturnType<typeof useMaterialStore.getState>,
+  suffix: string,
+) => {
+  duplicate.materialIdMap.forEach((newMaterialId, oldMaterialId) => {
+    const sourceMaterial = materials.materials[oldMaterialId];
+    if (!sourceMaterial) return;
+    const newObjectId = duplicate.idMap.get(sourceMaterial.objectId);
+    if (!newObjectId) return;
+    const newMaterial = materials.createMaterialForObject(newObjectId, newMaterialId, `${sourceMaterial.name} ${suffix}`);
+    materials.updateMaterial(newMaterial.uuid, cloneMaterialPatch(sourceMaterial));
+  });
+};
 
 type MenuItem = {
   label?: string;
@@ -140,21 +156,11 @@ function ObjectMenu({ objectId }: { objectId: string }) {
         const scene = useSceneStore.getState();
         const mats = useMaterialStore.getState();
         const editor = useEditorStore.getState();
-        const mat = mats.materials[object.materialId] ?? null;
         state.pushSnapshot();
-        const copy = scene.addObject({
-          name: `${object.name} Copy`, kind: object.kind, source: object.source,
-          sourceType: object.sourceType, primitive: object.primitive,
-          geometry: object.geometry ? { ...object.geometry } : undefined,
-          editableMesh: object.editableMesh ? cloneEditableMesh(object.editableMesh) : undefined,
-          position: offsetPosition(object.position), rotation: [...object.rotation],
-          scale: [...object.scale], visible: object.visible, parent: object.parent,
-        });
-        if (mat) {
-          const nm = mats.createMaterialForObject(copy.uuid, copy.materialId, `${mat.name} Copy`);
-          mats.updateMaterial(nm.uuid, cloneMaterialPatch(mat));
-        }
-        editor.setSelectedObject(copy.uuid);
+        const duplicate = scene.duplicateObject(object.uuid);
+        if (!duplicate) return;
+        cloneDuplicateMaterials(duplicate, mats, 'Copy');
+        editor.setSelectedObject(duplicate.rootId);
       },
     },
     {
@@ -202,8 +208,9 @@ function ObjectMenu({ objectId }: { objectId: string }) {
         const mats = useMaterialStore.getState();
         const editor = useEditorStore.getState();
         state.pushSnapshot();
+        const ids = getSubtreeIds(scene.objects, object.uuid);
         scene.removeObject(object.uuid);
-        mats.removeMaterial(object.materialId);
+        mats.removeMaterialsForObjects(ids);
         editor.setSelectedObject(null);
       },
     },

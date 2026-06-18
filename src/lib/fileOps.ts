@@ -76,9 +76,29 @@ type ExportOptions = {
   fps?: number;
 };
 
+function stripHelpers(obj: THREE.Object3D) {
+  const toRemove: THREE.Object3D[] = [];
+  obj.traverse((child) => {
+    if (child.userData?.isHelper && child.parent) {
+      toRemove.push(child);
+    }
+  });
+  for (const child of toRemove) {
+    child.parent?.remove(child);
+    child.traverse((c) => {
+      if (c instanceof THREE.Mesh || c instanceof THREE.LineSegments || c instanceof THREE.Points) {
+        c.geometry?.dispose();
+        if (Array.isArray(c.material)) c.material.forEach((m) => m.dispose());
+        else c.material?.dispose();
+      }
+    });
+  }
+}
+
 export const exportObjectAsGLB = async (root: THREE.Object3D, filename = 'editor-scene.glb', options?: ExportOptions) => {
   const exporter = new GLTFExporter();
   const clone = root.clone(true);
+  stripHelpers(clone);
 
   let animations: THREE.AnimationClip[] = [];
   if (options?.keyframes && options.keyframes.length > 0 && options?.objects) {

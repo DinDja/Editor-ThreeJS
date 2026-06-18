@@ -7,14 +7,18 @@ import * as THREE from 'three';
 import MeshEditOverlay from './MeshEditOverlay';
 import TransformGizmo from './TransformGizmo';
 import { installMeshBVH, mergePrimitiveGeometry } from '@/lib/geometryOps';
-import { editableMeshFromObject3D, editableMeshToBufferGeometry, grabMeshVertices, sculptMesh } from '@/lib/meshOps';
+import { editableMeshFromBufferGeometry, editableMeshFromObject3D, editableMeshToBufferGeometry, grabMeshVertices, sculptMesh } from '@/lib/meshOps';
 import { useEditorStore } from '@/store/editorStore';
 import { useHistoryStore } from '@/store/historyStore';
 import { useMaterialStore } from '@/store/materialStore';
 import { useSceneStore } from '@/store/sceneStore';
 import { useContextMenu } from '@/store/contextMenuStore';
 import ContextMenu from './ContextMenu';
-import type { EditableMesh, EditorMaterial, PointerType, ReferenceImage, SceneObject, ViewportDisplayMode } from '@/store/types';
+import type { EditableMesh, EditorMaterial, LightConfig, PointerType, ReferenceImage, SceneObject, ViewportDisplayMode, SvgConfig, Text3DConfig } from '@/store/types';
+import { buildSceneTree, getSelectionTargetId, type SceneTreeNode } from '@/store/sceneTree';
+import { SVGLoader } from 'three/examples/jsm/loaders/SVGLoader.js';
+import { FontLoader } from 'three/examples/jsm/loaders/FontLoader.js';
+import { TextGeometry } from 'three/examples/jsm/geometries/TextGeometry.js';
 import { EffectAsset } from '@/lib/effects';
 import { BehaviorEngine } from '@/lib/behaviors';
 import { ScriptEngine } from '@/lib/scriptEngine';
@@ -237,6 +241,110 @@ function ModelAsset({ object, material }: { object: SceneObject; material: Edito
     });
   }, [clone, material, object.source, textureSet, viewportDisplayMode]);
 
+  return <primitive object={clone} />;
+}
+
+const pathKey = (path: unknown) => (Array.isArray(path) ? path.join('/') : '');
+
+const findObjectByPath = (root: THREE.Object3D, path: unknown) => {
+  if (!Array.isArray(path)) return null;
+  let current: THREE.Object3D | null = root;
+
+  for (const index of path) {
+    if (typeof index !== 'number' || !current?.children[index]) return null;
+    current = current.children[index];
+  }
+
+  return current;
+};
+
+function GltfMeshAsset({ object, material }: { object: SceneObject; material: EditorMaterial }) {
+  const source = typeof object.metadata.gltfSource === 'string' ? object.metadata.gltfSource : object.source;
+  const gltf = useGLTF(source ?? '');
+  const allMaterials = useMaterialStore((state) => state.materials);
+  const textureSet = useMaterialTextures(material);
+  const activeTool = useEditorStore((state) => state.activeTool);
+  const viewportDisplayMode = useEditorStore((state) => state.viewportDisplayMode);
+  const selectedObjectId = useEditorStore((state) => state.selectedObjectId);
+  const updateObject = useSceneStore((state) => state.updateObject);
+  const gltfPathKey = pathKey(object.metadata.gltfNodePath);
+  const sourceNode = useMemo(
+    () => findObjectByPath(gltf.scene, object.metadata.gltfNodePath),
+    [gltf.scene, object.metadata.gltfNodePath, gltfPathKey],
+  );
+  const sourceMesh = sourceNode instanceof THREE.Mesh ? sourceNode : null;
+
+  useEffect(() => {
+    if ((activeTool !== 'edit' && activeTool !== 'sculpt') || selectedObjectId !== object.uuid || object.editableMesh || !sourceMesh) return;
+
+    const editableMesh = editableMeshFromBufferGeometry(sourceMesh.geometry);
+    if (!editableMesh) return;
+
+    updateObject(object.uuid, { editableMesh });
+  }, [activeTool, object.editableMesh, object.uuid, selectedObjectId, sourceMesh, updateObject]);
+
+  const meshMaterials = useMemo(() => {
+    if (!sourceMesh) return null;
+
+    const sourceMaterials = Array.isArray(sourceMesh.material) ? sourceMesh.material : [sourceMesh.material];
+    const materialIds = object.materialIds?.length ? object.materialIds : [object.materialId];
+
+    return sourceMaterials.map((sourceMaterial, index) => {
+      const materialId = materialIds[index] ?? object.materialId;
+      const editorMaterial = allMaterials[materialId] ?? material;
+      const hasOverride = object.metadata.materialOverrides?.[materialId] === true;
+      const nextMaterial = cloneMaterialAsStandard(sourceMaterial);
+
+      if (!hasOverride && viewportDisplayMode === 'textured') {
+        nextMaterial.side = THREE.DoubleSide;
+        nextMaterial.wireframe = false;
+        nextMaterial.needsUpdate = true;
+        return nextMaterial;
+      }
+
+      applyViewportMaterialProps(nextMaterial, editorMaterial, index === 0 ? textureSet : EMPTY_TEXTURE_SET, viewportDisplayMode);
+      return nextMaterial;
+    });
+  }, [allMaterials, material, object.materialId, object.materialIds, object.metadata.materialOverrides, sourceMesh, textureSet, viewportDisplayMode]);
+
+  useEffect(
+    () => () => {
+      meshMaterials?.forEach((item) => item.dispose());
+    },
+    [meshMaterials],
+  );
+
+  if (!sourceMesh) return null;
+
+  return (
+    <mesh
+      geometry={sourceMesh.geometry}
+      material={meshMaterials && meshMaterials.length > 1 ? meshMaterials : meshMaterials?.[0]}
+      castShadow
+      receiveShadow
+    />
+  );
+}
+
+function GltfNodePrimitiveAsset({ object }: { object: SceneObject }) {
+  const source = typeof object.metadata.gltfSource === 'string' ? object.metadata.gltfSource : object.source;
+  const gltf = useGLTF(source ?? '');
+  const gltfPathKey = pathKey(object.metadata.gltfNodePath);
+  const sourceNode = useMemo(
+    () => findObjectByPath(gltf.scene, object.metadata.gltfNodePath),
+    [gltf.scene, object.metadata.gltfNodePath, gltfPathKey],
+  );
+  const clone = useMemo(() => {
+    if (!sourceNode) return null;
+    const next = sourceNode.clone(false);
+    next.position.set(0, 0, 0);
+    next.rotation.set(0, 0, 0);
+    next.scale.set(1, 1, 1);
+    next.updateMatrix();
+    return next;
+  }, [sourceNode]);
+
+  if (!clone) return null;
   return <primitive object={clone} />;
 }
 
@@ -549,31 +657,231 @@ function PrimitiveAsset({ object, material }: { object: SceneObject; material: E
   );
 }
 
+function useGlowTexture() {
+  const texture = useMemo(() => {
+    if (typeof document === 'undefined') return null;
+    const canvas = document.createElement('canvas');
+    canvas.width = 64;
+    canvas.height = 64;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return null;
+    const grad = ctx.createRadialGradient(32, 32, 0, 32, 32, 32);
+    grad.addColorStop(0, 'rgba(255,255,255,1)');
+    grad.addColorStop(0.15, 'rgba(255,255,255,0.8)');
+    grad.addColorStop(0.5, 'rgba(255,255,255,0.2)');
+    grad.addColorStop(1, 'rgba(255,255,255,0)');
+    ctx.fillStyle = grad;
+    ctx.fillRect(0, 0, 64, 64);
+    const t = new THREE.CanvasTexture(canvas);
+    t.needsUpdate = true;
+    return t;
+  }, []);
+  return texture;
+}
+
+function LightSprite({ color, size }: { color: THREE.Color; size: number }) {
+  const texture = useGlowTexture();
+  const hex = useMemo(() => color.getStyle(), [color]);
+  return texture ? (
+    <sprite scale={[size, size, 1]}>
+      <spriteMaterial map={texture} transparent depthWrite={false} blending={THREE.AdditiveBlending} color={hex} opacity={0.7} />
+    </sprite>
+  ) : null;
+}
+
+function SpotHelper({ color, angle }: { color: THREE.Color; angle: number }) {
+  const len = 2.0;
+  const rad = Math.tan(angle) * len;
+  const beamLen = 8.0;
+  const beamRad = Math.tan(angle) * beamLen;
+  const coneGeo = useMemo(() => new THREE.ConeGeometry(rad, len, 24, 1, true), [rad, len]);
+  const ringGeo = useMemo(() => new THREE.RingGeometry(rad * 0.15, rad, 32), [rad]);
+  const coneEdges = useMemo(() => new THREE.EdgesGeometry(coneGeo), [coneGeo]);
+  const ringEdges = useMemo(() => new THREE.EdgesGeometry(ringGeo), [ringGeo]);
+  return (
+    <group userData={{ isHelper: true }}>
+      <lineSegments geometry={coneEdges}>
+        <lineBasicMaterial color={color} transparent opacity={0.7} depthWrite={false} />
+      </lineSegments>
+      <lineSegments geometry={ringEdges} position={[0, 0, -len]}>
+        <lineBasicMaterial color={color} transparent opacity={0.8} depthWrite={false} />
+      </lineSegments>
+      <mesh position={[0, 0, -beamLen / 2]}>
+        <coneGeometry args={[beamRad, beamLen, 32, 1, true]} />
+        <meshBasicMaterial color={color} transparent opacity={0.08} depthWrite={false} side={THREE.DoubleSide} />
+      </mesh>
+      <LightSprite color={color} size={0.8} />
+    </group>
+  );
+}
+
+function PointHelper({ color }: { color: THREE.Color }) {
+  const geo = useMemo(() => new THREE.OctahedronGeometry(0.8, 0), []);
+  const edges = useMemo(() => new THREE.EdgesGeometry(geo), [geo]);
+  return (
+    <group userData={{ isHelper: true }}>
+      <lineSegments geometry={edges}>
+        <lineBasicMaterial color={color} transparent opacity={0.7} depthWrite={false} />
+      </lineSegments>
+      <LightSprite color={color} size={0.8} />
+    </group>
+  );
+}
+
+function PointRangeHelper({ color, distance }: { color: THREE.Color; distance: number }) {
+  const r = Math.max(0.5, distance);
+  const geo = useMemo(() => new THREE.SphereGeometry(r, 20, 14), [r]);
+  const edges = useMemo(() => new THREE.EdgesGeometry(geo), [geo]);
+  return (
+    <group userData={{ isHelper: true }}>
+      <lineSegments geometry={edges}>
+        <lineBasicMaterial color={color} transparent opacity={0.15} depthWrite={false} />
+      </lineSegments>
+    </group>
+  );
+}
+
+function DirectionalHelper({ color }: { color: THREE.Color }) {
+  const ringGeo = useMemo(() => new THREE.RingGeometry(0.5, 1.0, 32), []);
+  const ringEdges = useMemo(() => new THREE.EdgesGeometry(ringGeo), [ringGeo]);
+  return (
+    <group userData={{ isHelper: true }}>
+      <lineSegments geometry={ringEdges}>
+        <lineBasicMaterial color={color} transparent opacity={0.7} depthWrite={false} />
+      </lineSegments>
+      {[0, 1, 2].map((i) => (
+        <lineSegments key={i} position={[0, 0, -0.5 - i * 0.35]}>
+          <edgesGeometry>
+            <ringGeometry args={[0.05, 0.3, 10]} />
+          </edgesGeometry>
+          <lineBasicMaterial color={color} transparent opacity={0.4} depthWrite={false} />
+        </lineSegments>
+      ))}
+      <LightSprite color={color} size={0.8} />
+    </group>
+  );
+}
+
+function AmbientHelper({ color }: { color: THREE.Color }) {
+  const geo = useMemo(() => new THREE.SphereGeometry(0.8, 20, 14), []);
+  const edges = useMemo(() => new THREE.EdgesGeometry(geo), [geo]);
+  return (
+    <group userData={{ isHelper: true }}>
+      <lineSegments geometry={edges}>
+        <lineBasicMaterial color={color} transparent opacity={0.3} depthWrite={false} />
+      </lineSegments>
+      <LightSprite color={color} size={0.6} />
+    </group>
+  );
+}
+
+function LightAsset({ object }: { object: SceneObject }) {
+  const config = object.lightConfig!;
+  const [targetRef] = useState(() => new THREE.Object3D());
+  const dirRef = useRef<THREE.Group>(null);
+
+  useEffect(() => {
+    targetRef.position.set(config.target[0], config.target[1], config.target[2]);
+  }, [config.target, targetRef]);
+
+  const memoColor = useMemo(() => new THREE.Color(config.color), [config.color]);
+
+  const dir = useMemo(() => {
+    const d = new THREE.Vector3(config.target[0], config.target[1], config.target[2]);
+    if (d.lengthSq() < 0.0001) d.set(0, 0, -1);
+    return d.normalize();
+  }, [config.target]);
+
+  useFrame(() => {
+    if (!dirRef.current) return;
+    if (config.kind === 'spot' || config.kind === 'directional') {
+      dirRef.current.quaternion.setFromUnitVectors(new THREE.Vector3(0, 0, -1), dir);
+    }
+  });
+
+  const commonProps = {
+    color: config.color,
+    intensity: config.intensity,
+    distance: config.distance,
+    decay: config.decay,
+    castShadow: config.castShadow,
+    'shadow-bias': config.shadowBias,
+    'shadow-radius': config.shadowRadius,
+  };
+
+  switch (config.kind) {
+    case 'spot':
+      return (
+        <group>
+          <spotLight position={[0, 0, 0]} angle={config.angle} penumbra={config.penumbra} target={targetRef} {...commonProps} />
+          <primitive object={targetRef} />
+          <group ref={dirRef}>
+            <SpotHelper color={memoColor} angle={config.angle} />
+          </group>
+        </group>
+      );
+    case 'point':
+      return (
+        <group>
+          <pointLight position={[0, 0, 0]} {...commonProps} />
+          <PointHelper color={memoColor} />
+          <PointRangeHelper color={memoColor} distance={config.distance} />
+        </group>
+      );
+    case 'directional':
+      return (
+        <group>
+          <directionalLight position={[0, 0, 0]} target={targetRef} {...commonProps} />
+          <primitive object={targetRef} />
+          <group ref={dirRef}>
+            <DirectionalHelper color={memoColor} />
+          </group>
+        </group>
+      );
+    case 'ambient':
+      return (
+        <group>
+          <ambientLight intensity={config.intensity} color={config.color} />
+          <AmbientHelper color={memoColor} />
+        </group>
+      );
+    default:
+      return <PointHelper color={memoColor} />;
+  }
+}
+
 function ObjectNode({
-  object,
-  material,
+  node,
   registerObjectRef,
+  allObjects,
+  layerVisibilityMap,
+  layerLockMap,
 }: {
-  object: SceneObject;
-  material: EditorMaterial;
+  node: SceneTreeNode;
   registerObjectRef: ObjectRefRegistry;
+  allObjects: SceneObject[];
+  layerVisibilityMap: Map<string, boolean>;
+  layerLockMap: Map<string, boolean>;
 }) {
+  const object = node.object;
   const groupRef = useRef<THREE.Group>(null);
-  const layers = useSceneStore((state) => state.layers);
+  const materials = useMaterialStore((state) => state.materials);
   const setSelectedObject = useEditorStore((state) => state.setSelectedObject);
+  const objectSelectionMode = useEditorStore((state) => state.objectSelectionMode);
   const viewportDisplayMode = useEditorStore((state) => state.viewportDisplayMode);
   const showPrimitiveShape = viewportDisplayMode === 'primitive' && object.kind === 'primitive';
   const showContextMenu = useContextMenu((state) => state.show);
-  const layerLocked = useMemo(
-    () => layers.find((l) => l.id === object.layerId)?.locked ?? false,
-    [layers, object.layerId],
-  );
+  const material = materials[object.materialId];
+  const layerLocked = layerLockMap.get(object.layerId) ?? false;
+  const layerVisible = layerVisibilityMap.get(object.layerId) !== false;
+  const locked = object.locked || layerLocked;
 
   useEffect(() => {
     registerObjectRef(object.uuid, groupRef.current);
     return () => registerObjectRef(object.uuid, null);
   }, [object.uuid, registerObjectRef]);
 
+  if (!layerVisible || !material) return null;
   if (object.kind === 'model' && !object.source) return null;
 
   return (
@@ -586,12 +894,13 @@ function ObjectNode({
       scale={object.scale}
       visible={object.visible}
       onClick={(event) => {
-        if (layerLocked) return;
+        if (locked) return;
         event.stopPropagation();
-        setSelectedObject(object.uuid);
+        const targetId = getSelectionTargetId(allObjects, object.uuid, objectSelectionMode);
+        if (targetId) setSelectedObject(targetId);
       }}
       onContextMenu={(event) => {
-        if (layerLocked) return;
+        if (locked) return;
         event.stopPropagation();
         const e = event.nativeEvent as MouseEvent;
         showContextMenu(e.clientX, e.clientY, object.uuid);
@@ -602,18 +911,38 @@ function ObjectNode({
     >
       {object.effect ? (
         <EffectAsset effect={object.effect} />
+      ) : object.lightConfig ? (
+        <LightAsset object={object} />
+      ) : (object.type === 'Light' || object.type === 'Camera') && object.metadata.gltfSource ? (
+        <GltfNodePrimitiveAsset object={object} />
+      ) : object.kind === 'svg' ? (
+        <Svg3DAsset object={object} material={material} />
+      ) : object.kind === 'text' ? (
+        <Text3DAsset object={object} material={material} />
       ) : showPrimitiveShape ? (
         <PrimitiveAsset object={object} material={material} />
       ) : object.editableMesh ? (
         <EditableMeshAsset object={object} material={material} />
+      ) : object.kind === 'mesh' && object.metadata.gltfSource ? (
+        <GltfMeshAsset object={object} material={material} />
       ) : object.kind === 'model' ? (
         <ModelAsset object={object} material={material} />
-      ) : (
+      ) : object.type === 'Mesh' ? (
         <PrimitiveAsset object={object} material={material} />
-      )}
-      {!object.effect && <MeshEditOverlay object={object} />}
-      <BehaviorEngine object={object} groupRef={groupRef} />
-      <ScriptEngine object={object} groupRef={groupRef} />
+      ) : null}
+      {!object.effect && !object.lightConfig && object.type === 'Mesh' && <MeshEditOverlay object={object} />}
+      {!object.lightConfig && <BehaviorEngine object={object} groupRef={groupRef} />}
+      {!object.lightConfig && <ScriptEngine object={object} groupRef={groupRef} />}
+      {node.children.map((child) => (
+        <ObjectNode
+          key={child.object.uuid}
+          node={child}
+          registerObjectRef={registerObjectRef}
+          allObjects={allObjects}
+          layerVisibilityMap={layerVisibilityMap}
+          layerLockMap={layerLockMap}
+        />
+      ))}
     </group>
   );
 }
@@ -692,13 +1021,43 @@ function GridHelper({ show }: { show: boolean }) {
 }
 
 function ReferenceImagePlane({ refImg }: { refImg: ReferenceImage }) {
-  const texture = useLoader(THREE.TextureLoader, refImg.imageUrl);
+  const [texture, setTexture] = useState<THREE.Texture | null>(null);
+  const [error, setError] = useState(false);
+  const textureRef = useRef<THREE.Texture | null>(null);
   const selectedReferenceId = useEditorStore((s) => s.selectedReferenceId);
   const setSelectedReference = useEditorStore((s) => s.setSelectedReference);
 
-  useEffect(() => () => texture.dispose(), [texture]);
+  useEffect(() => {
+    let cancelled = false;
+    setError(false);
+    setTexture(null);
+    const loader = new THREE.TextureLoader();
+    loader.load(
+      refImg.imageUrl,
+      (tex) => {
+        if (!cancelled) {
+          textureRef.current = tex;
+          setTexture(tex);
+        }
+      },
+      undefined,
+      () => {
+        if (!cancelled) setError(true);
+      },
+    );
+    return () => {
+      cancelled = true;
+      if (textureRef.current) {
+        textureRef.current.dispose();
+        textureRef.current = null;
+      }
+    };
+  }, [refImg.imageUrl]);
 
-  const aspect = texture.image ? texture.image.width / texture.image.height : 1;
+  if (!texture || error) return null;
+
+  const img = texture.image as HTMLImageElement | null;
+  const aspect = img ? img.width / img.height : 1;
   const scale: [number, number, number] = [refImg.scale[0] * aspect, refImg.scale[1], 1];
 
   return (
@@ -721,11 +1080,124 @@ function ReferenceImagePlane({ refImg }: { refImg: ReferenceImage }) {
   );
 }
 
+function Svg3DAsset({ object }: { object: SceneObject; material?: EditorMaterial }) {
+  const [group, setGroup] = useState<THREE.Group | null>(null);
+  const objectSource = object.source;
+  const depth = object.svgConfig?.depth ?? 0.3;
+  const bevelEnabled = object.svgConfig?.bevelEnabled ?? false;
+  const bevelThickness = object.svgConfig?.bevelThickness ?? 0.05;
+  const bevelSize = object.svgConfig?.bevelSize ?? 0.05;
+
+  useEffect(() => {
+    if (!objectSource) return;
+
+    let cancelled = false;
+    const loader = new SVGLoader();
+
+    const svgTextPromise = objectSource.startsWith('data:')
+      ? Promise.resolve().then(() => {
+          const comma = objectSource.indexOf(',');
+          const raw = objectSource.slice(comma + 1);
+          if (objectSource.includes(';base64')) return decodeURIComponent(escape(atob(raw)));
+          return decodeURIComponent(raw);
+        })
+      : fetch(objectSource).then((res) => res.text());
+
+    svgTextPromise
+      .then((svgText) => {
+        if (cancelled) return null;
+        const data = loader.parse(svgText);
+        if (data.paths.length === 0) {
+          console.warn('SVGLoader: no paths found in SVG');
+          return null;
+        }
+
+        const g = new THREE.Group();
+        let meshCount = 0;
+
+        for (const path of data.paths) {
+          const shapes = SVGLoader.createShapes(path);
+          for (const shape of shapes) {
+            const geo = new THREE.ExtrudeGeometry(shape, {
+              depth,
+              bevelEnabled,
+              bevelThickness,
+              bevelSize,
+              bevelSegments: 4,
+            });
+            const hex = path.color ? `#${path.color.getHexString()}` : '#cccccc';
+            g.add(new THREE.Mesh(geo, new THREE.MeshStandardMaterial({ color: hex, side: THREE.DoubleSide })));
+            meshCount++;
+          }
+        }
+
+        if (meshCount === 0) {
+          console.warn('SVGLoader: no shapes created from paths');
+          return null;
+        }
+
+        const box = new THREE.Box3().setFromObject(g);
+        const center = box.getCenter(new THREE.Vector3());
+        g.position.sub(center);
+
+        return g;
+      })
+      .then((g) => { if (!cancelled && g) setGroup(g); })
+      .catch((err) => console.warn('SVG3D error:', err));
+
+    return () => { cancelled = true; };
+  }, [objectSource, depth, bevelEnabled, bevelThickness, bevelSize]);
+
+  if (!group) return null;
+  return <primitive object={group} />;
+}
+
+function Text3DAsset({ object, material }: { object: SceneObject; material: EditorMaterial }) {
+  const font = useLoader(FontLoader, '/fonts/helvetiker_regular.typeface.json');
+  const text = object.textConfig?.text ?? '3D';
+  const size = object.textConfig?.size ?? 1;
+  const depth = object.textConfig?.depth ?? 0.3;
+  const curveSegments = object.textConfig?.curveSegments ?? 8;
+  const bevelEnabled = object.textConfig?.bevelEnabled ?? false;
+  const bevelThickness = object.textConfig?.bevelThickness ?? 0.05;
+  const bevelSize = object.textConfig?.bevelSize ?? 0.05;
+  const bevelSegments = object.textConfig?.bevelSegments ?? 4;
+
+  const geometry = useMemo(() => {
+    const geo = new TextGeometry(text, {
+      font,
+      size,
+      depth,
+      curveSegments,
+      bevelEnabled,
+      bevelThickness,
+      bevelSize,
+      bevelSegments,
+    });
+    geo.computeBoundingBox();
+    const b = geo.boundingBox;
+    if (b) {
+      const cx = (b.max.x - b.min.x) / 2;
+      const cy = (b.max.y - b.min.y) / 2;
+      const cz = (b.max.z - b.min.z) / 2;
+      geo.translate(-(b.min.x + cx), -(b.min.y + cy), -(b.min.z + cz));
+    }
+    return geo;
+  }, [font, text, size, depth, curveSegments, bevelEnabled, bevelThickness, bevelSize, bevelSegments]);
+
+  useEffect(() => () => geometry.dispose(), [geometry]);
+
+  return (
+    <mesh geometry={geometry} castShadow receiveShadow>
+      <meshStandardMaterial color={material.color} metalness={material.metalness} roughness={material.roughness} side={THREE.DoubleSide} />
+    </mesh>
+  );
+}
+
 function EditorScene({ sceneRootRef }: Canvas3DProps) {
   const objects = useSceneStore((state) => state.objects);
   const layers = useSceneStore((state) => state.layers);
   const referenceImages = useSceneStore((state) => state.referenceImages);
-  const materials = useMaterialStore((state) => state.materials);
   const selectedObjectId = useEditorStore((state) => state.selectedObjectId);
   const showGrid = useEditorStore((state) => state.showGrid);
   const activeTool = useEditorStore((state) => state.activeTool);
@@ -751,23 +1223,19 @@ function EditorScene({ sceneRootRef }: Canvas3DProps) {
     return map;
   }, [layers]);
 
-  const visibleObjects = useMemo(
-    () => objects.filter((o) => layerVisibilityMap.get(o.layerId) !== false),
-    [objects, layerVisibilityMap],
-  );
-
   const sortedObjects = useMemo(() => {
     const layerOrder = new Map<string, number>();
     for (const layer of layers) {
       layerOrder.set(layer.id, layer.order);
     }
-    return [...visibleObjects].sort((a, b) => {
+    return [...objects].sort((a, b) => {
       const orderA = layerOrder.get(a.layerId) ?? 0;
       const orderB = layerOrder.get(b.layerId) ?? 0;
       if (orderA !== orderB) return orderA - orderB;
       return a.createdAt - b.createdAt;
     });
-  }, [visibleObjects, layers]);
+  }, [objects, layers]);
+  const sceneTree = useMemo(() => buildSceneTree(sortedObjects), [sortedObjects]);
   const [ctrlPressed, setCtrlPressed] = useState(false);
   const [altPressed, setAltPressed] = useState(false);
 
@@ -871,27 +1339,30 @@ function EditorScene({ sceneRootRef }: Canvas3DProps) {
 
   return (
     <>
-      <ambientLight intensity={0.72} />
-      <directionalLight position={[5, 7, 4]} intensity={1.7} castShadow />
-      <directionalLight position={[-4, 3, -5]} intensity={0.45} />
-      <hemisphereLight args={['#dbeafe', '#1f2937', 0.75]} />
+      <ambientLight intensity={0.15} />
+      <directionalLight position={[5, 7, 4]} intensity={0.3} castShadow />
+      <directionalLight position={[-4, 3, -5]} intensity={0.1} />
+      <hemisphereLight args={['#dbeafe', '#1f2937', 0.2]} />
       <GridHelper show={showGrid} />
 
       {referenceImages.filter((r) => r.visible).map((ref) => (
-        <ReferenceImagePlane key={ref.id} refImg={ref} />
+        <Suspense key={ref.id} fallback={null}>
+          <ReferenceImagePlane refImg={ref} />
+        </Suspense>
       ))}
 
       <group ref={rootRef}>
-        {sortedObjects.map((object) => {
-          const material = materials[object.materialId];
-          if (!material) return null;
-
-          return (
-            <Suspense key={object.uuid} fallback={<ObjectLoading object={object} />}>
-              <ObjectNode object={object} material={material} registerObjectRef={registerObjectRef} />
-            </Suspense>
-          );
-        })}
+        {sceneTree.map((node) => (
+          <Suspense key={node.object.uuid} fallback={<ObjectLoading object={node.object} />}>
+            <ObjectNode
+              node={node}
+              registerObjectRef={registerObjectRef}
+              allObjects={objects}
+              layerVisibilityMap={layerVisibilityMap}
+              layerLockMap={layerLockMap}
+            />
+          </Suspense>
+        ))}
       </group>
 
       {activeTool !== 'edit' && <SelectionBox object={selectedObject} />}
@@ -926,11 +1397,6 @@ function EditorScene({ sceneRootRef }: Canvas3DProps) {
 
 export default function Canvas3D({ sceneRootRef }: Canvas3DProps) {
   const setSelectedObject = useEditorStore((state) => state.setSelectedObject);
-  const activeTool = useEditorStore((state) => state.activeTool);
-  const viewportDisplayMode = useEditorStore((state) => state.viewportDisplayMode);
-  const selectedObjectId = useEditorStore((state) => state.selectedObjectId);
-  const objects = useSceneStore((state) => state.objects);
-  const selectedObject = objects.find((object) => object.uuid === selectedObjectId);
 
   return (
     <div className="relative h-full w-full overflow-hidden bg-[#101214]" onContextMenu={(e) => e.preventDefault()}>
@@ -946,13 +1412,6 @@ export default function Canvas3D({ sceneRootRef }: Canvas3DProps) {
         <fog attach="fog" args={['#101214', 18, 38]} />
         <EditorScene sceneRootRef={sceneRootRef} />
       </Canvas>
-      <div className="pointer-events-none absolute left-2 top-2 flex max-w-[calc(100%-1rem)] items-center gap-1.5 rounded-md border border-neutral-800/90 bg-neutral-950/70 px-2.5 py-1.5 text-[10px] uppercase tracking-[0.14em] text-neutral-400 shadow-lg backdrop-blur sm:left-4 sm:top-4 sm:max-w-[calc(100%-2rem)] sm:gap-2 sm:px-3 sm:py-2 sm:text-[11px]">
-        <span className="text-emerald-300">{activeTool}</span>
-        <span className="h-3 w-px bg-neutral-700" />
-        <span className="text-sky-300">{viewportDisplayMode}</span>
-        <span className="h-3 w-px bg-neutral-700" />
-        <span className="max-w-24 truncate sm:max-w-48">{selectedObject?.name ?? 'Sem selecao'}</span>
-      </div>
     </div>
   );
 }

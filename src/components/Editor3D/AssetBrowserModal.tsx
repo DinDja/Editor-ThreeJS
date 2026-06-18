@@ -6,6 +6,7 @@ import { useEditorStore } from '@/store/editorStore';
 import { useHistoryStore } from '@/store/historyStore';
 import { useMaterialStore } from '@/store/materialStore';
 import { useSceneStore } from '@/store/sceneStore';
+import { buildSceneObjectsFromGltf } from '@/lib/gltfImport';
 
 type PolyHavenAsset = {
   id: string;
@@ -66,6 +67,7 @@ export default function AssetBrowserModal({ open, onClose }: AssetBrowserModalPr
   const [importingId, setImportingId] = useState<string | null>(null);
   const objects = useSceneStore((state) => state.objects);
   const addObject = useSceneStore((state) => state.addObject);
+  const addObjects = useSceneStore((state) => state.addObjects);
   const createMaterialForObject = useMaterialStore((state) => state.createMaterialForObject);
   const materials = useMaterialStore((state) => state.materials);
   const updateMaterial = useMaterialStore((state) => state.updateMaterial);
@@ -153,16 +155,29 @@ export default function AssetBrowserModal({ open, onClose }: AssetBrowserModalPr
         }
 
         pushSnapshot();
-        const object = addObject({
-          name: asset.name,
-          kind: 'model',
-          source: `/api/assets/polyhaven/${encodeURIComponent(asset.id)}/gltf?resolution=1k&delivery=direct`,
-          sourceType: 'public',
-          position: [0, 0, 0],
-        });
+        const source = `/api/assets/polyhaven/${encodeURIComponent(asset.id)}/gltf?resolution=1k&delivery=direct`;
 
-        createMaterialForObject(object.uuid, object.materialId, `Material ${asset.name}`);
-        setSelectedObject(object.uuid);
+        try {
+          const imported = await buildSceneObjectsFromGltf({ source, name: asset.name, sourceType: 'public' });
+          addObjects(imported.objects);
+          imported.materials.forEach((draft) => {
+            const created = createMaterialForObject(draft.objectId, draft.materialId, draft.name);
+            updateMaterial(created.uuid, draft.patch);
+          });
+          setSelectedObject(imported.rootId);
+        } catch (error) {
+          console.warn('Falha ao preservar hierarquia Poly Haven, usando importacao legada:', error);
+          const object = addObject({
+            name: asset.name,
+            kind: 'model',
+            source,
+            sourceType: 'public',
+            position: [0, 0, 0],
+          });
+          createMaterialForObject(object.uuid, object.materialId, `Material ${asset.name}`);
+          setSelectedObject(object.uuid);
+        }
+
         setActiveTool('translate');
         onClose();
       } catch (assetError) {
@@ -174,6 +189,7 @@ export default function AssetBrowserModal({ open, onClose }: AssetBrowserModalPr
     },
     [
       addObject,
+      addObjects,
       createMaterialForObject,
       importingId,
       library,

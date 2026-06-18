@@ -11,6 +11,7 @@ import Timeline from './Timeline';
 import Toolbar from './Toolbar';
 import TutorialSpotlight from './TutorialSpotlight';
 import { useEditorStore } from '@/store/editorStore';
+import { useSceneStore } from '@/store/sceneStore';
 import type { MobilePanel } from '@/store/types';
 
 function ResizeHandle({
@@ -113,6 +114,41 @@ function MobileTabBar() {
   );
 }
 
+function useViewportInfo() {
+  const activeTool = useEditorStore((s) => s.activeTool);
+  const viewportDisplayMode = useEditorStore((s) => s.viewportDisplayMode);
+  const selectedObjectId = useEditorStore((s) => s.selectedObjectId);
+  const objects = useSceneStore((s) => s.objects);
+  const selectedObject = objects.find((o) => o.uuid === selectedObjectId);
+  return { activeTool, viewportDisplayMode, selectedObjectName: selectedObject?.name ?? 'Sem selecao' };
+}
+
+function DesktopHUD() {
+  const { activeTool, viewportDisplayMode, selectedObjectName } = useViewportInfo();
+  return (
+    <div className="flex items-center gap-2 rounded-md border border-neutral-800/90 bg-neutral-950/70 px-3 py-2 text-[11px] uppercase tracking-[0.14em] text-neutral-400 shadow-lg backdrop-blur">
+      <span className="text-emerald-300">{activeTool}</span>
+      <span className="h-3 w-px bg-neutral-700" />
+      <span className="text-sky-300">{viewportDisplayMode}</span>
+      <span className="h-3 w-px bg-neutral-700" />
+      <span className="max-w-48 truncate">{selectedObjectName}</span>
+    </div>
+  );
+}
+
+function MobileHUD() {
+  const { activeTool, viewportDisplayMode, selectedObjectName } = useViewportInfo();
+  return (
+    <div className="flex items-center gap-1.5 rounded-md border border-neutral-800/90 bg-neutral-950/70 px-2.5 py-1.5 text-[10px] uppercase tracking-[0.14em] text-neutral-400 shadow-lg backdrop-blur">
+      <span className="text-emerald-300">{activeTool}</span>
+      <span className="h-3 w-px bg-neutral-700" />
+      <span className="text-sky-300">{viewportDisplayMode}</span>
+      <span className="h-3 w-px bg-neutral-700" />
+      <span className="max-w-24 truncate">{selectedObjectName}</span>
+    </div>
+  );
+}
+
 export default function Editor3D() {
   const sceneRootRef = useRef<THREE.Group | null>(null);
   const [tutorialOpen, setTutorialOpen] = useState(false);
@@ -157,14 +193,21 @@ export default function Editor3D() {
         {/* ── Single Canvas3D fills the section ── */}
         <div className="absolute inset-0 overflow-hidden">
           <Canvas3D sceneRootRef={sceneRootRef} />
+          {/* ── Viewport HUD ── */}
+          <div className="hidden lg:block pointer-events-none absolute top-4 z-10" style={{ left: `calc(${leftCol} + 1rem)` }}>
+            <DesktopHUD />
+          </div>
+          <div className="lg:hidden pointer-events-none absolute left-2 top-2 z-10">
+            <MobileHUD />
+          </div>
         </div>
 
         {/* ── Desktop: panels + timeline overlay the canvas ── */}
         <div className="hidden lg:flex flex-col absolute inset-0 pointer-events-none">
-          <div className="flex min-h-0 flex-1 pointer-events-auto">
+          <div className="flex min-h-0 flex-1">
             <div
               data-tutorial="scene-graph-panel"
-              className="relative shrink-0 overflow-hidden"
+              className="relative shrink-0 overflow-hidden pointer-events-auto"
               style={{ width: leftCol }}
             >
               <SceneGraph />
@@ -172,10 +215,10 @@ export default function Editor3D() {
                 <ResizeHandle position="right" onDrag={handleLeftResize} />
               )}
             </div>
-            <div className="flex-1 min-w-0 relative" />
+            <div className="flex-1 min-w-0" />
             <div
               data-tutorial="properties-panel"
-              className="relative shrink-0 overflow-hidden"
+              className="relative shrink-0 overflow-hidden pointer-events-auto"
               style={{ width: rightCol }}
             >
               <Properties />

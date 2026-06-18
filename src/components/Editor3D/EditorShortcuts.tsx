@@ -8,7 +8,8 @@ import { useHistoryStore } from '@/store/historyStore';
 import { useMaterialStore } from '@/store/materialStore';
 import { useSceneStore } from '@/store/sceneStore';
 import { useTimelineStore } from '@/store/timelineStore';
-import { cloneEditableMesh, type EditorMaterial, type SceneObject, type Vec3 } from '@/store/types';
+import { cloneEditableMesh, type EditorMaterial, type SceneObject } from '@/store/types';
+import { getSubtreeIds, type SceneDuplicateResult } from '@/store/sceneTree';
 
 type ClipboardObject = {
   material: EditorMaterial | null;
@@ -36,7 +37,20 @@ const cloneMaterialPatch = (material: EditorMaterial): Partial<Omit<EditorMateri
   displacementMapUrl: material.displacementMapUrl,
 });
 
-const offsetPosition = (position: Vec3, offset = 0.45): Vec3 => [position[0] + offset, position[1], position[2]];
+const cloneDuplicateMaterials = (
+  duplicate: SceneDuplicateResult,
+  materials: ReturnType<typeof useMaterialStore.getState>,
+  suffix: string,
+) => {
+  duplicate.materialIdMap.forEach((newMaterialId, oldMaterialId) => {
+    const sourceMaterial = materials.materials[oldMaterialId];
+    if (!sourceMaterial) return;
+    const newObjectId = duplicate.idMap.get(sourceMaterial.objectId);
+    if (!newObjectId) return;
+    const newMaterial = materials.createMaterialForObject(newObjectId, newMaterialId, `${sourceMaterial.name} ${suffix}`);
+    materials.updateMaterial(newMaterial.uuid, cloneMaterialPatch(sourceMaterial));
+  });
+};
 
 const applyTimelineFrame = (frame: number) => {
   const timeline = useTimelineStore.getState();
@@ -50,31 +64,15 @@ const applyTimelineFrame = (frame: number) => {
   });
 };
 
-const duplicateObject = (object: SceneObject, material: EditorMaterial | null) => {
+const duplicateObject = (object: SceneObject) => {
   const scene = useSceneStore.getState();
   const materials = useMaterialStore.getState();
   const editor = useEditorStore.getState();
-  const copy = scene.addObject({
-    name: `${object.name} Copy`,
-    kind: object.kind,
-    source: object.source,
-    sourceType: object.sourceType,
-    primitive: object.primitive,
-    geometry: object.geometry ? { ...object.geometry } : undefined,
-    editableMesh: object.editableMesh ? cloneEditableMesh(object.editableMesh) : undefined,
-    position: offsetPosition(object.position),
-    rotation: [...object.rotation],
-    scale: [...object.scale],
-    visible: object.visible,
-    parent: object.parent,
-  });
-
-  if (material) {
-    const newMaterial = materials.createMaterialForObject(copy.uuid, copy.materialId, `${material.name} Copy`);
-    materials.updateMaterial(newMaterial.uuid, cloneMaterialPatch(material));
-  }
-
-  editor.setSelectedObject(copy.uuid);
+  const duplicate = scene.duplicateObject(object.uuid);
+  if (!duplicate) return null;
+  cloneDuplicateMaterials(duplicate, materials, 'Copy');
+  const copy = useSceneStore.getState().objects.find((item) => item.uuid === duplicate.rootId) ?? null;
+  editor.setSelectedObject(duplicate.rootId);
   return copy;
 };
 
@@ -148,7 +146,8 @@ export default function EditorShortcuts() {
         if (!clipboard) return;
         event.preventDefault();
         history.pushSnapshot();
-        const copy = duplicateObject(clipboard.object, clipboard.material);
+        const copy = duplicateObject(clipboard.object);
+        if (!copy) return;
         clipboardRef.current = {
           object: { ...copy, position: [...copy.position], rotation: [...copy.rotation], scale: [...copy.scale] },
           material: materials.materials[copy.materialId] ?? null,
@@ -160,7 +159,7 @@ export default function EditorShortcuts() {
         if (!selectedObject) return;
         event.preventDefault();
         history.pushSnapshot();
-        duplicateObject(selectedObject, selectedMaterial);
+        duplicateObject(selectedObject);
         return;
       }
 
@@ -183,8 +182,9 @@ export default function EditorShortcuts() {
           return;
         }
 
+        const ids = getSubtreeIds(scene.objects, selectedObject.uuid);
         scene.removeObject(selectedObject.uuid);
-        materials.removeMaterial(selectedObject.materialId);
+        materials.removeMaterialsForObjects(ids);
         editor.setSelectedObject(null);
         return;
       }
