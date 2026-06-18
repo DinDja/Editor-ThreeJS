@@ -12,7 +12,7 @@ export async function GET() {
 
   // Fallback: servidor local (self-hosted)
   const installerDir = process.env.INSTALLER_DIR || path.join(process.cwd(), 'release');
-  const installerName = process.env.INSTALLER_NAME || 'Editor 3D-1.0.0-setup.exe';
+  const installerName = process.env.INSTALLER_NAME || 'Editor.3D-1.0.0-setup.exe';
   const installerPath = path.join(installerDir, installerName);
 
   if (!existsSync(installerPath)) {
