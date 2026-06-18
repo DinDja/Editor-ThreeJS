@@ -2,10 +2,11 @@ import { create } from 'zustand';
 import { useEditorStore } from './editorStore';
 import { useMaterialStore } from './materialStore';
 import { useSceneStore } from './sceneStore';
-import { cloneMaterial, cloneSceneObject, type EditorMaterial, type SceneObject } from './types';
+import { cloneLayer, cloneMaterial, cloneSceneObject, type EditorMaterial, type Layer, type SceneObject } from './types';
 
 type HistorySnapshot = {
   objects: SceneObject[];
+  layers: Layer[];
   materials: Record<string, EditorMaterial>;
   selectedObjectId: string | null;
 };
@@ -24,12 +25,14 @@ const cloneMaterials = (materials: Record<string, EditorMaterial>) =>
 
 const captureSnapshot = (): HistorySnapshot => ({
   objects: useSceneStore.getState().objects.map(cloneSceneObject),
+  layers: useSceneStore.getState().layers.map(cloneLayer),
   materials: cloneMaterials(useMaterialStore.getState().materials),
   selectedObjectId: useEditorStore.getState().selectedObjectId,
 });
 
 const restoreSnapshot = (snapshot: HistorySnapshot) => {
   useSceneStore.getState().setObjects(snapshot.objects);
+  useSceneStore.getState().setLayers(snapshot.layers);
   useMaterialStore.getState().setMaterials(snapshot.materials);
   useEditorStore.getState().setSelectedObject(snapshot.selectedObjectId);
 };

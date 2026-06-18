@@ -264,6 +264,43 @@ export default function EditorShortcuts() {
       if (key === ']') {
         event.preventDefault();
         editor.setSculptRadius(editor.sculptRadius + 0.05);
+        return;
+      }
+
+      if (key === 'p' && !meta) {
+        event.preventDefault();
+        editor.setSculptPressureStrength(!editor.sculptPressureStrength);
+        return;
+      }
+
+      if (key === ';') {
+        event.preventDefault();
+        editor.setSculptPenSmoothing(Math.min(0.9, editor.sculptPenSmoothing + 0.1));
+        return;
+      }
+
+      if (key === "'") {
+        event.preventDefault();
+        editor.setSculptPenSmoothing(Math.max(0, editor.sculptPenSmoothing - 0.1));
+        return;
+      }
+
+      if (key === 'l' && !meta && !event.shiftKey && selectedObject) {
+        event.preventDefault();
+        const layer = scene.layers.find((l) => l.id === selectedObject.layerId);
+        if (!layer) return;
+        history.pushSnapshot();
+        scene.updateLayer(layer.id, { visible: !layer.visible });
+        return;
+      }
+
+      if (key === 'l' && event.shiftKey && selectedObject) {
+        event.preventDefault();
+        const layer = scene.layers.find((l) => l.id === selectedObject.layerId);
+        if (!layer) return;
+        history.pushSnapshot();
+        scene.updateLayer(layer.id, { locked: !layer.locked });
+        return;
       }
     };
 

@@ -49,6 +49,10 @@ export default function MeshEditOverlay({ object }: MeshEditOverlayProps) {
   const sculptBrushCenter = useEditorStore((state) => state.sculptBrushCenter);
   const sculptBrushNormal = useEditorStore((state) => state.sculptBrushNormal);
   const sculptRadius = useEditorStore((state) => state.sculptRadius);
+  const sculptStrength = useEditorStore((state) => state.sculptStrength);
+  const sculptPressureStrength = useEditorStore((state) => state.sculptPressureStrength);
+  const sculptPressureRadius = useEditorStore((state) => state.sculptPressureRadius);
+  const sculptPointerType = useEditorStore((state) => state.sculptPointerType);
   const snapping = useEditorStore((state) => state.snapping);
   const snapStep = useEditorStore((state) => state.snapStep);
   const setSelectedObject = useEditorStore((state) => state.setSelectedObject);
@@ -360,10 +364,50 @@ export default function MeshEditOverlay({ object }: MeshEditOverlayProps) {
         })}
 
       {showBrushPreview && (
-        <mesh position={sculptBrushCenter ?? [0, 0, 0]} quaternion={brushQuaternion} renderOrder={35}>
-          <ringGeometry args={[Math.max(0.001, sculptRadius * 0.96), sculptRadius, 96]} />
-          <meshBasicMaterial color="#fbbf24" transparent opacity={0.72} depthTest={false} side={THREE.DoubleSide} />
-        </mesh>
+        <group position={sculptBrushCenter ?? [0, 0, 0]} quaternion={brushQuaternion} renderOrder={35}>
+          {/* Crosshair lines for precision alignment */}
+          <mesh position={[0, 0, 0.002]}>
+            <planeGeometry args={[sculptRadius * 0.04, sculptRadius * 2]} />
+            <meshBasicMaterial color="#ffffff" transparent opacity={0.25} depthTest={false} side={THREE.DoubleSide} />
+          </mesh>
+          <mesh position={[0, 0, 0.002]}>
+            <planeGeometry args={[sculptRadius * 2, sculptRadius * 0.04]} />
+            <meshBasicMaterial color="#ffffff" transparent opacity={0.25} depthTest={false} side={THREE.DoubleSide} />
+          </mesh>
+          {/* Outer ring - brush radius boundary */}
+          <mesh>
+            <ringGeometry args={[Math.max(0.001, sculptRadius * 0.96), sculptRadius, 96]} />
+            <meshBasicMaterial
+              color={sculptPointerType === 'pen' ? '#a78bfa' : '#fbbf24'}
+              transparent
+              opacity={0.72}
+              depthTest={false}
+              side={THREE.DoubleSide}
+            />
+          </mesh>
+          {/* Inner ring - 50% falloff zone */}
+          <mesh>
+            <ringGeometry args={[Math.max(0.001, sculptRadius * 0.46), sculptRadius * 0.5, 64]} />
+            <meshBasicMaterial
+              color={sculptPointerType === 'pen' ? '#c4b5fd' : '#fde68a'}
+              transparent
+              opacity={0.35}
+              depthTest={false}
+              side={THREE.DoubleSide}
+            />
+          </mesh>
+          {/* Center dot - pressure indicator */}
+          <mesh position={[0, 0, 0.001]}>
+            <circleGeometry args={[sculptRadius * 0.08, 16]} />
+            <meshBasicMaterial
+              color={sculptPressureStrength ? '#34d399' : '#f87171'}
+              transparent
+              opacity={0.9}
+              depthTest={false}
+              side={THREE.DoubleSide}
+            />
+          </mesh>
+        </group>
       )}
 
       {isEditMode && <group ref={setPivotRef} visible={false} />}

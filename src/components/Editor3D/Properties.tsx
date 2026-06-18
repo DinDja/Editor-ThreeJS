@@ -1,6 +1,6 @@
 'use client';
 
-import { Eye, EyeOff, Move3D, PanelRight, Rotate3D, Scale3D } from 'lucide-react';
+import { Eye, EyeOff, Move3D, PanelRight, Plus, Rotate3D, Scale3D, Trash2 } from 'lucide-react';
 import * as THREE from 'three';
 import CollapsibleSection from './CollapsibleSection';
 import MaterialEditor from './MaterialEditor';
@@ -12,13 +12,14 @@ import { useHistoryStore } from '@/store/historyStore';
 import { useMaterialStore } from '@/store/materialStore';
 import { useSceneStore } from '@/store/sceneStore';
 import { useTimelineStore } from '@/store/timelineStore';
-import type { BehaviorConfig, BehaviorKind, EffectConfig, EffectKind, SceneObject, Vec3 } from '@/store/types';
+import type { BehaviorConfig, BehaviorKind, EffectConfig, EffectKind, SceneObject, Script, Vec3 } from '@/store/types';
 import { EFFECT_KINDS, EFFECT_LABELS, EFFECT_PRESETS } from '@/lib/effects';
 import { BEHAVIOR_KINDS, BEHAVIOR_LABELS, BEHAVIOR_DEFAULTS } from '@/lib/behaviors';
+import { createId } from '@/store/types';
 
 const labelClass = 'text-[11px] font-medium uppercase tracking-[0.14em] text-neutral-500';
 const inputClass =
-  'h-9 w-full rounded-md border border-neutral-700/80 bg-[#0d0f10] px-2.5 text-sm text-neutral-100 outline-none transition focus:border-emerald-400 focus:bg-[#101414]';
+  'h-11 w-full rounded-md border border-neutral-700/80 bg-[#0d0f10] px-3 text-sm text-neutral-100 outline-none transition focus:border-emerald-400 focus:bg-[#101414] sm:h-9 sm:px-2.5';
 
 type TransformField = 'position' | 'rotation' | 'scale';
 
@@ -430,6 +431,97 @@ function BehaviorPanel({ object }: { object: SceneObject }) {
   );
 }
 
+function ScriptPanel({ object }: { object: SceneObject }) {
+  const updateObject = useSceneStore((state) => state.updateObject);
+  const pushSnapshot = useHistoryStore((state) => state.pushSnapshot);
+  const scripts = object.scripts ?? [];
+
+  const addScript = () => {
+    pushSnapshot();
+    const newScript: Script = {
+      id: createId(),
+      name: `Script ${scripts.length + 1}`,
+      code: '// api.group.position.y += Math.sin(api.elapsed) * 0.1',
+      enabled: true,
+    };
+    updateObject(object.uuid, { scripts: [...scripts, newScript] });
+  };
+
+  const removeScript = (id: string) => {
+    pushSnapshot();
+    updateObject(object.uuid, {
+      scripts: scripts.filter((s) => s.id !== id),
+    });
+  };
+
+  const updateScript = (id: string, patch: Partial<Omit<Script, 'id'>>) => {
+    updateObject(object.uuid, {
+      scripts: scripts.map((s) => (s.id === id ? { ...s, ...patch } : s)),
+    });
+  };
+
+  return (
+    <CollapsibleSection title="Scripts">
+      <div className="grid gap-3">
+        {scripts.length === 0 && (
+          <p className="text-xs text-neutral-500">Nenhum script. Clique em + para adicionar.</p>
+        )}
+        {scripts.map((script) => (
+          <div key={script.id} className="rounded-md border border-neutral-800 bg-neutral-950 p-3">
+            <div className="mb-2 flex items-center justify-between gap-2">
+              <input
+                type="text"
+                value={script.name}
+                onChange={(e) => updateScript(script.id, { name: e.target.value })}
+                onFocus={pushSnapshot}
+                className="h-7 min-w-0 flex-1 rounded border border-neutral-700/80 bg-[#0d0f10] px-2 text-xs font-medium text-neutral-100 outline-none focus:border-emerald-400"
+              />
+              <div className="flex items-center gap-1">
+                <button
+                  type="button"
+                  onClick={() => updateScript(script.id, { enabled: !script.enabled })}
+                  className={`cursor-pointer rounded px-2 py-1 text-[10px] font-semibold uppercase tracking-[0.12em] transition ${
+                    script.enabled
+                      ? 'bg-emerald-400/15 text-emerald-300'
+                      : 'bg-neutral-800 text-neutral-500 hover:bg-neutral-700'
+                  }`}
+                >
+                  {script.enabled ? 'Ativo' : 'Inativo'}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => removeScript(script.id)}
+                  className="grid h-7 w-7 cursor-pointer place-items-center rounded text-neutral-500 transition hover:bg-red-500/15 hover:text-red-200"
+                  title="Remover script"
+                >
+                  <Trash2 size={12} />
+                </button>
+              </div>
+            </div>
+            <textarea
+              value={script.code}
+              onChange={(e) => updateScript(script.id, { code: e.target.value })}
+              onFocus={pushSnapshot}
+              spellCheck={false}
+              rows={8}
+              className="w-full resize-y rounded border border-neutral-700/80 bg-[#0a0b0c] px-2.5 py-2 font-mono text-[11px] leading-relaxed text-neutral-100 outline-none transition focus:border-emerald-400 focus:bg-[#101414]"
+              placeholder="// Digite seu codigo aqui"
+            />
+          </div>
+        ))}
+        <button
+          type="button"
+          onClick={addScript}
+          className="flex h-9 cursor-pointer items-center justify-center gap-2 rounded-md border border-dashed border-neutral-700/60 text-xs font-medium text-neutral-400 transition hover:border-emerald-400/50 hover:text-emerald-200"
+        >
+          <Plus size={13} />
+          Adicionar Script
+        </button>
+      </div>
+    </CollapsibleSection>
+  );
+}
+
 export default function Properties() {
   const selectedObjectId = useEditorStore((state) => state.selectedObjectId);
   const objects = useSceneStore((state) => state.objects);
@@ -447,14 +539,14 @@ export default function Properties() {
       <button
         type="button"
         onClick={() => setRightPanelCollapsed(false)}
-        className="grid h-7 w-7 cursor-pointer place-items-center rounded text-neutral-500 transition hover:bg-neutral-700/80 hover:text-neutral-100"
+        className="grid min-h-9 min-w-9 cursor-pointer place-items-center rounded text-neutral-500 transition hover:bg-neutral-700/80 hover:text-neutral-100 touch-manipulation"
         title="Expandir"
       >
-        <PanelRight size={14} className="rotate-180" />
+        <PanelRight size={16} className="rotate-180" />
       </button>
     </div>
   ) : (
-    <div className="flex items-center justify-between border-b border-neutral-800 px-4 py-3 max-sm:px-3 max-sm:py-2">
+    <div className="flex items-center justify-between border-b border-neutral-800 px-3 py-2.5 sm:px-4 sm:py-3">
       <div className="flex items-center gap-2">
         <PanelRight size={15} className="text-emerald-300" />
         <h2 className="text-xs font-semibold uppercase tracking-[0.18em] text-neutral-400">Properties</h2>
@@ -468,10 +560,10 @@ export default function Properties() {
         <button
           type="button"
           onClick={() => setRightPanelCollapsed(true)}
-          className="grid h-7 w-7 cursor-pointer place-items-center rounded text-neutral-500 transition hover:bg-neutral-700/80 hover:text-neutral-100"
+          className="grid min-h-9 min-w-9 cursor-pointer place-items-center rounded text-neutral-500 transition hover:bg-neutral-700/80 hover:text-neutral-100 touch-manipulation"
           title="Recolher"
         >
-          <PanelRight size={14} />
+          <PanelRight size={16} />
         </button>
       </div>
     </div>
@@ -479,18 +571,18 @@ export default function Properties() {
 
   if (!object || !material) {
     return (
-      <aside className="flex h-full min-h-0 flex-col border-l border-neutral-800 bg-[#151719] max-lg:border-l-0 max-lg:border-t">
+      <aside className="flex h-full min-h-0 flex-col border-l border-neutral-800 bg-[#151719]">
         {headerContent}
       </aside>
     );
   }
 
   return (
-    <aside className="flex h-full min-h-0 flex-col border-l border-neutral-800 bg-[#151719] max-lg:border-l-0 max-lg:border-t">
+    <aside className="flex h-full min-h-0 flex-col border-l border-neutral-800 bg-[#151719]">
       {headerContent}
       {!rightPanelCollapsed && (
-        <div className="min-h-0 flex-1 overflow-auto p-4 max-sm:p-3">
-          <div className="grid gap-6 max-sm:gap-4">
+        <div className="min-h-0 flex-1 overflow-auto p-3 sm:p-4">
+          <div className="grid gap-4 sm:gap-6">
           <section className="grid gap-3">
             <label className="grid gap-2">
               <span className={labelClass}>Nome</span>
@@ -573,6 +665,8 @@ export default function Properties() {
           {object.effect && <EffectPanel object={object} />}
 
           {!object.effect && <BehaviorPanel object={object} />}
+
+          <ScriptPanel object={object} />
           </div>
         </div>
       )}

@@ -22,6 +22,10 @@ export type SculptMode =
 
 export type SculptFalloff = 'smooth' | 'sphere' | 'sharp' | 'linear';
 
+export type PointerType = 'mouse' | 'pen' | 'touch';
+
+export type MobilePanel = 'scene' | 'properties' | 'timeline';
+
 export type PrimitiveKind = 'box' | 'sphere' | 'cylinder' | 'cone' | 'torus' | 'plane';
 
 export type EffectKind = 'fireworks' | 'fire' | 'smoke' | 'sparkle' | 'lightGlow';
@@ -61,6 +65,13 @@ export type EditableMesh = {
 
 export type BehaviorKind = 'jump' | 'walk' | 'accelerate' | 'roll' | 'gravity' | 'bubble' | 'massDeform';
 
+export type Script = {
+  id: string;
+  name: string;
+  code: string;
+  enabled: boolean;
+};
+
 export type BehaviorConfig = {
   type: BehaviorKind;
   enabled: boolean;
@@ -81,6 +92,15 @@ export type BehaviorConfig = {
   deformReturnSpeed?: number;
 };
 
+export type Layer = {
+  id: string;
+  name: string;
+  visible: boolean;
+  locked: boolean;
+  color: string;
+  order: number;
+};
+
 export type SceneObject = {
   uuid: string;
   name: string;
@@ -92,12 +112,14 @@ export type SceneObject = {
   editableMesh?: EditableMesh;
   effect?: EffectConfig;
   behaviors?: BehaviorConfig[];
+  scripts?: Script[];
   position: Vec3;
   rotation: Vec3;
   scale: Vec3;
   visible: boolean;
   parent: string | null;
   materialId: string;
+  layerId: string;
   createdAt: number;
 };
 
@@ -124,10 +146,10 @@ export type EditorMaterial = {
 };
 
 export type SceneObjectInput = Partial<
-  Pick<SceneObject, 'uuid' | 'position' | 'rotation' | 'scale' | 'visible' | 'parent' | 'materialId' | 'createdAt'>
+  Pick<SceneObject, 'uuid' | 'position' | 'rotation' | 'scale' | 'visible' | 'parent' | 'materialId' | 'layerId' | 'createdAt'>
 > &
   Pick<SceneObject, 'name' | 'kind'> &
-  Pick<SceneObject, 'source' | 'sourceType' | 'primitive' | 'geometry' | 'editableMesh' | 'effect' | 'behaviors'>;
+  Pick<SceneObject, 'source' | 'sourceType' | 'primitive' | 'geometry' | 'editableMesh' | 'effect' | 'behaviors' | 'scripts'>;
 
 export const createId = () => {
   if (typeof crypto !== 'undefined' && 'randomUUID' in crypto) {
@@ -153,9 +175,13 @@ export const cloneSceneObject = (object: SceneObject): SceneObject => ({
   editableMesh: object.editableMesh ? cloneEditableMesh(object.editableMesh) : undefined,
   effect: object.effect ? { ...object.effect } : undefined,
   behaviors: object.behaviors ? object.behaviors.map((b) => ({ ...b })) : undefined,
+  scripts: object.scripts ? object.scripts.map((s) => ({ ...s })) : undefined,
   position: cloneVec3(object.position),
   rotation: cloneVec3(object.rotation),
   scale: cloneVec3(object.scale),
+  layerId: object.layerId,
 });
+
+export const cloneLayer = (layer: Layer): Layer => ({ ...layer });
 
 export const cloneMaterial = (material: EditorMaterial): EditorMaterial => ({ ...material });

@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import type { ActiveTool, MeshSelectionMode, SculptFalloff, SculptMode, Vec3, ViewportDisplayMode } from './types';
+import type { ActiveTool, MeshSelectionMode, MobilePanel, PointerType, SculptFalloff, SculptMode, Vec3, ViewportDisplayMode } from './types';
 
 type EditorState = {
   selectedObjectId: string | null;
@@ -20,6 +20,10 @@ type EditorState = {
   sculptBrushObjectId: string | null;
   sculptBrushCenter: Vec3 | null;
   sculptBrushNormal: Vec3 | null;
+  sculptPressureStrength: boolean;
+  sculptPressureRadius: boolean;
+  sculptPenSmoothing: number;
+  sculptPointerType: PointerType;
   showGrid: boolean;
   snapping: boolean;
   snapStep: number;
@@ -28,6 +32,7 @@ type EditorState = {
   timelineCollapsed: boolean;
   leftPanelWidth: number;
   rightPanelWidth: number;
+  activeMobilePanel: MobilePanel | null;
   setSelectedObject: (uuid: string | null) => void;
   setActiveTool: (tool: ActiveTool) => void;
   setViewportDisplayMode: (mode: ViewportDisplayMode) => void;
@@ -47,6 +52,10 @@ type EditorState = {
   setSculptStrength: (strength: number) => void;
   setSculptBrushPreview: (objectId: string, center: Vec3, normal: Vec3) => void;
   clearSculptBrushPreview: () => void;
+  setSculptPressureStrength: (enabled: boolean) => void;
+  setSculptPressureRadius: (enabled: boolean) => void;
+  setSculptPenSmoothing: (smoothing: number) => void;
+  setSculptPointerType: (pointerType: PointerType) => void;
   setShowGrid: (showGrid: boolean) => void;
   setSnapping: (snapping: boolean) => void;
   setSnapStep: (snapStep: number) => void;
@@ -55,6 +64,7 @@ type EditorState = {
   setTimelineCollapsed: (collapsed: boolean) => void;
   setLeftPanelWidth: (width: number) => void;
   setRightPanelWidth: (width: number) => void;
+  setActiveMobilePanel: (panel: MobilePanel | null) => void;
 };
 
 export const useEditorStore = create<EditorState>((set) => ({
@@ -76,6 +86,10 @@ export const useEditorStore = create<EditorState>((set) => ({
   sculptBrushObjectId: null,
   sculptBrushCenter: null,
   sculptBrushNormal: null,
+  sculptPressureStrength: true,
+  sculptPressureRadius: false,
+  sculptPenSmoothing: 0,
+  sculptPointerType: 'mouse',
   showGrid: true,
   snapping: false,
   snapStep: 0.25,
@@ -84,6 +98,7 @@ export const useEditorStore = create<EditorState>((set) => ({
   timelineCollapsed: false,
   leftPanelWidth: 280,
   rightPanelWidth: 360,
+  activeMobilePanel: null,
 
   setSelectedObject: (selectedObjectId) =>
     set({
@@ -160,6 +175,10 @@ export const useEditorStore = create<EditorState>((set) => ({
       sculptBrushCenter: null,
       sculptBrushNormal: null,
     }),
+  setSculptPressureStrength: (sculptPressureStrength) => set({ sculptPressureStrength }),
+  setSculptPressureRadius: (sculptPressureRadius) => set({ sculptPressureRadius }),
+  setSculptPenSmoothing: (sculptPenSmoothing) => set({ sculptPenSmoothing: Math.max(0, Math.min(1, sculptPenSmoothing)) }),
+  setSculptPointerType: (sculptPointerType) => set({ sculptPointerType }),
   setShowGrid: (showGrid) => set({ showGrid }),
   setSnapping: (snapping) => set({ snapping }),
   setSnapStep: (snapStep) => set({ snapStep }),
@@ -168,4 +187,5 @@ export const useEditorStore = create<EditorState>((set) => ({
   setTimelineCollapsed: (timelineCollapsed) => set({ timelineCollapsed }),
   setLeftPanelWidth: (leftPanelWidth) => set({ leftPanelWidth: Math.max(180, Math.min(480, leftPanelWidth)) }),
   setRightPanelWidth: (rightPanelWidth) => set({ rightPanelWidth: Math.max(220, Math.min(600, rightPanelWidth)) }),
+  setActiveMobilePanel: (activeMobilePanel) => set({ activeMobilePanel }),
 }));

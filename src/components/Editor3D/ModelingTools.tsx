@@ -196,6 +196,10 @@ export default function ModelingTools({ object, material }: ModelingToolsProps) 
   const sculptSpacing = useEditorStore((state) => state.sculptSpacing);
   const sculptRadius = useEditorStore((state) => state.sculptRadius);
   const sculptStrength = useEditorStore((state) => state.sculptStrength);
+  const sculptPressureStrength = useEditorStore((state) => state.sculptPressureStrength);
+  const sculptPressureRadius = useEditorStore((state) => state.sculptPressureRadius);
+  const sculptPenSmoothing = useEditorStore((state) => state.sculptPenSmoothing);
+  const sculptPointerType = useEditorStore((state) => state.sculptPointerType);
   const setSelectedObject = useEditorStore((state) => state.setSelectedObject);
   const setActiveTool = useEditorStore((state) => state.setActiveTool);
   const setMeshSelectionMode = useEditorStore((state) => state.setMeshSelectionMode);
@@ -208,6 +212,9 @@ export default function ModelingTools({ object, material }: ModelingToolsProps) 
   const setSculptSpacing = useEditorStore((state) => state.setSculptSpacing);
   const setSculptRadius = useEditorStore((state) => state.setSculptRadius);
   const setSculptStrength = useEditorStore((state) => state.setSculptStrength);
+  const setSculptPressureStrength = useEditorStore((state) => state.setSculptPressureStrength);
+  const setSculptPressureRadius = useEditorStore((state) => state.setSculptPressureRadius);
+  const setSculptPenSmoothing = useEditorStore((state) => state.setSculptPenSmoothing);
   const pushSnapshot = useHistoryStore((state) => state.pushSnapshot);
   const primitive = object.kind === 'primitive' ? object.primitive ?? 'box' : null;
   const objectMaterials = useMemo(
@@ -637,6 +644,54 @@ export default function ModelingTools({ object, material }: ModelingToolsProps) 
             className="h-1.5 w-full cursor-pointer accent-emerald-400"
           />
         </label>
+
+        <div className="border-t border-neutral-700/40 pt-3">
+          <span className="mb-2 block text-[11px] font-medium uppercase tracking-[0.14em] text-neutral-500">
+            Tablet / Pressao
+          </span>
+          <div className="grid gap-2">
+            <label className="flex h-11 cursor-pointer items-center justify-between gap-3 rounded-md border border-neutral-700/80 bg-[#0d0f10] px-3 text-xs font-medium text-neutral-300 transition hover:border-emerald-400/70 hover:text-emerald-100">
+              <span>Pressao na Forca</span>
+              <input
+                type="checkbox"
+                checked={sculptPressureStrength}
+                onChange={(event) => setSculptPressureStrength(event.target.checked)}
+                className="h-4 w-4 cursor-pointer accent-emerald-400"
+              />
+            </label>
+            <label className="flex h-11 cursor-pointer items-center justify-between gap-3 rounded-md border border-neutral-700/80 bg-[#0d0f10] px-3 text-xs font-medium text-neutral-300 transition hover:border-emerald-400/70 hover:text-emerald-100">
+              <span>Pressao no Raio</span>
+              <input
+                type="checkbox"
+                checked={sculptPressureRadius}
+                onChange={(event) => setSculptPressureRadius(event.target.checked)}
+                className="h-4 w-4 cursor-pointer accent-emerald-400"
+              />
+            </label>
+            <label className="grid gap-2">
+              <div className="flex items-center justify-between gap-3">
+                <span className={labelClass}>Suavizacao (Stabilizer)</span>
+                <span className="w-10 text-right text-xs tabular-nums text-neutral-400">{sculptPenSmoothing.toFixed(2)}</span>
+              </div>
+              <input
+                type="range"
+                min={0}
+                max={0.9}
+                step={0.05}
+                value={sculptPenSmoothing}
+                onChange={(event) => setSculptPenSmoothing(Number(event.target.value))}
+                className="h-1.5 w-full cursor-pointer accent-emerald-400"
+              />
+            </label>
+            <div className="rounded-md border border-neutral-800 bg-neutral-950 px-3 py-2 text-[11px]">
+              <span className="block text-[10px] uppercase tracking-[0.14em] text-neutral-500">Dispositivo</span>
+              <span className="tabular-nums text-neutral-200">
+                {sculptPointerType === 'pen' ? 'Caneta' : sculptPointerType === 'touch' ? 'Toque' : 'Mouse'}
+              </span>
+            </div>
+          </div>
+        </div>
+
         <div className="grid grid-cols-2 gap-2">
           <button type="button" onClick={handleMaskClear} disabled={!object.editableMesh} className={buttonClass}>
             Limpar Mask

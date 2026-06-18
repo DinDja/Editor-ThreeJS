@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useMemo, type CSSProperties } from 'react';
+import { useCallback, useEffect, useMemo } from 'react';
 import { ChevronDown, ChevronLeft, ChevronRight, Copy, Diamond, Pause, Play, SkipBack, SkipForward, Trash2 } from 'lucide-react';
 import { frameToSeconds, sampleObjectTransform, type KeyframeInterpolation, type TransformKeyframe } from '@/lib/animation';
 import { useEditorStore } from '@/store/editorStore';
@@ -8,10 +8,10 @@ import { useSceneStore } from '@/store/sceneStore';
 import { useTimelineStore } from '@/store/timelineStore';
 
 const iconButtonClass =
-  'grid h-9 w-9 shrink-0 cursor-pointer place-items-center rounded-md border border-neutral-700/80 bg-[#0d0f10] text-neutral-400 transition hover:border-emerald-400/70 hover:text-emerald-100 disabled:cursor-not-allowed disabled:opacity-35';
+  'grid min-h-11 min-w-11 shrink-0 cursor-pointer place-items-center rounded-md border border-neutral-700/80 bg-[#0d0f10] text-neutral-400 transition hover:border-emerald-400/70 hover:text-emerald-100 disabled:cursor-not-allowed disabled:opacity-35 touch-manipulation sm:h-9 sm:w-9';
 
 const smallButtonClass =
-  'inline-flex h-8 min-w-0 cursor-pointer items-center justify-center gap-1.5 rounded-md border border-neutral-700/80 bg-[#0d0f10] px-2 text-[10px] font-medium uppercase tracking-[0.08em] text-neutral-400 transition hover:border-emerald-400/70 hover:text-emerald-100 disabled:cursor-not-allowed disabled:opacity-35';
+  'inline-flex min-h-10 min-w-0 cursor-pointer items-center justify-center gap-1.5 rounded-md border border-neutral-700/80 bg-[#0d0f10] px-2.5 text-[10px] font-medium uppercase tracking-[0.08em] text-neutral-400 transition hover:border-emerald-400/70 hover:text-emerald-100 disabled:cursor-not-allowed disabled:opacity-35 touch-manipulation sm:h-8 sm:px-2';
 
 const inputClass =
   'h-7 min-w-0 rounded-md border border-neutral-700/80 bg-[#0d0f10] px-2 text-xs tabular-nums text-neutral-100 outline-none transition focus:border-emerald-400';
@@ -25,10 +25,6 @@ const interpolationLabels: Record<KeyframeInterpolation, string> = {
 };
 
 const interpolationModes = Object.keys(interpolationLabels) as KeyframeInterpolation[];
-
-const timelineSafeAreaStyle = {
-  '--timeline-bottom-safe': 'max(1.25rem, env(safe-area-inset-bottom))',
-} as CSSProperties;
 
 const clampFrame = (frame: number, durationFrames: number) =>
   Math.max(0, Math.min(durationFrames, Number.isFinite(frame) ? Math.round(frame) : 0));
@@ -78,7 +74,7 @@ function TogglePill({
     <button
       type="button"
       onClick={onClick}
-      className={`h-8 cursor-pointer rounded-md border px-2 text-[10px] font-medium uppercase tracking-[0.08em] transition ${
+      className={`min-h-10 cursor-pointer rounded-md border px-2.5 text-[10px] font-medium uppercase tracking-[0.08em] transition touch-manipulation sm:h-8 sm:px-2 ${
         active
           ? 'border-emerald-400/70 bg-emerald-400/10 text-emerald-100'
           : 'border-neutral-700/80 bg-[#0d0f10] text-neutral-500 hover:border-emerald-400/70 hover:text-emerald-100'
@@ -228,11 +224,10 @@ export default function Timeline() {
 
   return (
     <footer
-      style={timelineSafeAreaStyle}
-      className={`flex shrink-0 flex-col border-t border-neutral-800 bg-[#17191b] pb-[var(--timeline-bottom-safe)] ${
+      className={`flex shrink-0 flex-col border-t border-neutral-800 bg-[#17191b] ${
         timelineCollapsed
-          ? 'h-[calc(2.5rem+var(--timeline-bottom-safe))]'
-          : 'h-[calc(15.5rem+var(--timeline-bottom-safe))] max-lg:h-[calc(21rem+var(--timeline-bottom-safe))]'
+          ? 'h-10'
+          : 'h-[21rem] lg:h-[15.5rem]'
       }`}
     >
       <div className="flex h-10 shrink-0 items-center justify-between border-b border-neutral-800 px-3">
@@ -247,8 +242,8 @@ export default function Timeline() {
         </button>
       </div>
       {!timelineCollapsed && (
-      <div className="grid min-h-0 flex-1 grid-cols-[300px_minmax(0,1fr)] overflow-y-auto overscroll-contain max-lg:grid-cols-1 max-lg:grid-rows-[minmax(0,1fr)_minmax(0,1fr)]">
-      <div className="grid min-h-0 gap-2 overflow-y-auto overscroll-contain border-r border-neutral-800 p-3 max-lg:border-r-0 max-lg:border-b">
+      <div className="grid min-h-0 flex-1 grid-cols-1 grid-rows-[auto_minmax(0,1fr)] overflow-y-auto overscroll-contain lg:grid-cols-[300px_minmax(0,1fr)] lg:grid-rows-none">
+      <div className="grid min-h-0 gap-2 overflow-y-auto overscroll-contain border-b border-neutral-800 p-2.5 sm:p-3 lg:border-r lg:border-b-0">
         <div className="flex min-w-0 items-center gap-1.5">
           <button type="button" title="Inicio" aria-label="Inicio" onClick={() => goToFrame(startFrame)} className={iconButtonClass}>
             <SkipBack size={14} />
@@ -348,7 +343,7 @@ export default function Timeline() {
         </div>
       </div>
 
-      <div className="grid min-h-0 min-w-0 grid-cols-[160px_minmax(0,1fr)] overflow-hidden p-3 max-sm:grid-cols-[112px_minmax(0,1fr)]">
+      <div className="grid min-h-0 min-w-0 grid-cols-[112px_minmax(0,1fr)] overflow-hidden p-2.5 sm:grid-cols-[160px_minmax(0,1fr)] sm:p-3">
         <div className="min-h-0 overflow-hidden border-r border-neutral-800 pr-2">
           <div className="mb-2 h-6 text-[10px] uppercase tracking-[0.14em] text-neutral-500">Dope Sheet</div>
           <div className="grid max-h-full gap-1 overflow-y-auto overscroll-contain pr-1">

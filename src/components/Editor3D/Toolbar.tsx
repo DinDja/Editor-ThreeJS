@@ -71,10 +71,10 @@ const viewportDisplayLabels: Record<ViewportDisplayMode, string> = {
 const viewportDisplayModes = Object.keys(viewportDisplayLabels) as ViewportDisplayMode[];
 
 const buttonClass =
-  'inline-flex min-h-11 shrink-0 cursor-pointer items-center justify-center gap-2 rounded-md border border-neutral-700/80 bg-[#111315] px-5 py-2.5 text-xs font-medium text-neutral-300 shadow-[inset_0_1px_0_rgba(255,255,255,0.04)] transition hover:border-emerald-400/70 hover:bg-[#151918] hover:text-emerald-100 disabled:cursor-not-allowed disabled:opacity-35';
+  'inline-flex min-h-11 shrink-0 cursor-pointer items-center justify-center gap-2 rounded-md border border-neutral-700/80 bg-[#111315] px-3 py-2 text-xs font-medium text-neutral-300 shadow-[inset_0_1px_0_rgba(255,255,255,0.04)] transition hover:border-emerald-400/70 hover:bg-[#151918] hover:text-emerald-100 disabled:cursor-not-allowed disabled:opacity-35 sm:px-5 sm:py-2.5';
 
 const iconButtonClass =
-  'inline-flex h-11 w-11 shrink-0 cursor-pointer items-center justify-center rounded-md border border-neutral-700/80 bg-[#111315] p-2.5 text-neutral-400 shadow-[inset_0_1px_0_rgba(255,255,255,0.04)] transition hover:border-emerald-400/70 hover:bg-[#151918] hover:text-emerald-100 disabled:cursor-not-allowed disabled:opacity-35';
+  'inline-flex min-h-11 min-w-11 shrink-0 cursor-pointer items-center justify-center rounded-md border border-neutral-700/80 bg-[#111315] p-2.5 text-neutral-400 shadow-[inset_0_1px_0_rgba(255,255,255,0.04)] transition hover:border-emerald-400/70 hover:bg-[#151918] hover:text-emerald-100 disabled:cursor-not-allowed disabled:opacity-35';
 
 type AiPrimitiveDraft = {
   name: string;
@@ -387,7 +387,7 @@ export default function Toolbar({ sceneRootRef, onOpenTutorial }: ToolbarProps) 
       ref={toolbarRef}
       onPointerDown={handleToolbarPointerDown}
       onClickCapture={handleToolbarClickCapture}
-      className={`flex min-h-[72px] select-none items-center gap-2.5 overflow-x-auto overflow-y-hidden border-b border-neutral-800 bg-[#17191b] px-3 py-2.5 text-neutral-100 shadow-[0_1px_0_rgba(255,255,255,0.03)] max-sm:min-h-[64px] ${
+      className={`flex min-h-[60px] select-none items-center gap-1.5 overflow-x-auto overflow-y-hidden border-b border-neutral-800 bg-[#17191b] px-2 py-1.5 text-neutral-100 shadow-[0_1px_0_rgba(255,255,255,0.03)] sm:min-h-[72px] sm:gap-2.5 sm:px-3 sm:py-2.5 ${
         toolbarDragging ? 'cursor-grabbing' : 'cursor-grab'
       }`}
     >
@@ -404,7 +404,7 @@ export default function Toolbar({ sceneRootRef, onOpenTutorial }: ToolbarProps) 
                 aria-label={toolLabels[tool]}
                 data-tutorial={`tool-${tool}`}
                 onClick={() => handleTool(tool)}
-                className={`inline-flex h-10 min-w-10 shrink-0 cursor-pointer items-center justify-center gap-2 rounded-md px-4 text-xs font-medium transition ${
+                className={`inline-flex min-h-11 min-w-11 shrink-0 cursor-pointer items-center justify-center gap-2 rounded-md px-3 text-xs font-medium transition touch-manipulation sm:px-4 ${
                   activeTool === tool
                     ? 'bg-emerald-400 text-neutral-950 shadow-[0_0_0_1px_rgba(16,185,129,0.25),0_8px_18px_rgba(16,185,129,0.15)]'
                     : 'text-neutral-400 hover:bg-neutral-800 hover:text-neutral-100'
@@ -520,7 +520,7 @@ export default function Toolbar({ sceneRootRef, onOpenTutorial }: ToolbarProps) 
         <ChevronDown size={14} className="pointer-events-none absolute right-2.5 top-1/2 -translate-y-1/2 text-neutral-500" />
       </div>
 
-      <div className="ml-auto flex shrink-0 items-center gap-2 max-md:ml-0">
+      <div className="ml-auto flex shrink-0 flex-wrap items-center gap-1.5 sm:gap-2 md:ml-auto">
         <input
           ref={fileInputRef}
           type="file"

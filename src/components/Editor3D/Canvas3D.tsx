@@ -14,9 +14,10 @@ import { useMaterialStore } from '@/store/materialStore';
 import { useSceneStore } from '@/store/sceneStore';
 import { useContextMenu } from '@/store/contextMenuStore';
 import ContextMenu from './ContextMenu';
-import type { EditableMesh, EditorMaterial, SceneObject, ViewportDisplayMode } from '@/store/types';
+import type { EditableMesh, EditorMaterial, PointerType, SceneObject, ViewportDisplayMode } from '@/store/types';
 import { EffectAsset } from '@/lib/effects';
 import { BehaviorEngine } from '@/lib/behaviors';
+import { ScriptEngine } from '@/lib/scriptEngine';
 
 type Canvas3DProps = {
   sceneRootRef: MutableRefObject<THREE.Group | null>;
@@ -254,6 +255,10 @@ function EditableMeshAsset({ object, material }: { object: SceneObject; material
   const sculptSpacing = useEditorStore((state) => state.sculptSpacing);
   const sculptRadius = useEditorStore((state) => state.sculptRadius);
   const sculptStrength = useEditorStore((state) => state.sculptStrength);
+  const sculptPressureStrength = useEditorStore((state) => state.sculptPressureStrength);
+  const sculptPressureRadius = useEditorStore((state) => state.sculptPressureRadius);
+  const sculptPenSmoothing = useEditorStore((state) => state.sculptPenSmoothing);
+  const setSculptPointerType = useEditorStore((state) => state.setSculptPointerType);
   const setSculptBrushPreview = useEditorStore((state) => state.setSculptBrushPreview);
   const clearSculptBrushPreview = useEditorStore((state) => state.clearSculptBrushPreview);
   const camera = useThree((state) => state.camera);
@@ -265,6 +270,8 @@ function EditableMeshAsset({ object, material }: { object: SceneObject; material
   const strokeGrabStartPointRef = useRef<THREE.Vector3 | null>(null);
   const strokeLastPointRef = useRef<THREE.Vector3 | null>(null);
   const strokePaintedVerticesRef = useRef<Set<number>>(new Set());
+  const strokeSmoothBufferRef = useRef<THREE.Vector3[]>([]);
+  const strokePressureRef = useRef(1);
   const objectMaterials = useMemo(() => {
     const baseMaterial = allMaterials[object.materialId] ?? material;
     const extraMaterials = Object.values(allMaterials)
@@ -299,13 +306,32 @@ function EditableMeshAsset({ object, material }: { object: SceneObject; material
 
   if (!geometry) return null;
 
+  const getSmoothedPoint = (rawPoint: THREE.Vector3) => {
+    const smoothing = sculptPenSmoothing;
+    if (smoothing <= 0) return rawPoint;
+
+    const buffer = strokeSmoothBufferRef.current;
+    buffer.push(rawPoint.clone());
+    if (buffer.length > 8) buffer.shift();
+    if (buffer.length < 2) return rawPoint;
+
+    const weightSum = buffer.reduce((sum, _, i) => sum + Math.pow(1 - smoothing, buffer.length - 1 - i), 0);
+    const smoothed = new THREE.Vector3();
+    buffer.forEach((p, i) => {
+      const weight = Math.pow(1 - smoothing, buffer.length - 1 - i) / weightSum;
+      smoothed.add(p.clone().multiplyScalar(weight));
+    });
+    return smoothed;
+  };
+
   const updateBrushPreview = (event: ThreeEvent<PointerEvent>) => {
     if (activeTool !== 'sculpt' || selectedObjectId !== object.uuid || !meshRef.current || !event.face) return null;
 
+    const pressure = event.nativeEvent.pressure || 0.5;
     const localPoint = meshRef.current.worldToLocal(event.point.clone());
     const localNormal = event.face.normal.clone().normalize();
     setSculptBrushPreview(object.uuid, [localPoint.x, localPoint.y, localPoint.z], [localNormal.x, localNormal.y, localNormal.z]);
-    return { localPoint, localNormal };
+    return { localPoint, localNormal, pressure };
   };
 
   const applySculptStroke = (event: ThreeEvent<PointerEvent>) => {
@@ -318,21 +344,32 @@ function EditableMeshAsset({ object, material }: { object: SceneObject; material
     const preview = updateBrushPreview(event);
     if (!preview) return;
 
-    const { localPoint, localNormal } = preview;
+    const { localPoint, localNormal, pressure } = preview;
+    const rawPressure = event.nativeEvent.pressure || (event.nativeEvent.pointerType === 'pen' ? 0.5 : 1);
+
+    strokePressureRef.current = rawPressure;
+
+    const effectivePressure = rawPressure > 0 ? rawPressure : 1;
+    const pressureStrength = sculptPressureStrength ? effectivePressure : 1;
+    const pressureRadius = sculptPressureRadius ? (0.3 + effectivePressure * 0.7) : 1;
+
+    const smoothedPoint = getSmoothedPoint(localPoint);
 
     if (strokeLastPointRef.current) {
-      const spacingDistance = sculptRadius * sculptSpacing;
-      if (sculptMode !== 'grab' && localPoint.distanceTo(strokeLastPointRef.current) < spacingDistance) return;
+      const spacingDistance = (sculptRadius * pressureRadius) * sculptSpacing * (sculptPressureRadius ? (0.5 + effectivePressure * 0.5) : 1);
+      if (sculptMode !== 'grab' && smoothedPoint.distanceTo(strokeLastPointRef.current) < spacingDistance) return;
     }
 
-    strokeLastPointRef.current = localPoint.clone();
+    strokeLastPointRef.current = smoothedPoint.clone();
     const localCamera = meshRef.current.worldToLocal(camera.position.clone());
-    const localViewDirection = localCamera.sub(localPoint).normalize();
+    const localViewDirection = localCamera.sub(smoothedPoint).normalize();
+    const effectiveStrength = sculptStrength * pressureStrength;
+    const effectiveRadius = sculptRadius * pressureRadius;
     const nextMesh =
       sculptMode === 'grab'
         ? (() => {
             if (!strokeGrabStartPointRef.current) {
-              strokeGrabStartPointRef.current = localPoint.clone();
+              strokeGrabStartPointRef.current = smoothedPoint.clone();
               strokeGrabStartMeshRef.current = sourceMesh;
               return sourceMesh;
             }
@@ -340,8 +377,8 @@ function EditableMeshAsset({ object, material }: { object: SceneObject; material
             return grabMeshVertices({
               mesh: strokeGrabStartMeshRef.current ?? sourceMesh,
               center: strokeGrabStartPointRef.current,
-              delta: localPoint.clone().sub(strokeGrabStartPointRef.current),
-              radius: sculptRadius,
+              delta: smoothedPoint.clone().sub(strokeGrabStartPointRef.current),
+              radius: effectiveRadius,
               falloff: sculptFalloff,
               symmetryX: sculptSymmetryX,
               frontFacesOnly: sculptFrontFacesOnly,
@@ -350,10 +387,10 @@ function EditableMeshAsset({ object, material }: { object: SceneObject; material
           })()
         : sculptMesh({
             mesh: sourceMesh,
-            center: localPoint,
+            center: smoothedPoint,
             normal: localNormal,
-            radius: sculptRadius,
-            strength: sculptStrength,
+            radius: effectiveRadius,
+            strength: effectiveStrength,
             mode: sculptMode,
             falloff: sculptFalloff,
             symmetryX: sculptSymmetryX,
@@ -376,6 +413,10 @@ function EditableMeshAsset({ object, material }: { object: SceneObject; material
     if (event.nativeEvent.target instanceof Element) {
       event.nativeEvent.target.setPointerCapture?.(event.pointerId);
     }
+
+    const pointerType = event.nativeEvent.pointerType as PointerType;
+    setSculptPointerType(pointerType);
+
     pushSnapshot();
     sculptingRef.current = true;
     strokeMeshRef.current = object.editableMesh;
@@ -383,6 +424,8 @@ function EditableMeshAsset({ object, material }: { object: SceneObject; material
     strokeGrabStartPointRef.current = null;
     strokeLastPointRef.current = null;
     strokePaintedVerticesRef.current = new Set();
+    strokeSmoothBufferRef.current = [];
+    strokePressureRef.current = event.nativeEvent.pressure || 0.5;
     applySculptStroke(event);
   };
 
@@ -402,6 +445,8 @@ function EditableMeshAsset({ object, material }: { object: SceneObject; material
     strokeGrabStartPointRef.current = null;
     strokeLastPointRef.current = null;
     strokePaintedVerticesRef.current.clear();
+    strokeSmoothBufferRef.current = [];
+    strokePressureRef.current = 1;
   };
 
   return (
@@ -417,6 +462,9 @@ function EditableMeshAsset({ object, material }: { object: SceneObject; material
       onPointerLeave={() => {
         endSculpt();
         clearSculptBrushPreview();
+      }}
+      onPointerEnter={(event) => {
+        setSculptPointerType(event.nativeEvent.pointerType as PointerType);
       }}
     >
       {!meshMaterials && (
@@ -511,10 +559,15 @@ function ObjectNode({
   registerObjectRef: ObjectRefRegistry;
 }) {
   const groupRef = useRef<THREE.Group>(null);
+  const layers = useSceneStore((state) => state.layers);
   const setSelectedObject = useEditorStore((state) => state.setSelectedObject);
   const viewportDisplayMode = useEditorStore((state) => state.viewportDisplayMode);
   const showPrimitiveShape = viewportDisplayMode === 'primitive' && object.kind === 'primitive';
   const showContextMenu = useContextMenu((state) => state.show);
+  const layerLocked = useMemo(
+    () => layers.find((l) => l.id === object.layerId)?.locked ?? false,
+    [layers, object.layerId],
+  );
 
   useEffect(() => {
     registerObjectRef(object.uuid, groupRef.current);
@@ -533,20 +586,18 @@ function ObjectNode({
       scale={object.scale}
       visible={object.visible}
       onClick={(event) => {
+        if (layerLocked) return;
         event.stopPropagation();
         setSelectedObject(object.uuid);
       }}
       onContextMenu={(event) => {
+        if (layerLocked) return;
         event.stopPropagation();
         const e = event.nativeEvent as MouseEvent;
         showContextMenu(e.clientX, e.clientY, object.uuid);
       }}
       onPointerOver={(event) => {
         event.stopPropagation();
-        document.body.style.cursor = 'pointer';
-      }}
-      onPointerOut={() => {
-        document.body.style.cursor = 'default';
       }}
     >
       {object.effect ? (
@@ -562,6 +613,7 @@ function ObjectNode({
       )}
       {!object.effect && <MeshEditOverlay object={object} />}
       <BehaviorEngine object={object} groupRef={groupRef} />
+      <ScriptEngine object={object} groupRef={groupRef} />
     </group>
   );
 }
@@ -641,6 +693,7 @@ function GridHelper({ show }: { show: boolean }) {
 
 function EditorScene({ sceneRootRef }: Canvas3DProps) {
   const objects = useSceneStore((state) => state.objects);
+  const layers = useSceneStore((state) => state.layers);
   const materials = useMaterialStore((state) => state.materials);
   const selectedObjectId = useEditorStore((state) => state.selectedObjectId);
   const showGrid = useEditorStore((state) => state.showGrid);
@@ -650,6 +703,40 @@ function EditorScene({ sceneRootRef }: Canvas3DProps) {
   const objectRefs = useRef(new Map<string, THREE.Object3D>());
   const rootRef = useRef<THREE.Group>(null);
   const [selectedObject, setSelectedObject3D] = useState<THREE.Object3D | null>(null);
+
+  const layerVisibilityMap = useMemo(() => {
+    const map = new Map<string, boolean>();
+    for (const layer of layers) {
+      map.set(layer.id, layer.visible);
+    }
+    return map;
+  }, [layers]);
+
+  const layerLockMap = useMemo(() => {
+    const map = new Map<string, boolean>();
+    for (const layer of layers) {
+      map.set(layer.id, layer.locked);
+    }
+    return map;
+  }, [layers]);
+
+  const visibleObjects = useMemo(
+    () => objects.filter((o) => layerVisibilityMap.get(o.layerId) !== false),
+    [objects, layerVisibilityMap],
+  );
+
+  const sortedObjects = useMemo(() => {
+    const layerOrder = new Map<string, number>();
+    for (const layer of layers) {
+      layerOrder.set(layer.id, layer.order);
+    }
+    return [...visibleObjects].sort((a, b) => {
+      const orderA = layerOrder.get(a.layerId) ?? 0;
+      const orderB = layerOrder.get(b.layerId) ?? 0;
+      if (orderA !== orderB) return orderA - orderB;
+      return a.createdAt - b.createdAt;
+    });
+  }, [visibleObjects, layers]);
   const [ctrlPressed, setCtrlPressed] = useState(false);
   const [altPressed, setAltPressed] = useState(false);
 
@@ -717,6 +804,15 @@ function EditorScene({ sceneRootRef }: Canvas3DProps) {
   }, []);
 
   useEffect(() => {
+    if (activeTool === 'sculpt') {
+      document.body.style.cursor = 'crosshair';
+    } else {
+      document.body.style.cursor = 'default';
+    }
+    return () => { document.body.style.cursor = 'default'; };
+  }, [activeTool]);
+
+  useEffect(() => {
     sceneRootRef.current = rootRef.current;
     return () => {
       sceneRootRef.current = null;
@@ -751,7 +847,7 @@ function EditorScene({ sceneRootRef }: Canvas3DProps) {
       <GridHelper show={showGrid} />
 
       <group ref={rootRef}>
-        {objects.map((object) => {
+        {sortedObjects.map((object) => {
           const material = materials[object.materialId];
           if (!material) return null;
 
@@ -802,7 +898,7 @@ export default function Canvas3D({ sceneRootRef }: Canvas3DProps) {
   const selectedObject = objects.find((object) => object.uuid === selectedObjectId);
 
   return (
-    <div className="relative h-full min-h-[320px] w-full overflow-hidden bg-[#101214] max-sm:min-h-[300px]" onContextMenu={(e) => e.preventDefault()}>
+    <div className="relative h-full w-full overflow-hidden bg-[#101214]" onContextMenu={(e) => e.preventDefault()}>
       <ContextMenu />
       <Canvas
         shadows
@@ -815,12 +911,12 @@ export default function Canvas3D({ sceneRootRef }: Canvas3DProps) {
         <fog attach="fog" args={['#101214', 18, 38]} />
         <EditorScene sceneRootRef={sceneRootRef} />
       </Canvas>
-      <div className="pointer-events-none absolute left-4 top-4 flex max-w-[calc(100%-2rem)] items-center gap-2 rounded-md border border-neutral-800/90 bg-neutral-950/70 px-3 py-2 text-[11px] uppercase tracking-[0.14em] text-neutral-400 shadow-lg backdrop-blur max-sm:left-2 max-sm:top-2 max-sm:px-2 max-sm:py-1.5 max-sm:text-[10px]">
+      <div className="pointer-events-none absolute left-2 top-2 flex max-w-[calc(100%-1rem)] items-center gap-1.5 rounded-md border border-neutral-800/90 bg-neutral-950/70 px-2.5 py-1.5 text-[10px] uppercase tracking-[0.14em] text-neutral-400 shadow-lg backdrop-blur sm:left-4 sm:top-4 sm:max-w-[calc(100%-2rem)] sm:gap-2 sm:px-3 sm:py-2 sm:text-[11px]">
         <span className="text-emerald-300">{activeTool}</span>
         <span className="h-3 w-px bg-neutral-700" />
         <span className="text-sky-300">{viewportDisplayMode}</span>
         <span className="h-3 w-px bg-neutral-700" />
-        <span className="max-w-48 truncate">{selectedObject?.name ?? 'Sem selecao'}</span>
+        <span className="max-w-24 truncate sm:max-w-48">{selectedObject?.name ?? 'Sem selecao'}</span>
       </div>
     </div>
   );
