@@ -9,6 +9,7 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
+    "icons": "node scripts/generate-icons.js",
     "electron:dev": "npx next dev -p 3456",
     "electron:start": "node -e \"const{spawn}=require('child_process');spawn('npx',['next','start','-p','3456'],{stdio:'inherit',shell:true})\"",
     "electron": "npx electron .",
@@ -37,7 +38,9 @@
     "electron-builder": "^25.1.0",
     "eslint": "^9",
     "eslint-config-next": "16.2.9",
+    "sharp": "^0.35.1",
     "tailwindcss": "^4",
+    "to-ico": "^1.1.5",
     "typescript": "^5"
   },
   "build": {
@@ -46,33 +49,24 @@
     "directories": {
       "output": "release"
     },
-    "files": [
-      "electron/**/*",
-      "package.json"
-    ],
-    "extraResources": [
-      {
-        "from": ".",
-        "to": "app",
-        "filter": [
-          ".next/**/*",
-          "public/**/*",
-          "node_modules/**/*",
-          "next.config.ts",
-          "package.json"
-        ]
-      }
+    "asarUnpack": [
+      "node_modules/next/**/*",
+      ".next/**/*",
+      "public/**/*",
+      "next.config.ts"
     ],
     "win": {
       "target": "nsis",
-      "icon": "public/favicon.ico",
-      "artifactName": "${productName}-${version}-setup.${ext}"
+      "icon": "public/icon.ico",
+      "artifactName": "${productName}-${version}-setup.${ext}",
+      "sign": null
     },
     "nsis": {
       "oneClick": false,
       "allowToChangeInstallationDirectory": true,
       "createDesktopShortcut": true,
       "deleteAppDataOnUninstall": false
-    }
+    },
+    "electronDist": "node_modules/electron/dist"
   }
 }

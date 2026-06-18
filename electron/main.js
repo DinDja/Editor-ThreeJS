@@ -31,7 +31,7 @@ function waitForServer(url, retries = 60) {
 
 function getProjectDir() {
   if (isDev()) return path.join(__dirname, '..');
-  return path.join(process.resourcesPath, 'app');
+  return path.join(process.resourcesPath, 'app.asar.unpacked');
 }
 
 function getNextCliPath() {
@@ -94,7 +94,7 @@ function createWindow() {
     minWidth: 1024,
     minHeight: 700,
     title: 'Editor 3D',
-    icon: path.join(getProjectDir(), 'public', 'favicon.ico'),
+    icon: path.join(getProjectDir(), 'public', 'icon.png'),
     webPreferences: {
       preload: path.join(__dirname, 'preload.js'),
       nodeIntegration: false,
