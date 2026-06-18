@@ -16,6 +16,7 @@ import {
   MousePointer2,
   Move3D,
   Pause,
+  PenTool,
   Play,
   PlugZap,
   Redo2,
@@ -23,6 +24,8 @@ import {
   RotateCcw,
   Scale3D,
   ScanLine,
+  Scissors,
+  Sparkles,
   Type,
   Upload,
   Undo2,
@@ -34,6 +37,7 @@ import * as THREE from 'three';
 import { exportObjectAsGLB, isModelFile, MODEL_FILE_ACCEPT } from '@/lib/fileOps';
 import { buildSceneObjectsFromGltf } from '@/lib/gltfImport';
 import { primitiveKinds, primitiveLabels } from '@/lib/geometryOps';
+import { buildEditableMeshFromAiData } from '@/lib/aiMeshEnhancer';
 import { createPrimitiveEditableMesh } from '@/lib/meshOps';
 import { useEditorStore } from '@/store/editorStore';
 import { useHistoryStore } from '@/store/historyStore';
@@ -41,7 +45,7 @@ import { useMaterialStore } from '@/store/materialStore';
 import { usePhysicsStore } from '@/store/physicsStore';
 import { useSceneStore } from '@/store/sceneStore';
 import { useTimelineStore } from '@/store/timelineStore';
-import type { ActiveTool, EffectKind, LightConfig, ObjectSelectionMode, PrimitiveGeometry, PrimitiveKind, ViewportDisplayMode
+import type { ActiveTool, EffectKind, LightConfig, ObjectSelectionMode, PrimitiveKind, ViewportDisplayMode
 } from '@/store/types';
 import { DEFAULT_LIGHT_CONFIG } from '@/store/types';
 import { EFFECT_KINDS, EFFECT_LABELS, EFFECT_PRESETS } from '@/lib/effects';
@@ -59,6 +63,8 @@ const toolLabels: Record<ActiveTool, string> = {
   scale: 'Escalar',
   edit: 'Editar',
   sculpt: 'Sculpt',
+  drawPolygon: 'Draw Polygon',
+  knife: 'Knife',
 };
 
 const toolIcons: Record<ActiveTool, LucideIcon> = {
@@ -68,9 +74,12 @@ const toolIcons: Record<ActiveTool, LucideIcon> = {
   scale: Scale3D,
   edit: Grid3X3,
   sculpt: Brush,
+  drawPolygon: PenTool,
+  knife: Scissors,
 };
 
 const tools: ActiveTool[] = ['select', 'translate', 'rotate', 'scale', 'edit', 'sculpt'];
+const editTools: ActiveTool[] = ['drawPolygon', 'knife'];
 
 const viewportDisplayLabels: Record<ViewportDisplayMode, string> = {
   textured: 'Textura',
@@ -107,16 +116,15 @@ const selectClass = 'h-8 appearance-none rounded-md border border-neutral-700/50
 
 const selectChevron = 'pointer-events-none absolute right-2 top-1/2 -translate-y-1/2 text-neutral-600';
 
-type AiPrimitiveDraft = {
+type AiMeshDraft = {
   name: string;
-  primitive: PrimitiveKind;
+  vertices: [number, number, number][];
+  faces: [number, number, number][];
   position?: [number, number, number];
   rotation?: [number, number, number];
   scale?: [number, number, number];
   visible?: boolean;
   parentName?: string;
-  editableMesh?: boolean;
-  geometry?: PrimitiveGeometry;
   material?: Partial<{
     color: string;
     metalness: number;
@@ -133,12 +141,14 @@ type AiPrimitiveDraft = {
 };
 
 type AiGenerateResponse = {
-  objects: AiPrimitiveDraft[];
+  objects: AiMeshDraft[];
 };
 
 function ToolbarDivider() {
   return <div className="mx-1 h-5 w-px bg-neutral-800" />;
 }
+
+const round3 = (value: number) => Number(value.toFixed(3));
 
 export default function Toolbar({ sceneRootRef, onOpenTutorial }: ToolbarProps) {
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -347,7 +357,7 @@ export default function Toolbar({ sceneRootRef, onOpenTutorial }: ToolbarProps) 
   };
 
   const handleTool = (tool: ActiveTool) => {
-    if (tool !== 'edit' && tool !== 'sculpt') {
+    if (tool !== 'edit' && tool !== 'sculpt' && tool !== 'drawPolygon' && tool !== 'knife') {
       setActiveTool(tool);
       return;
     }
@@ -459,19 +469,24 @@ export default function Toolbar({ sceneRootRef, onOpenTutorial }: ToolbarProps) 
       pushSnapshot();
 
       let lastObjectId: string | null = null;
-      const createdObjects: Array<{ uuid: string; name: string; parentName?: string }> = [];
+      const createdObjects: Array<{
+        uuid: string;
+        name: string;
+        parentName?: string;
+        absolutePosition: [number, number, number];
+      }> = [];
 
       payload.objects.forEach((item) => {
+        const absolutePosition = item.position ?? [0, 0.5, 0];
+        const editableMesh = buildEditableMeshFromAiData(item.vertices, item.faces);
         const object = addObject({
           name: item.name,
-          kind: 'primitive',
-          primitive: item.primitive,
-          geometry: item.geometry,
-          position: item.position ?? [0, 0.5, 0],
+          kind: 'mesh',
+          position: absolutePosition,
           rotation: item.rotation ?? [0, 0, 0],
           scale: item.scale ?? [1, 1, 1],
           visible: item.visible ?? true,
-          editableMesh: item.editableMesh ? createPrimitiveEditableMesh(item.primitive, item.geometry) : undefined,
+          editableMesh,
         });
 
         createMaterialForObject(object.uuid, object.materialId, `Material ${item.name}`);
@@ -495,16 +510,29 @@ export default function Toolbar({ sceneRootRef, onOpenTutorial }: ToolbarProps) 
           Object.fromEntries(Object.entries(materialPatch).filter(([, value]) => value !== undefined)),
         );
 
-        createdObjects.push({ uuid: object.uuid, name: item.name, parentName: item.parentName });
+        createdObjects.push({ uuid: object.uuid, name: item.name, parentName: item.parentName, absolutePosition });
         lastObjectId = object.uuid;
       });
 
+      const nameToAbsolute = new Map(
+        createdObjects.map((item) => [item.name.toLowerCase(), item.absolutePosition]),
+      );
       const nameToId = new Map(createdObjects.map((item) => [item.name.toLowerCase(), item.uuid]));
       createdObjects.forEach((item) => {
         if (!item.parentName) return;
         const parentId = nameToId.get(item.parentName.toLowerCase());
         if (!parentId || parentId === item.uuid) return;
-        updateObject(item.uuid, { parent: parentId });
+
+        const parentAbsolute = nameToAbsolute.get(item.parentName.toLowerCase());
+        const relativePosition: [number, number, number] = parentAbsolute
+          ? [
+              round3(item.absolutePosition[0] - parentAbsolute[0]),
+              round3(item.absolutePosition[1] - parentAbsolute[1]),
+              round3(item.absolutePosition[2] - parentAbsolute[2]),
+            ]
+          : item.absolutePosition;
+
+        updateObject(item.uuid, { parent: parentId, position: relativePosition });
       });
 
       setAiModalOpen(false);
@@ -551,6 +579,33 @@ export default function Toolbar({ sceneRootRef, onOpenTutorial }: ToolbarProps) 
           );
         })}
       </div>
+
+      {/* ── Edit Mesh Tools ── */}
+      {(activeTool === 'edit' || activeTool === 'drawPolygon' || activeTool === 'knife') && (
+        <>
+          <ToolbarDivider />
+          <div className="flex shrink-0 items-center gap-0.5 rounded-md bg-fuchsia-950/30 p-0.5">
+            {editTools.map((tool) => {
+              const Icon = toolIcons[tool];
+              const isActive = activeTool === tool;
+              return (
+                <button
+                  key={tool}
+                  type="button"
+                  title={toolLabels[tool]}
+                  aria-label={toolLabels[tool]}
+                  aria-current={isActive ? 'true' : undefined}
+                  data-tutorial={`tool-${tool}`}
+                  onClick={() => handleTool(tool)}
+                  className={`${btnTool} ${isActive ? btnToolActive : btnToolInactive}`}
+                >
+                  <Icon size={14} />
+                </button>
+              );
+            })}
+          </div>
+        </>
+      )}
 
       <ToolbarDivider />
 
@@ -806,6 +861,22 @@ export default function Toolbar({ sceneRootRef, onOpenTutorial }: ToolbarProps) 
       <button type="button" title="Criar texto 3D" aria-label="Criar texto 3D" onClick={handleAddText} className={btnBase}>
         <Type size={14} />
       </button>
+
+      <ToolbarDivider />
+
+      {/* ── AI Generation ── */}
+      {/* <button
+        type="button"
+        title="Gerar cena com IA (NVIDIA NIM)"
+        aria-label="Gerar IA"
+        data-tutorial="ai-generate"
+        onClick={() => { setAiModalOpen(true); setAiError(null); }}
+        disabled={generatingAi}
+        className="inline-flex items-center justify-center shrink-0 h-8 gap-1.5 rounded-md border border-fuchsia-600/40 bg-fuchsia-950/30 px-3 text-[11px] font-semibold text-fuchsia-300 transition-colors hover:border-fuchsia-500/60 hover:bg-fuchsia-900/40 hover:text-fuchsia-200 disabled:opacity-50 disabled:cursor-not-allowed"
+      >
+        <Sparkles size={12} />
+        <span>{generatingAi ? '...' : 'Gerar IA'}</span>
+      </button> */}
 
       <ToolbarDivider />
 

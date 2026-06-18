@@ -236,10 +236,23 @@ export default function EditorShortcuts() {
         return;
       }
 
+      if (key === '2' && !meta && !event.shiftKey) {
+        event.preventDefault();
+        editor.setMeshSelectionMode('edge');
+        editor.setActiveTool('edit');
+        return;
+      }
+
       if (key === 'f') {
         event.preventDefault();
         editor.setMeshSelectionMode('face');
         editor.setActiveTool('edit');
+        return;
+      }
+
+      if (key === 'k' && !meta && !event.shiftKey) {
+        event.preventDefault();
+        editor.setActiveTool('knife');
         return;
       }
 
@@ -267,9 +280,41 @@ export default function EditorShortcuts() {
         return;
       }
 
+      if (key === 'arrowup' && !meta) {
+        event.preventDefault();
+        editor.setSculptStrength(Math.min(1, editor.sculptStrength + 0.02));
+        return;
+      }
+
+      if (key === 'arrowdown' && !meta) {
+        event.preventDefault();
+        editor.setSculptStrength(Math.max(0.01, editor.sculptStrength - 0.02));
+        return;
+      }
+
+      if (key === 'x' && !meta && editor.activeTool === 'sculpt') {
+        event.preventDefault();
+        const inverse: Record<string, string> = { push: 'pull', pull: 'push', inflate: 'pinch', pinch: 'inflate' };
+        const next = inverse[editor.sculptMode];
+        if (next) editor.setSculptMode(next as never);
+        return;
+      }
+
+      if (key === 'f' && event.shiftKey && !meta) {
+        event.preventDefault();
+        const order = ['smooth', 'sphere', 'sharp', 'linear'] as const;
+        const idx = order.indexOf(editor.sculptFalloff);
+        editor.setSculptFalloff(order[(idx + 1) % order.length]);
+        return;
+      }
+
       if (key === 'p' && !meta) {
         event.preventDefault();
-        editor.setSculptPressureStrength(!editor.sculptPressureStrength);
+        if (editor.activeTool === 'sculpt') {
+          editor.setSculptPressureStrength(!editor.sculptPressureStrength);
+        } else {
+          editor.setActiveTool('drawPolygon');
+        }
         return;
       }
 

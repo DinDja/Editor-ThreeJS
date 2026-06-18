@@ -1,6 +1,6 @@
 'use client';
 
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import {
   AlertTriangle,
   Atom,
@@ -34,7 +34,6 @@ import {
   Type,
 } from 'lucide-react';
 import * as THREE from 'three';
-import { useRef } from 'react';
 import { TEXTURE_FILE_ACCEPT } from '@/lib/fileOps';
 import { primitiveKinds, primitiveLabels } from '@/lib/geometryOps';
 import { createPrimitiveEditableMesh } from '@/lib/meshOps';
@@ -1291,6 +1290,7 @@ function ActionButton({
 export default function Properties() {
   const selectedObjectIds = useEditorStore((s) => s.selectedObjectIds);
   const selectedReferenceId = useEditorStore((s) => s.selectedReferenceId);
+  const activeTool = useEditorStore((s) => s.activeTool);
   const objects = useSceneStore((s) => s.objects);
   const updateObject = useSceneStore((s) => s.updateObject);
   const pushSnapshot = useHistoryStore((s) => s.pushSnapshot);
@@ -1301,6 +1301,32 @@ export default function Properties() {
   const [materialScope, setMaterialScope] = useState<MaterialApplicationScope>('self');
   const [selectedMaterialId, setSelectedMaterialId] = useState<string | null>(null);
   const object = objects.find((item) => item.uuid === (selectedObjectIds[0] ?? null));
+  const propertiesBodyRef = useRef<HTMLDivElement>(null);
+  const prevSelectedId = useRef<string | null>(null);
+
+  useEffect(() => {
+    if (!object || selectedObjectIds[0] === prevSelectedId.current) return;
+    prevSelectedId.current = selectedObjectIds[0] ?? null;
+
+    let sectionId: string | null = null;
+    switch (activeTool) {
+      case 'translate':
+      case 'rotate':
+      case 'scale':
+        sectionId = 'section-transformar';
+        break;
+      case 'edit':
+      case 'sculpt':
+        sectionId = 'section-modelagem';
+        break;
+    }
+
+    if (sectionId && propertiesBodyRef.current) {
+      const el = propertiesBodyRef.current.querySelector(`#${sectionId}`) as HTMLElement | null;
+      el?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
+  }, [selectedObjectIds, activeTool, object]);
+
   const materialIds = object?.materialIds?.length ? object.materialIds : object ? [object.materialId] : [];
   const activeMaterialId = materialIds.includes(selectedMaterialId ?? '') ? selectedMaterialId! : object?.materialId;
   const material = activeMaterialId ? allMaterials[activeMaterialId] ?? null : null;
@@ -1422,7 +1448,7 @@ export default function Properties() {
       </div>
 
       {/* ── Body ── */}
-      <div className="min-h-0 flex-1 space-y-1 overflow-auto py-3">
+      <div ref={propertiesBodyRef} className="min-h-0 flex-1 space-y-1 overflow-auto py-3">
         {/* Transform */}
         <Section title="Transformar" icon={<Move3D size={11} className="text-neutral-500" />}>
           <TransformRow object={object} field="position" />

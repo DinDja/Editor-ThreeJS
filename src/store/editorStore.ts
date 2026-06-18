@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import type { ActiveTool, MeshSelectionMode, MobilePanel, ObjectSelectionMode, PointerType, SculptFalloff, SculptMode, Vec3, ViewportDisplayMode } from './types';
+import type { ActiveTool, MeshEditMode, MeshSelectionMode, MobilePanel, ObjectSelectionMode, PointerType, SculptFalloff, SculptMode, Vec3, ViewportDisplayMode } from './types';
 
 type EditorState = {
   selectedObjectIds: string[];
@@ -7,9 +7,17 @@ type EditorState = {
   objectSelectionMode: ObjectSelectionMode;
   viewportDisplayMode: ViewportDisplayMode;
   meshSelectionMode: MeshSelectionMode;
+  meshEditMode: MeshEditMode;
   selectedVertexIndices: number[];
   selectedEdgeVertexIndices: [number, number] | null;
+  selectedEdgeIndices: number[];
   selectedFaceIndex: number | null;
+  selectedFaceIndices: number[];
+  drawPolygonPoints: Vec3[];
+  knifePoints: Vec3[];
+  hoverVertexIndex: number | null;
+  hoverEdgeIndex: number | null;
+  hoverFaceIndex: number | null;
   sculptMode: SculptMode;
   sculptFalloff: SculptFalloff;
   sculptSymmetryX: boolean;
@@ -43,11 +51,25 @@ type EditorState = {
   setObjectSelectionMode: (mode: ObjectSelectionMode) => void;
   setViewportDisplayMode: (mode: ViewportDisplayMode) => void;
   setMeshSelectionMode: (mode: MeshSelectionMode) => void;
+  setMeshEditMode: (mode: MeshEditMode) => void;
   setSelectedVertices: (indices: number[]) => void;
   toggleVertexSelection: (index: number, additive?: boolean) => void;
   setSelectedEdge: (edge: [number, number] | null) => void;
+  setSelectedEdges: (indices: number[]) => void;
+  toggleEdgeSelection: (index: number, additive?: boolean) => void;
   setSelectedFace: (faceIndex: number | null, vertexIndices?: number[]) => void;
+  setSelectedFaces: (indices: number[]) => void;
+  toggleFaceSelection: (index: number, additive?: boolean) => void;
   clearMeshSelection: () => void;
+  setDrawPolygonPoints: (points: Vec3[]) => void;
+  addDrawPolygonPoint: (point: Vec3) => void;
+  clearDrawPolygon: () => void;
+  setKnifePoints: (points: Vec3[]) => void;
+  addKnifePoint: (point: Vec3) => void;
+  clearKnife: () => void;
+  setHoverVertex: (index: number | null) => void;
+  setHoverEdge: (index: number | null) => void;
+  setHoverFace: (index: number | null) => void;
   setSculptMode: (mode: SculptMode) => void;
   setSculptFalloff: (falloff: SculptFalloff) => void;
   setSculptSymmetryX: (enabled: boolean) => void;
@@ -79,23 +101,31 @@ export const useEditorStore = create<EditorState>((set) => ({
   objectSelectionMode: 'subelement',
   viewportDisplayMode: 'textured',
   meshSelectionMode: 'vertex',
+  meshEditMode: 'object',
   selectedVertexIndices: [],
   selectedEdgeVertexIndices: null,
+  selectedEdgeIndices: [],
   selectedFaceIndex: null,
+  selectedFaceIndices: [],
+  drawPolygonPoints: [],
+  knifePoints: [],
+  hoverVertexIndex: null,
+  hoverEdgeIndex: null,
+  hoverFaceIndex: null,
   sculptMode: 'push',
   sculptFalloff: 'smooth',
   sculptSymmetryX: false,
   sculptFrontFacesOnly: false,
   sculptAccumulate: true,
-  sculptSpacing: 0.2,
+  sculptSpacing: 0.15,
   sculptRadius: 0.45,
-  sculptStrength: 0.18,
+  sculptStrength: 0.25,
   sculptBrushObjectId: null,
   sculptBrushCenter: null,
   sculptBrushNormal: null,
-  sculptPressureStrength: true,
+  sculptPressureStrength: false,
   sculptPressureRadius: false,
-  sculptPenSmoothing: 0,
+  sculptPenSmoothing: 0.35,
   sculptPointerType: 'mouse',
   showGrid: true,
   snapping: false,
@@ -157,14 +187,21 @@ export const useEditorStore = create<EditorState>((set) => ({
     }),
   setActiveTool: (activeTool) =>
     set(() =>
-      activeTool === 'edit' || activeTool === 'sculpt'
+      activeTool === 'edit' || activeTool === 'sculpt' || activeTool === 'drawPolygon' || activeTool === 'knife'
         ? { activeTool }
         : {
             activeTool,
             selectedObjectIds: [],
             selectedVertexIndices: [],
             selectedEdgeVertexIndices: null,
+            selectedEdgeIndices: [],
             selectedFaceIndex: null,
+            selectedFaceIndices: [],
+            drawPolygonPoints: [],
+            knifePoints: [],
+            hoverVertexIndex: null,
+            hoverEdgeIndex: null,
+            hoverFaceIndex: null,
             sculptBrushObjectId: null,
             sculptBrushCenter: null,
             sculptBrushNormal: null,
@@ -177,14 +214,17 @@ export const useEditorStore = create<EditorState>((set) => ({
       meshSelectionMode,
       selectedVertexIndices: [],
       selectedEdgeVertexIndices: null,
+      selectedEdgeIndices: [],
       selectedFaceIndex: null,
+      selectedFaceIndices: [],
     }),
+  setMeshEditMode: (meshEditMode) => set({ meshEditMode }),
   setSelectedVertices: (selectedVertexIndices) =>
-    set({ selectedVertexIndices, selectedEdgeVertexIndices: null, selectedFaceIndex: null }),
+    set({ selectedVertexIndices, selectedEdgeVertexIndices: null, selectedEdgeIndices: [], selectedFaceIndex: null, selectedFaceIndices: [] }),
   toggleVertexSelection: (index, additive = false) =>
     set((state) => {
       if (!additive) {
-        return { selectedVertexIndices: [index], selectedEdgeVertexIndices: null, selectedFaceIndex: null };
+        return { selectedVertexIndices: [index], selectedEdgeVertexIndices: null, selectedEdgeIndices: [], selectedFaceIndex: null, selectedFaceIndices: [] };
       }
 
       const exists = state.selectedVertexIndices.includes(index);
@@ -193,18 +233,69 @@ export const useEditorStore = create<EditorState>((set) => ({
           ? state.selectedVertexIndices.filter((item) => item !== index)
           : [...state.selectedVertexIndices, index],
         selectedEdgeVertexIndices: null,
+        selectedEdgeIndices: [],
         selectedFaceIndex: null,
+        selectedFaceIndices: [],
       };
     }),
   setSelectedEdge: (selectedEdgeVertexIndices) =>
     set({
       selectedEdgeVertexIndices,
       selectedVertexIndices: selectedEdgeVertexIndices ? [...selectedEdgeVertexIndices] : [],
+      selectedEdgeIndices: [],
       selectedFaceIndex: null,
+      selectedFaceIndices: [],
+    }),
+  setSelectedEdges: (selectedEdgeIndices) =>
+    set({ selectedEdgeIndices, selectedEdgeVertexIndices: null, selectedFaceIndex: null, selectedFaceIndices: [] }),
+  toggleEdgeSelection: (index, additive = false) =>
+    set((state) => {
+      if (!additive) return { selectedEdgeIndices: [index] };
+      const exists = state.selectedEdgeIndices.includes(index);
+      return {
+        selectedEdgeIndices: exists
+          ? state.selectedEdgeIndices.filter((item) => item !== index)
+          : [...state.selectedEdgeIndices, index],
+      };
     }),
   setSelectedFace: (selectedFaceIndex, selectedVertexIndices = []) =>
-    set({ selectedFaceIndex, selectedVertexIndices, selectedEdgeVertexIndices: null }),
-  clearMeshSelection: () => set({ selectedVertexIndices: [], selectedEdgeVertexIndices: null, selectedFaceIndex: null }),
+    set({
+      selectedFaceIndex,
+      selectedVertexIndices,
+      selectedEdgeVertexIndices: null,
+      selectedEdgeIndices: [],
+      selectedFaceIndices: selectedFaceIndex !== null ? [selectedFaceIndex] : [],
+    }),
+  setSelectedFaces: (selectedFaceIndices) =>
+    set({ selectedFaceIndices, selectedFaceIndex: selectedFaceIndices[0] ?? null, selectedEdgeVertexIndices: null, selectedEdgeIndices: [] }),
+  toggleFaceSelection: (index, additive = false) =>
+    set((state) => {
+      if (!additive) return { selectedFaceIndices: [index], selectedFaceIndex: index };
+      const exists = state.selectedFaceIndices.includes(index);
+      const next = exists
+        ? state.selectedFaceIndices.filter((item) => item !== index)
+        : [...state.selectedFaceIndices, index];
+      return { selectedFaceIndices: next, selectedFaceIndex: next[0] ?? null };
+    }),
+  clearMeshSelection: () => set({
+    selectedVertexIndices: [],
+    selectedEdgeVertexIndices: null,
+    selectedEdgeIndices: [],
+    selectedFaceIndex: null,
+    selectedFaceIndices: [],
+    hoverVertexIndex: null,
+    hoverEdgeIndex: null,
+    hoverFaceIndex: null,
+  }),
+  setDrawPolygonPoints: (drawPolygonPoints) => set({ drawPolygonPoints }),
+  addDrawPolygonPoint: (point) => set((state) => ({ drawPolygonPoints: [...state.drawPolygonPoints, point] })),
+  clearDrawPolygon: () => set({ drawPolygonPoints: [] }),
+  setKnifePoints: (knifePoints) => set({ knifePoints }),
+  addKnifePoint: (point) => set((state) => ({ knifePoints: [...state.knifePoints, point] })),
+  clearKnife: () => set({ knifePoints: [] }),
+  setHoverVertex: (hoverVertexIndex) => set({ hoverVertexIndex }),
+  setHoverEdge: (hoverEdgeIndex) => set({ hoverEdgeIndex }),
+  setHoverFace: (hoverFaceIndex) => set({ hoverFaceIndex }),
   setSculptMode: (sculptMode) => set({ sculptMode }),
   setSculptFalloff: (sculptFalloff) => set({ sculptFalloff }),
   setSculptSymmetryX: (sculptSymmetryX) => set({ sculptSymmetryX }),

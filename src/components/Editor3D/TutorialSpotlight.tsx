@@ -145,6 +145,16 @@ const steps: TutorialStep[] = [
     ],
   },
   {
+    id: 'ai-generate',
+    selector: '[data-tutorial="ai-generate"]',
+    title: 'Gerar IA',
+    description: 'Descreva uma cena e a IA monta varias primitivas para voce.',
+    details: [
+      'Decompoe objetos complexos em partes (tronco, cabeca, membros, detalhes).',
+      'Use prompts detalhados para resultados mais ricos e variados.',
+    ],
+  },
+  {
     id: 'import',
     selector: '[data-tutorial="import"]',
     title: 'Importar Modelo',

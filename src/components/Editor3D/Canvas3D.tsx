@@ -5,6 +5,8 @@ import { Canvas, useFrame, useLoader, useThree, type ThreeEvent } from '@react-t
 import { Html, OrbitControls, useGLTF } from '@react-three/drei';
 import * as THREE from 'three';
 import MeshEditOverlay from './MeshEditOverlay';
+import DrawPolygonOverlay from './DrawPolygonOverlay';
+import KnifeOverlay from './KnifeOverlay';
 import TransformGizmo from './TransformGizmo';
 import { installMeshBVH, mergePrimitiveGeometry } from '@/lib/geometryOps';
 import { editableMeshFromBufferGeometry, editableMeshFromObject3D, editableMeshToBufferGeometry, grabMeshVertices, sculptMesh } from '@/lib/meshOps';
@@ -24,6 +26,9 @@ import { BehaviorEngine } from '@/lib/behaviors';
 import { ScriptEngine } from '@/lib/scriptEngine';
 import PhysicsRuntime, { PhysicsColliderDebug } from './PhysicsRuntime';
 import { usePhysicsStore } from '@/store/physicsStore';
+
+/* Track right-click drag to suppress context menu during orbit/pan */
+let _rightClickDragged = false;
 
 type Canvas3DProps = {
   sceneRootRef: MutableRefObject<THREE.Group | null>;
@@ -398,6 +403,14 @@ function EditableMeshAsset({ object, material }: { object: SceneObject; material
   const strokePaintedVerticesRef = useRef<Set<number>>(new Set());
   const strokeSmoothBufferRef = useRef<THREE.Vector3[]>([]);
   const strokePressureRef = useRef(1);
+  const strokeLastScreenRef = useRef<{ x: number; y: number; t: number } | null>(null);
+  const strokeSpeedRef = useRef(0);
+  const strokeClockRef = useRef({ last: 0 });
+  const tickClock = () => {
+    const now = Date.now();
+    strokeClockRef.current.last = now;
+    return now;
+  };
   const objectMaterials = useMemo(() => {
     const baseMaterial = allMaterials[object.materialId] ?? material;
     const extraMaterials = Object.values(allMaterials)
@@ -455,11 +468,10 @@ function EditableMeshAsset({ object, material }: { object: SceneObject; material
   const updateBrushPreview = (event: ThreeEvent<PointerEvent>) => {
     if (activeTool !== 'sculpt' || !selectedObjectIds.includes(object.uuid) || !meshRef.current || !event.face) return null;
 
-    const pressure = event.nativeEvent.pressure || 0.5;
     const localPoint = meshRef.current.worldToLocal(event.point.clone());
     const localNormal = event.face.normal.clone().normalize();
     setSculptBrushPreview(object.uuid, [localPoint.x, localPoint.y, localPoint.z], [localNormal.x, localNormal.y, localNormal.z]);
-    return { localPoint, localNormal, pressure };
+    return { localPoint, localNormal };
   };
 
   const applySculptStroke = (event: ThreeEvent<PointerEvent>) => {
@@ -472,12 +484,34 @@ function EditableMeshAsset({ object, material }: { object: SceneObject; material
     const preview = updateBrushPreview(event);
     if (!preview) return;
 
-    const { localPoint, localNormal, pressure } = preview;
-    const rawPressure = event.nativeEvent.pressure || (event.nativeEvent.pointerType === 'pen' ? 0.5 : 1);
+    const { localPoint, localNormal } = preview;
+    const nativeEvent = event.nativeEvent as PointerEvent;
+    const pointerType = nativeEvent.pointerType;
+    const hasRealPressure = pointerType === 'pen' || pointerType === 'touch';
+    const rawPressure = hasRealPressure ? nativeEvent.pressure || 0.5 : 1;
 
     strokePressureRef.current = rawPressure;
 
-    const effectivePressure = rawPressure > 0 ? rawPressure : 1;
+    let effectivePressure = rawPressure > 0 ? rawPressure : 1;
+
+    if (!hasRealPressure && (sculptPressureStrength || sculptPressureRadius)) {
+      const now = tickClock();
+      const last = strokeLastScreenRef.current;
+      const sx = nativeEvent.clientX;
+      const sy = nativeEvent.clientY;
+      if (last) {
+        const dx = sx - last.x;
+        const dy = sy - last.y;
+        const dt = Math.max(1, now - last.t);
+        const speed = Math.sqrt(dx * dx + dy * dy) / dt;
+        strokeSpeedRef.current = strokeSpeedRef.current * 0.6 + speed * 0.4;
+      }
+      strokeLastScreenRef.current = { x: sx, y: sy, t: now };
+
+      const speedFactor = Math.max(0.35, Math.min(1, 1 - strokeSpeedRef.current * 0.12));
+      effectivePressure = speedFactor;
+    }
+
     const pressureStrength = sculptPressureStrength ? effectivePressure : 1;
     const pressureRadius = sculptPressureRadius ? (0.3 + effectivePressure * 0.7) : 1;
 
@@ -545,6 +579,16 @@ function EditableMeshAsset({ object, material }: { object: SceneObject; material
     const pointerType = event.nativeEvent.pointerType as PointerType;
     setSculptPointerType(pointerType);
 
+    const handleGlobalPointerUp = (e: PointerEvent) => {
+      if (e.pointerId === event.pointerId) {
+        endSculpt();
+        window.removeEventListener('pointerup', handleGlobalPointerUp);
+        window.removeEventListener('pointercancel', handleGlobalPointerUp);
+      }
+    };
+    window.addEventListener('pointerup', handleGlobalPointerUp);
+    window.addEventListener('pointercancel', handleGlobalPointerUp);
+
     pushSnapshot();
     sculptingRef.current = true;
     strokeMeshRef.current = object.editableMesh;
@@ -554,6 +598,12 @@ function EditableMeshAsset({ object, material }: { object: SceneObject; material
     strokePaintedVerticesRef.current = new Set();
     strokeSmoothBufferRef.current = [];
     strokePressureRef.current = event.nativeEvent.pressure || 0.5;
+    strokeLastScreenRef.current = {
+      x: event.nativeEvent.clientX,
+      y: event.nativeEvent.clientY,
+      t: tickClock(),
+    };
+    strokeSpeedRef.current = 0;
     applySculptStroke(event);
   };
 
@@ -575,6 +625,8 @@ function EditableMeshAsset({ object, material }: { object: SceneObject; material
     strokePaintedVerticesRef.current.clear();
     strokeSmoothBufferRef.current = [];
     strokePressureRef.current = 1;
+    strokeLastScreenRef.current = null;
+    strokeSpeedRef.current = 0;
   };
 
   return (
@@ -587,9 +639,10 @@ function EditableMeshAsset({ object, material }: { object: SceneObject; material
       onPointerDown={startSculpt}
       onPointerMove={updateSculpt}
       onPointerUp={endSculpt}
-      onPointerLeave={() => {
-        endSculpt();
-        clearSculptBrushPreview();
+      onPointerLeave={(event) => {
+        if (!sculptingRef.current) {
+          clearSculptBrushPreview();
+        }
       }}
       onPointerEnter={(event) => {
         setSculptPointerType(event.nativeEvent.pointerType as PointerType);
@@ -917,8 +970,9 @@ function ObjectNode({
         if (targetId) setSelectedObject(targetId, event.nativeEvent.shiftKey || event.nativeEvent.ctrlKey);
       }}
       onContextMenu={(event) => {
-        if (locked) return;
+        if (locked || _rightClickDragged) return;
         event.stopPropagation();
+        _rightClickDragged = false;
         const e = event.nativeEvent as MouseEvent;
         showContextMenu(e.clientX, e.clientY, object.uuid);
       }}
@@ -1259,6 +1313,31 @@ function EditorScene({ sceneRootRef }: Canvas3DProps) {
   const [ctrlPressed, setCtrlPressed] = useState(false);
   const [altPressed, setAltPressed] = useState(false);
 
+  const { gl: canvasGl } = useThree();
+
+  useEffect(() => {
+    const canvas = canvasGl.domElement;
+
+    const handleMouseDown = (e: MouseEvent) => {
+      if (e.button === 2) {
+        _rightClickDragged = false;
+      }
+    };
+
+    const handleMouseMove = (e: MouseEvent) => {
+      if (e.buttons & 2) {
+        _rightClickDragged = true;
+      }
+    };
+
+    canvas.addEventListener('mousedown', handleMouseDown);
+    canvas.addEventListener('mousemove', handleMouseMove);
+    return () => {
+      canvas.removeEventListener('mousedown', handleMouseDown);
+      canvas.removeEventListener('mousemove', handleMouseMove);
+    };
+  }, [canvasGl]);
+
   useEffect(() => {
     const updateFromEvent = (event: KeyboardEvent) => {
       setCtrlPressed(event.ctrlKey);
@@ -1380,6 +1459,14 @@ function EditorScene({ sceneRootRef }: Canvas3DProps) {
           </Suspense>
         ))}
       </group>
+
+      {activeTool === 'drawPolygon' && (
+        <DrawPolygonOverlay objectUuid={selectedObjectIds[0] ?? ''} />
+      )}
+      {activeTool === 'knife' && selectedObjectIds[0] && (
+        <KnifeOverlay objectUuid={selectedObjectIds[0]} />
+      )}
+
       <PhysicsRuntime objects={objects} objectRefs={objectRefs} />
 
       {activeTool !== 'edit' && selectedObjectIds.map((uuid) => (
@@ -1402,7 +1489,9 @@ function EditorScene({ sceneRootRef }: Canvas3DProps) {
         visible={false}
         onClick={() => clearSelectedObjects()}
         onContextMenu={(event) => {
+          if (_rightClickDragged) return;
           event.stopPropagation();
+          _rightClickDragged = false;
           const e = event.nativeEvent as MouseEvent;
           showContextMenu(e.clientX, e.clientY, null);
         }}

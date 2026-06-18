@@ -13,7 +13,7 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Editor 3D",
+  title: "Tupi Editor",
   description: "Editor de cena, transform e materiais para modelos GLB/GLTF",
   icons: {
     icon: "/icon.png",

@@ -43,12 +43,14 @@ export default function TransformGizmo({ objectId, object }: TransformGizmoProps
     }
   }, [addTransformKeyframe, autoKey, object, objectId, updateObject]);
 
-  if (!object || !objectId || simulationMode === 'simulation' || activeTool === 'select' || activeTool === 'edit' || activeTool === 'sculpt') return null;
+  if (!object || !objectId || simulationMode === 'simulation' || activeTool === 'select' || activeTool === 'edit' || activeTool === 'sculpt' || activeTool === 'drawPolygon' || activeTool === 'knife') return null;
+
+  const gizmoMode = activeTool === 'translate' || activeTool === 'rotate' || activeTool === 'scale' ? activeTool : undefined;
 
   return (
     <TransformControls
       object={object}
-      mode={activeTool}
+      mode={gizmoMode}
       translationSnap={snapping ? snapStep : null}
       rotationSnap={snapping ? THREE.MathUtils.degToRad(15) : null}
       scaleSnap={snapping ? snapStep : null}

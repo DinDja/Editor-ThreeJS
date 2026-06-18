@@ -563,7 +563,7 @@ export default function ModelingTools({ object, material }: ModelingToolsProps) 
         </div>
         <label className="grid gap-2">
           <div className="flex items-center justify-between gap-3">
-            <span className={labelClass}>Raio</span>
+            <span className={labelClass}>Raio <span className="text-neutral-600">[ ]</span></span>
             <span className="w-10 text-right text-xs tabular-nums text-neutral-400">{sculptRadius.toFixed(2)}</span>
           </div>
           <input
@@ -578,7 +578,7 @@ export default function ModelingTools({ object, material }: ModelingToolsProps) 
         </label>
         <label className="grid gap-2">
           <div className="flex items-center justify-between gap-3">
-            <span className={labelClass}>Forca</span>
+            <span className={labelClass}>Forca <span className="text-neutral-600">Up/Dn</span></span>
             <span className="w-10 text-right text-xs tabular-nums text-neutral-400">{sculptStrength.toFixed(2)}</span>
           </div>
           <input
@@ -592,7 +592,7 @@ export default function ModelingTools({ object, material }: ModelingToolsProps) 
           />
         </label>
         <label className="grid gap-2">
-          <span className={labelClass}>Falloff (Blender)</span>
+          <span className={labelClass}>Falloff <span className="text-neutral-600">Shift+F</span></span>
           <select
             value={sculptFalloff}
             onChange={(event) => setSculptFalloff(event.target.value as SculptFalloff)}

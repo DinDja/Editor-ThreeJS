@@ -2,11 +2,14 @@ export type Vec3 = [number, number, number];
 
 export type Vec2 = [number, number];
 
-export type ActiveTool = 'select' | 'translate' | 'rotate' | 'scale' | 'edit' | 'sculpt';
+export type ActiveTool = 'select' | 'translate' | 'rotate' | 'scale' | 'edit' | 'sculpt'
+  | 'drawPolygon' | 'knife';
 
 export type ViewportDisplayMode = 'textured' | 'solid' | 'wireframe' | 'vertices' | 'polygons' | 'primitive';
 
 export type MeshSelectionMode = 'vertex' | 'edge' | 'face';
+
+export type MeshEditMode = 'object' | 'edit' | 'drawPolygon' | 'knife';
 
 export type SculptMode =
   | 'push'
