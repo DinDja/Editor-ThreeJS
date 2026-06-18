@@ -559,7 +559,7 @@ export default function Toolbar({ sceneRootRef, onOpenTutorial }: ToolbarProps) 
           href="/api/download/desktop"
           className="inline-flex min-h-11 shrink-0 cursor-pointer items-center justify-center gap-2 rounded-md border border-emerald-600/50 bg-emerald-950/40 px-5 py-2.5 text-xs font-medium text-emerald-300 shadow-[inset_0_1px_0_rgba(255,255,255,0.04)] transition hover:border-emerald-400 hover:bg-emerald-900/50 hover:text-emerald-100"
         >
-          <Download size={14} />
+          <img src="/windows-icon.png" alt="" className="h-4 w-4 brightness-[4] invert-[0.65]" />
           <span className="hidden sm:inline">Baixar</span>
         </a>
       </div>
