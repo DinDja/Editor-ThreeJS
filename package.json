@@ -1,12 +1,20 @@
 {
-  "name": "brain-app",
-  "version": "0.1.0",
+  "name": "editor-3d-desktop",
+  "version": "1.0.0",
   "private": true,
+  "description": "Editor 3D Desktop — Next.js + Electron",
+  "main": "electron/main.js",
   "scripts": {
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint",
+    "electron:dev": "npx next dev -p 3456",
+    "electron:start": "node -e \"const{spawn}=require('child_process');spawn('npx',['next','start','-p','3456'],{stdio:'inherit',shell:true})\"",
+    "electron": "npx electron .",
+    "electron:build": "npx next build && npx electron-builder",
+    "dist": "npx next build && npx electron-builder --win --x64",
+    "dist:all": "npx next build && npx electron-builder --win --x64 --mac --linux"
   },
   "dependencies": {
     "@react-three/drei": "^10.7.7",
@@ -25,9 +33,42 @@
     "@types/node": "^20",
     "@types/react": "^19",
     "@types/react-dom": "^19",
+    "electron": "^35.0.0",
+    "electron-builder": "^25.1.0",
     "eslint": "^9",
     "eslint-config-next": "16.2.9",
     "tailwindcss": "^4",
     "typescript": "^5"
+  },
+  "build": {
+    "appId": "com.editor3d.desktop",
+    "productName": "Editor 3D",
+    "directories": {
+      "output": "release"
+    },
+    "files": [
+      "electron/**/*",
+      ".next/**/*",
+      "public/**/*",
+      "next.config.ts",
+      "package.json",
+      "node_modules/**/*"
+    ],
+    "win": {
+      "target": "nsis",
+      "icon": "public/icon.ico",
+      "artifactName": "${productName}-${version}-setup.${ext}"
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true
+    },
+    "extraResources": [
+      {
+        "from": "brain_hologram.glb",
+        "to": "brain_hologram.glb"
+      }
+    ]
   }
 }
