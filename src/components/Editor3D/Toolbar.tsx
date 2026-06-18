@@ -560,7 +560,7 @@ export default function Toolbar({ sceneRootRef, onOpenTutorial }: ToolbarProps) 
           className="inline-flex min-h-11 shrink-0 cursor-pointer items-center justify-center gap-2 rounded-md border border-emerald-600/50 bg-emerald-950/40 px-5 py-2.5 text-xs font-medium text-emerald-300 shadow-[inset_0_1px_0_rgba(255,255,255,0.04)] transition hover:border-emerald-400 hover:bg-emerald-900/50 hover:text-emerald-100"
         >
           <Download size={14} />
-          <span className="hidden sm:inline">Desktop</span>
+          <span className="hidden sm:inline">Baixar</span>
         </a>
       </div>
 
