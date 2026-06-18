@@ -90,7 +90,7 @@ export default function EditorShortcuts() {
       const materials = useMaterialStore.getState();
       const history = useHistoryStore.getState();
       const timeline = useTimelineStore.getState();
-      const selectedObject = scene.objects.find((object) => object.uuid === editor.selectedObjectId) ?? null;
+      const selectedObject = scene.objects.find((object) => object.uuid === (editor.selectedObjectIds[0] ?? null)) ?? null;
       const selectedMaterial = selectedObject ? materials.materials[selectedObject.materialId] ?? null : null;
 
       if (key === ' ') {
@@ -185,7 +185,7 @@ export default function EditorShortcuts() {
         const ids = getSubtreeIds(scene.objects, selectedObject.uuid);
         scene.removeObject(selectedObject.uuid);
         materials.removeMaterialsForObjects(ids);
-        editor.setSelectedObject(null);
+        editor.clearSelectedObjects();
         return;
       }
 

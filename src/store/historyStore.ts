@@ -9,7 +9,7 @@ type HistorySnapshot = {
   layers: Layer[];
   referenceImages: ReferenceImage[];
   materials: Record<string, EditorMaterial>;
-  selectedObjectId: string | null;
+  selectedObjectIds: string[];
 };
 
 type HistoryState = {
@@ -29,7 +29,7 @@ const captureSnapshot = (): HistorySnapshot => ({
   layers: useSceneStore.getState().layers.map(cloneLayer),
   referenceImages: useSceneStore.getState().referenceImages.map(cloneReferenceImage),
   materials: cloneMaterials(useMaterialStore.getState().materials),
-  selectedObjectId: useEditorStore.getState().selectedObjectId,
+  selectedObjectIds: [...useEditorStore.getState().selectedObjectIds],
 });
 
 const restoreSnapshot = (snapshot: HistorySnapshot) => {
@@ -37,7 +37,9 @@ const restoreSnapshot = (snapshot: HistorySnapshot) => {
   useSceneStore.getState().setLayers(snapshot.layers);
   useSceneStore.getState().setReferenceImages(snapshot.referenceImages);
   useMaterialStore.getState().setMaterials(snapshot.materials);
-  useEditorStore.getState().setSelectedObject(snapshot.selectedObjectId);
+  const editor = useEditorStore.getState();
+  editor.clearSelectedObjects();
+  snapshot.selectedObjectIds.forEach((id) => editor.toggleSelectedObject(id));
 };
 
 export const useHistoryStore = create<HistoryState>((set, get) => ({

@@ -5,6 +5,7 @@ import { TransformControls } from '@react-three/drei';
 import * as THREE from 'three';
 import { useEditorStore } from '@/store/editorStore';
 import { useHistoryStore } from '@/store/historyStore';
+import { usePhysicsStore } from '@/store/physicsStore';
 import { useSceneStore } from '@/store/sceneStore';
 import { useTimelineStore } from '@/store/timelineStore';
 
@@ -17,6 +18,7 @@ const toVec3 = (value: THREE.Vector3 | THREE.Euler): [number, number, number] =>
 
 export default function TransformGizmo({ objectId, object }: TransformGizmoProps) {
   const activeTool = useEditorStore((state) => state.activeTool);
+  const simulationMode = usePhysicsStore((state) => state.mode);
   const snapping = useEditorStore((state) => state.snapping);
   const snapStep = useEditorStore((state) => state.snapStep);
   const updateObject = useSceneStore((state) => state.updateObject);
@@ -41,7 +43,7 @@ export default function TransformGizmo({ objectId, object }: TransformGizmoProps
     }
   }, [addTransformKeyframe, autoKey, object, objectId, updateObject]);
 
-  if (!object || !objectId || activeTool === 'select' || activeTool === 'edit' || activeTool === 'sculpt') return null;
+  if (!object || !objectId || simulationMode === 'simulation' || activeTool === 'select' || activeTool === 'edit' || activeTool === 'sculpt') return null;
 
   return (
     <TransformControls

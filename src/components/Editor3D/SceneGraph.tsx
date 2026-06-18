@@ -2,6 +2,7 @@
 
 import { useMemo, useState } from 'react';
 import {
+  Atom,
   Box,
   Boxes,
   Brush,
@@ -16,18 +17,23 @@ import {
   Lock,
   LockOpen,
   Plus,
+  CircleDot,
+  Cuboid,
+  Play,
   Sun,
   Trash2,
 } from 'lucide-react';
 import { useEditorStore } from '@/store/editorStore';
 import { useHistoryStore } from '@/store/historyStore';
 import { useMaterialStore } from '@/store/materialStore';
+import { usePhysicsStore } from '@/store/physicsStore';
 import { useSceneStore } from '@/store/sceneStore';
 import { buildSceneTree, getSubtreeIds, type SceneTreeNode } from '@/store/sceneTree';
 import type { Layer, SceneObject } from '@/store/types';
+import { getPhysicsConfig, PHYSICS_BODY_LABELS, PHYSICS_COLLIDER_LABELS } from '@/lib/physics';
 
 const rowButton =
-  'grid min-w-0 grid-cols-[24px_24px_minmax(0,1fr)_88px] items-center gap-1.5 rounded-md px-2 py-2.5 text-left text-sm transition sm:py-2';
+  'flex min-w-0 items-center gap-1.5 rounded-md px-2 py-2.5 text-left text-sm transition sm:py-2';
 
 const objectIcon = (object: SceneObject) => {
   if (object.effect) return <Brush size={13} />;
@@ -37,6 +43,32 @@ const objectIcon = (object: SceneObject) => {
   if (object.kind === 'model') return <FileBox size={13} />;
   return <Box size={13} />;
 };
+
+function PhysicsIndicators({ object }: { object: SceneObject }) {
+  const simulationMode = usePhysicsStore((state) => state.mode);
+  const playback = usePhysicsStore((state) => state.playback);
+  const physics = getPhysicsConfig(object);
+
+  if (!physics.enabled) return <div className="h-6" />;
+
+  const bodyColor =
+    physics.bodyType === 'dynamic'
+      ? 'text-emerald-300'
+      : physics.bodyType === 'kinematic'
+        ? 'text-cyan-300'
+        : 'text-amber-300';
+
+  return (
+    <div className="flex h-6 items-center justify-end gap-1 text-neutral-600">
+      <Atom size={12} className="text-cyan-300" aria-label="Fisica ativa" />
+      <Cuboid size={12} className="text-neutral-400" aria-label={PHYSICS_COLLIDER_LABELS[physics.colliderType]} />
+      <CircleDot size={12} className={bodyColor} aria-label={PHYSICS_BODY_LABELS[physics.bodyType]} />
+      {simulationMode === 'simulation' && playback !== 'stopped' && (
+        <Play size={12} className="text-emerald-300" aria-label="Simulando" />
+      )}
+    </div>
+  );
+}
 
 function SceneRow({
   node,
@@ -50,7 +82,7 @@ function SceneRow({
   onToggle: (id: string) => void;
 }) {
   const object = node.object;
-  const selectedObjectId = useEditorStore((state) => state.selectedObjectId);
+  const selectedObjectIds = useEditorStore((state) => state.selectedObjectIds);
   const setSelectedObject = useEditorStore((state) => state.setSelectedObject);
   const updateObject = useSceneStore((state) => state.updateObject);
   const removeObject = useSceneStore((state) => state.removeObject);
@@ -58,7 +90,7 @@ function SceneRow({
   const removeMaterialsForObjects = useMaterialStore((state) => state.removeMaterialsForObjects);
   const pushSnapshot = useHistoryStore((state) => state.pushSnapshot);
 
-  const selected = selectedObjectId === object.uuid;
+  const selected = selectedObjectIds.includes(object.uuid);
   const hasChildren = node.children.length > 0;
   const expanded = !collapsedIds.has(object.uuid);
   const rowHidden = !layer.visible || !object.visible;
@@ -79,7 +111,7 @@ function SceneRow({
     const ids = getSubtreeIds(objects, object.uuid);
     removeObject(object.uuid);
     removeMaterialsForObjects(ids);
-    if (selectedObjectId && ids.includes(selectedObjectId)) setSelectedObject(null);
+    if (selectedObjectIds.some((id) => ids.includes(id))) useEditorStore.getState().clearSelectedObjects();
   };
 
   return (
@@ -99,12 +131,12 @@ function SceneRow({
           onClick={() => hasChildren && onToggle(object.uuid)}
           disabled={!hasChildren}
           title={expanded ? 'Recolher' : 'Expandir'}
-          className="grid h-6 w-6 place-items-center rounded text-neutral-500 transition enabled:hover:bg-neutral-700 enabled:hover:text-neutral-100 disabled:opacity-20"
+          className="grid h-6 w-6 shrink-0 place-items-center rounded text-neutral-500 transition enabled:hover:bg-neutral-700 enabled:hover:text-neutral-100 disabled:opacity-20"
         >
           <ChevronDown size={14} className={`transition ${expanded ? 'rotate-0' : '-rotate-90'}`} />
         </button>
         <div
-          className={`grid h-6 w-6 place-items-center rounded border ${
+          className={`grid h-6 w-6 shrink-0 place-items-center rounded border ${
             selected
               ? 'border-amber-300/35 bg-amber-300/10 text-amber-100'
               : locked
@@ -116,43 +148,44 @@ function SceneRow({
         </div>
         <button
           type="button"
-          onClick={() => setSelectedObject(object.uuid)}
-          className="min-w-0 truncate text-left"
+          onClick={(e) => setSelectedObject(object.uuid, e.shiftKey || e.ctrlKey)}
+          className="min-w-0 flex-1 truncate text-left"
           title={object.name}
         >
           {object.name}
         </button>
-        <div className="flex justify-end gap-0.5">
+        <div className="hidden shrink-0 lg:flex lg:items-center"><PhysicsIndicators object={object} /></div>
+        <div className="flex shrink-0 justify-end gap-0.5">
           <button
             type="button"
             title={object.visible ? 'Ocultar' : 'Mostrar'}
             aria-label={`Visibilidade ${object.name}`}
             onClick={handleVisibility}
-            className={`grid min-h-9 min-w-9 cursor-pointer place-items-center rounded transition hover:bg-neutral-700/80 hover:text-neutral-100 touch-manipulation ${
+            className={`grid min-h-7 min-w-7 cursor-pointer place-items-center rounded transition hover:bg-neutral-700/80 hover:text-neutral-100 touch-manipulation ${
               object.visible ? 'text-emerald-300' : 'text-neutral-600'
             }`}
           >
-            {object.visible ? <Eye size={14} /> : <EyeOff size={14} />}
+            {object.visible ? <Eye size={12} /> : <EyeOff size={12} />}
           </button>
           <button
             type="button"
             title={object.locked ? 'Destravar' : 'Travar'}
             aria-label={`Travar ${object.name}`}
             onClick={handleLock}
-            className={`grid min-h-9 min-w-9 cursor-pointer place-items-center rounded transition hover:bg-neutral-700/80 hover:text-neutral-100 touch-manipulation ${
+            className={`grid min-h-7 min-w-7 cursor-pointer place-items-center rounded transition hover:bg-neutral-700/80 hover:text-neutral-100 touch-manipulation ${
               object.locked ? 'text-amber-300' : 'text-neutral-600'
             }`}
           >
-            {object.locked ? <Lock size={14} /> : <LockOpen size={14} />}
+            {object.locked ? <Lock size={12} /> : <LockOpen size={12} />}
           </button>
           <button
             type="button"
             title="Remover"
             aria-label={`Remover ${object.name}`}
             onClick={handleRemove}
-            className="grid min-h-9 min-w-9 cursor-pointer place-items-center rounded text-neutral-500 transition hover:bg-red-500/15 hover:text-red-200 touch-manipulation"
+            className="grid min-h-7 min-w-7 cursor-pointer place-items-center rounded text-neutral-500 transition hover:bg-red-500/15 hover:text-red-200 touch-manipulation"
           >
-            <Trash2 size={14} />
+            <Trash2 size={12} />
           </button>
         </div>
       </div>
@@ -179,8 +212,8 @@ function LayerRow({ layer }: { layer: Layer }) {
   const updateLayer = useSceneStore((state) => state.updateLayer);
   const removeLayer = useSceneStore((state) => state.removeLayer);
   const reorderLayers = useSceneStore((state) => state.reorderLayers);
-  const selectedObjectId = useEditorStore((state) => state.selectedObjectId);
-  const setSelectedObject = useEditorStore((state) => state.setSelectedObject);
+  const selectedObjectIds = useEditorStore((state) => state.selectedObjectIds);
+  const clearSelectedObjects = useEditorStore((state) => state.clearSelectedObjects);
   const pushSnapshot = useHistoryStore((state) => state.pushSnapshot);
   const [editingName, setEditingName] = useState(false);
   const [nameDraft, setNameDraft] = useState(layer.name);
@@ -220,8 +253,8 @@ function LayerRow({ layer }: { layer: Layer }) {
     if (layers.length <= 1) return;
     pushSnapshot();
     const objectsInLayer = objects.filter((o) => o.layerId === layer.id);
-    if (selectedObjectId && objectsInLayer.some((o) => o.uuid === selectedObjectId)) {
-      setSelectedObject(null);
+    if (selectedObjectIds.some((id) => objectsInLayer.some((o) => o.uuid === id))) {
+      clearSelectedObjects();
     }
     removeLayer(layer.id);
   };
@@ -312,30 +345,30 @@ function LayerRow({ layer }: { layer: Layer }) {
             type="button"
             onClick={handleToggleVisibility}
             title={layer.visible ? 'Ocultar camada' : 'Mostrar camada'}
-            className={`grid min-h-9 min-w-9 cursor-pointer place-items-center rounded transition hover:bg-neutral-700/80 touch-manipulation ${
+            className={`grid min-h-7 min-w-7 cursor-pointer place-items-center rounded transition hover:bg-neutral-700/80 touch-manipulation ${
               layer.visible ? 'text-emerald-300' : 'text-neutral-600'
             }`}
           >
-            {layer.visible ? <Eye size={14} /> : <EyeOff size={14} />}
+            {layer.visible ? <Eye size={12} /> : <EyeOff size={12} />}
           </button>
           <button
             type="button"
             onClick={handleToggleLock}
             title={layer.locked ? 'Destravar camada' : 'Travar camada'}
-            className={`grid min-h-9 min-w-9 cursor-pointer place-items-center rounded transition hover:bg-neutral-700/80 touch-manipulation ${
+            className={`grid min-h-7 min-w-7 cursor-pointer place-items-center rounded transition hover:bg-neutral-700/80 touch-manipulation ${
               layer.locked ? 'text-amber-300' : 'text-neutral-600'
             }`}
           >
-            {layer.locked ? <Lock size={14} /> : <LockOpen size={14} />}
+            {layer.locked ? <Lock size={12} /> : <LockOpen size={12} />}
           </button>
           <button
             type="button"
             title="Remover camada"
             onClick={handleRemoveLayer}
             disabled={layers.length <= 1}
-            className="grid min-h-9 min-w-9 cursor-pointer place-items-center rounded text-neutral-600 transition hover:bg-red-500/15 hover:text-red-200 disabled:opacity-20 disabled:cursor-not-allowed touch-manipulation"
+            className="grid min-h-7 min-w-7 cursor-pointer place-items-center rounded text-neutral-600 transition hover:bg-red-500/15 hover:text-red-200 disabled:opacity-20 disabled:cursor-not-allowed touch-manipulation"
           >
-            <Trash2 size={14} />
+            <Trash2 size={12} />
           </button>
         </div>
       </div>

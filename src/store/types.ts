@@ -89,7 +89,56 @@ export type SceneObjectMetadata = {
   gltfNodeType?: string;
   sourceMaterialNames?: string[];
   materialOverrides?: Record<string, boolean>;
+  physics?: ScenePhysicsConfig;
   [key: string]: unknown;
+};
+
+export type PhysicsBodyType = 'static' | 'dynamic' | 'kinematic';
+
+export type PhysicsColliderType = 'box' | 'sphere' | 'capsule' | 'cylinder' | 'mesh' | 'convexHull';
+
+export type PhysicsAxisLocks = {
+  x: boolean;
+  y: boolean;
+  z: boolean;
+};
+
+export type ScenePhysicsConfig = {
+  enabled: boolean;
+  bodyType: PhysicsBodyType;
+  colliderType: PhysicsColliderType;
+  mass: number;
+  friction: number;
+  restitution: number;
+  linearDamping: number;
+  angularDamping: number;
+  gravityScale: number;
+  isTrigger: boolean;
+  lockTranslation: PhysicsAxisLocks;
+  lockRotation: PhysicsAxisLocks;
+};
+
+export const DEFAULT_PHYSICS_CONFIG: ScenePhysicsConfig = {
+  enabled: false,
+  bodyType: 'dynamic',
+  colliderType: 'box',
+  mass: 1,
+  friction: 0.5,
+  restitution: 0.2,
+  linearDamping: 0,
+  angularDamping: 0,
+  gravityScale: 1,
+  isTrigger: false,
+  lockTranslation: {
+    x: false,
+    y: false,
+    z: false,
+  },
+  lockRotation: {
+    x: false,
+    y: false,
+    z: false,
+  },
 };
 
 export type Text3DConfig = {
@@ -304,6 +353,18 @@ export const cloneEditableMesh = (mesh: EditableMesh): EditableMesh => ({
   faceMaterialIds: mesh.faceMaterialIds ? [...mesh.faceMaterialIds] : undefined,
 });
 
+export const clonePhysicsConfig = (physics: ScenePhysicsConfig): ScenePhysicsConfig => ({
+  ...physics,
+  lockTranslation: { ...physics.lockTranslation },
+  lockRotation: { ...physics.lockRotation },
+});
+
+export const cloneSceneObjectMetadata = (metadata: SceneObjectMetadata): SceneObjectMetadata => ({
+  ...metadata,
+  materialOverrides: metadata.materialOverrides ? { ...metadata.materialOverrides } : undefined,
+  physics: metadata.physics ? clonePhysicsConfig(metadata.physics) : undefined,
+});
+
 export const cloneSceneObject = (object: SceneObject): SceneObject => ({
   ...object,
   id: object.id ?? object.uuid,
@@ -323,7 +384,7 @@ export const cloneSceneObject = (object: SceneObject): SceneObject => ({
   parentId: object.parentId ?? object.parent ?? null,
   children: [...(object.children ?? [])],
   materialIds: object.materialIds ? [...object.materialIds] : undefined,
-  metadata: { ...(object.metadata ?? {}) },
+  metadata: cloneSceneObjectMetadata(object.metadata ?? {}),
   layerId: object.layerId,
 });
 

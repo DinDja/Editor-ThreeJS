@@ -71,11 +71,11 @@ export default function AssetBrowserModal({ open, onClose }: AssetBrowserModalPr
   const createMaterialForObject = useMaterialStore((state) => state.createMaterialForObject);
   const materials = useMaterialStore((state) => state.materials);
   const updateMaterial = useMaterialStore((state) => state.updateMaterial);
-  const selectedObjectId = useEditorStore((state) => state.selectedObjectId);
+  const selectedObjectIds = useEditorStore((state) => state.selectedObjectIds);
   const setSelectedObject = useEditorStore((state) => state.setSelectedObject);
   const setActiveTool = useEditorStore((state) => state.setActiveTool);
   const pushSnapshot = useHistoryStore((state) => state.pushSnapshot);
-  const selectedObject = objects.find((object) => object.uuid === selectedObjectId);
+  const selectedObject = objects.find((object) => object.uuid === (selectedObjectIds[0] ?? null));
   const selectedMaterial = selectedObject && !selectedObject.effect ? materials[selectedObject.materialId] : null;
 
   useEffect(() => {

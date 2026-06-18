@@ -2,6 +2,8 @@
 
 import { useMemo, useState } from 'react';
 import {
+  AlertTriangle,
+  Atom,
   Box,
   Brush,
   Check,
@@ -49,8 +51,12 @@ import type {
   EffectKind,
   LightConfig,
   MaterialApplicationScope,
+  PhysicsAxisLocks,
+  PhysicsBodyType,
+  PhysicsColliderType,
   ReferenceImage,
   SceneObject,
+  ScenePhysicsConfig,
   Script,
   SvgConfig,
   Text3DConfig,
@@ -58,6 +64,16 @@ import type {
 } from '@/store/types';
 import { EFFECT_KINDS, EFFECT_LABELS, EFFECT_PRESETS } from '@/lib/effects';
 import { BEHAVIOR_KINDS, BEHAVIOR_LABELS, BEHAVIOR_DEFAULTS } from '@/lib/behaviors';
+import {
+  canObjectUsePhysics,
+  createDefaultPhysicsConfig,
+  getPhysicsConfig,
+  getPhysicsWarnings,
+  PHYSICS_BODY_LABELS,
+  PHYSICS_BODY_TYPES,
+  PHYSICS_COLLIDER_LABELS,
+  PHYSICS_COLLIDER_TYPES,
+} from '@/lib/physics';
 import { createId } from '@/store/types';
 import ModelingTools from './ModelingTools';
 import { canObjectHaveMaterial, getDescendantIds, getMaterialTargetObjects } from '@/store/sceneTree';
@@ -289,7 +305,7 @@ function TransformRow({ object, field }: { object: SceneObject; field: Transform
         {meta.icon}
         {meta.label}
       </span>
-      <div className="grid grid-cols-3 gap-1.5">
+      <div className="grid grid-cols-3 gap-1.5 xl:grid-cols-3 lg:grid-cols-2">
         {values.map((value, i) => {
           const display = field === 'rotation' ? THREE.MathUtils.radToDeg(value) : value;
           return (
@@ -450,6 +466,217 @@ function BehaviorPanel({ object }: { object: SceneObject }) {
   );
 }
 
+/* ── PhysicsPanel ── */
+
+function AxisLockButtons({
+  label,
+  locks,
+  onToggle,
+}: {
+  label: string;
+  locks: PhysicsAxisLocks;
+  onToggle: (axis: keyof PhysicsAxisLocks) => void;
+}) {
+  return (
+    <div className="grid gap-1.5">
+      <span className={labelClass}>{label}</span>
+      <div className="grid grid-cols-3 gap-1.5">
+        {(['x', 'y', 'z'] as Array<keyof PhysicsAxisLocks>).map((axis, index) => (
+          <button
+            key={axis}
+            type="button"
+            onClick={() => onToggle(axis)}
+            className={`h-8 rounded-md border text-[10px] font-bold uppercase transition ${
+              locks[axis]
+                ? 'border-amber-400/40 bg-amber-400/10 text-amber-200'
+                : 'border-neutral-800 bg-neutral-950 text-neutral-500 hover:border-neutral-700 hover:text-neutral-200'
+            }`}
+          >
+            <span className={axisColors[index]}>{axis.toUpperCase()}</span>
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function PhysicsPanel({ object, objects }: { object: SceneObject; objects: SceneObject[] }) {
+  const updateObject = useSceneStore((s) => s.updateObject);
+  const pushSnapshot = useHistoryStore((s) => s.pushSnapshot);
+  const physics = getPhysicsConfig(object);
+  const supported = canObjectUsePhysics(object);
+  const warnings = getPhysicsWarnings(object, objects);
+
+  const setPhysics = (next: ScenePhysicsConfig) => {
+    updateObject(object.uuid, {
+      metadata: {
+        physics: {
+          ...next,
+          lockTranslation: { ...next.lockTranslation },
+          lockRotation: { ...next.lockRotation },
+        },
+      },
+    });
+  };
+
+  const updatePhysics = (patch: Partial<ScenePhysicsConfig>) => {
+    setPhysics({
+      ...physics,
+      ...patch,
+      lockTranslation: patch.lockTranslation ? { ...patch.lockTranslation } : { ...physics.lockTranslation },
+      lockRotation: patch.lockRotation ? { ...patch.lockRotation } : { ...physics.lockRotation },
+    });
+  };
+
+  const toggleEnabled = () => {
+    pushSnapshot();
+    if (!supported) return;
+
+    if (physics.enabled) {
+      updatePhysics({ enabled: false });
+      return;
+    }
+
+    const next = object.metadata.physics
+      ? { ...physics, enabled: true }
+      : createDefaultPhysicsConfig(object);
+    setPhysics(next);
+  };
+
+  const resetPhysics = () => {
+    pushSnapshot();
+    setPhysics(createDefaultPhysicsConfig(object));
+  };
+
+  const toggleTranslationLock = (axis: keyof PhysicsAxisLocks) => {
+    pushSnapshot();
+    updatePhysics({
+      lockTranslation: {
+        ...physics.lockTranslation,
+        [axis]: !physics.lockTranslation[axis],
+      },
+    });
+  };
+
+  const toggleRotationLock = (axis: keyof PhysicsAxisLocks) => {
+    pushSnapshot();
+    updatePhysics({
+      lockRotation: {
+        ...physics.lockRotation,
+        [axis]: !physics.lockRotation[axis],
+      },
+    });
+  };
+
+  return (
+    <Section title="Physics" icon={<Atom size={11} className="text-cyan-400" />}>
+      <ToggleRow label="Fisica" enabled={supported && physics.enabled} onChange={toggleEnabled} />
+
+      {!supported && (
+        <div className="rounded-md border border-amber-400/20 bg-amber-400/8 p-2 text-[11px] leading-relaxed text-amber-100">
+          Luzes, cameras e efeitos nao recebem rigid body nesta base inicial.
+        </div>
+      )}
+
+      {supported && physics.enabled && (
+        <div className="grid gap-3">
+          <div className="grid grid-cols-2 gap-2 xl:grid-cols-2 lg:grid-cols-1">
+            <label className="grid gap-0.5">
+              <span className={labelClass}>Rigid body</span>
+              <select
+                value={physics.bodyType}
+                onChange={(e) => {
+                  pushSnapshot();
+                  updatePhysics({ bodyType: e.target.value as PhysicsBodyType });
+                }}
+                className={inputClass}
+              >
+                {PHYSICS_BODY_TYPES.map((type) => (
+                  <option key={type} value={type}>{PHYSICS_BODY_LABELS[type]}</option>
+                ))}
+              </select>
+            </label>
+            <label className="grid gap-0.5">
+              <span className={labelClass}>Collider</span>
+              <select
+                value={physics.colliderType}
+                onChange={(e) => {
+                  pushSnapshot();
+                  updatePhysics({ colliderType: e.target.value as PhysicsColliderType });
+                }}
+                className={inputClass}
+              >
+                {PHYSICS_COLLIDER_TYPES.map((type) => (
+                  <option key={type} value={type}>{PHYSICS_COLLIDER_LABELS[type]}</option>
+                ))}
+              </select>
+            </label>
+          </div>
+
+          <div className="grid grid-cols-2 gap-2 xl:grid-cols-2 lg:grid-cols-1">
+            <NumericInput label="Massa" value={physics.mass} step={0.1} onChange={(v) => updatePhysics({ mass: Math.max(0.001, v) })} onFocus={pushSnapshot} />
+            <NumericInput label="Gravidade" value={physics.gravityScale} step={0.1} onChange={(v) => updatePhysics({ gravityScale: v })} onFocus={pushSnapshot} />
+          </div>
+
+          <div className="grid gap-2">
+            <SliderInput label="Atrito" value={physics.friction} min={0} max={2} step={0.05} onChange={(v) => updatePhysics({ friction: v })} onFocus={pushSnapshot} />
+            <SliderInput label="Restituicao" value={physics.restitution} min={0} max={1} step={0.05} onChange={(v) => updatePhysics({ restitution: v })} onFocus={pushSnapshot} />
+          </div>
+
+          <div className="grid grid-cols-2 gap-2 xl:grid-cols-2 lg:grid-cols-1">
+            <NumericInput label="Damping lin." value={physics.linearDamping} step={0.05} onChange={(v) => updatePhysics({ linearDamping: Math.max(0, v) })} onFocus={pushSnapshot} />
+            <NumericInput label="Damping ang." value={physics.angularDamping} step={0.05} onChange={(v) => updatePhysics({ angularDamping: Math.max(0, v) })} onFocus={pushSnapshot} />
+          </div>
+
+          <div className="grid grid-cols-2 gap-2 xl:grid-cols-2 lg:grid-cols-1">
+            <ToggleRow
+              label="Usar gravidade"
+              enabled={physics.gravityScale !== 0}
+              onChange={() => {
+                pushSnapshot();
+                updatePhysics({ gravityScale: physics.gravityScale === 0 ? 1 : 0 });
+              }}
+            />
+            <ToggleRow
+              label="Trigger"
+              enabled={physics.isTrigger}
+              onChange={() => {
+                pushSnapshot();
+                updatePhysics({ isTrigger: !physics.isTrigger });
+              }}
+            />
+          </div>
+
+          <div className="grid grid-cols-2 gap-2 xl:grid-cols-2 lg:grid-cols-1">
+            <AxisLockButtons label="Congelar pos." locks={physics.lockTranslation} onToggle={toggleTranslationLock} />
+            <AxisLockButtons label="Congelar rot." locks={physics.lockRotation} onToggle={toggleRotationLock} />
+          </div>
+
+          {warnings.length > 0 && (
+            <div className="grid gap-1.5">
+              {warnings.map((warning) => (
+                <div key={warning} className="flex gap-2 rounded-md border border-amber-400/20 bg-amber-400/8 p-2 text-[11px] leading-relaxed text-amber-100">
+                  <AlertTriangle size={12} className="mt-0.5 shrink-0 text-amber-300" />
+                  <span>{warning}</span>
+                </div>
+              ))}
+            </div>
+          )}
+
+          <button
+            type="button"
+            onClick={resetPhysics}
+            className="flex h-8 cursor-pointer items-center justify-center gap-1.5 rounded-md border border-neutral-700/60 text-[11px] font-medium text-neutral-400 transition hover:border-cyan-400/50 hover:text-cyan-200"
+          >
+            <RotateCcw size={12} />
+            Resetar fisica
+          </button>
+        </div>
+      )}
+    </Section>
+  );
+}
+
 /* ── ScriptPanel ── */
 
 function ScriptPanel({ object }: { object: SceneObject }) {
@@ -590,7 +817,7 @@ function MaterialEditor({
 
   return (
     <Section title="Material" icon={<Circle size={11} className="text-emerald-400" />}>
-      <div className="grid grid-cols-2 gap-2">
+      <div className="grid grid-cols-2 gap-2 xl:grid-cols-2 lg:grid-cols-1">
         <ColorInput label="Cor" value={material.color} onChange={(v) => update({ color: v })} />
         <ColorInput label="Emissiva" value={material.emissive} onChange={(v) => update({ emissive: v })} />
       </div>
@@ -713,7 +940,7 @@ function LightPanel({ object }: { object: SceneObject }) {
         <ToggleRow label="Sombra" enabled={config.castShadow} onChange={() => update({ castShadow: !config.castShadow })} />
       )}
       {config.castShadow && config.kind !== 'ambient' && (
-        <div className="grid grid-cols-2 gap-2">
+        <div className="grid grid-cols-2 gap-2 xl:grid-cols-2 lg:grid-cols-1">
           <NumericInput label="Bias" value={config.shadowBias} step={0.001} onChange={(v) => update({ shadowBias: v })} />
           <NumericInput label="Raio" value={config.shadowRadius} step={0.5} onChange={(v) => update({ shadowRadius: v })} />
         </div>
@@ -724,7 +951,7 @@ function LightPanel({ object }: { object: SceneObject }) {
             <Move3D size={11} className="text-neutral-600" />
             Alvo
           </span>
-          <div className="grid grid-cols-3 gap-1.5">
+          <div className="grid grid-cols-3 gap-1.5 xl:grid-cols-3 lg:grid-cols-2">
             {([0, 1, 2] as const).map((i) => (
               <NumericInput
                 key={i}
@@ -824,8 +1051,8 @@ function ReferenceManager() {
               <Move3D size={11} className="text-neutral-600" />
               Posicao
             </span>
-            <div className="grid grid-cols-3 gap-1.5">
-              {([0, 1, 2] as const).map((i) => (
+            <div className="grid grid-cols-3 gap-1.5 xl:grid-cols-3 lg:grid-cols-2">
+          {([0, 1, 2] as const).map((i) => (
                 <NumericInput
                   key={i}
                   axis={i}
@@ -875,14 +1102,14 @@ function TextConfigPanel({ object }: { object: SceneObject }) {
           className={inputClass}
         />
       </label>
-      <div className="grid grid-cols-2 gap-2">
+      <div className="grid grid-cols-2 gap-2 xl:grid-cols-2 lg:grid-cols-1">
         <NumericInput label="Tamanho" value={config.size} step={0.1} onChange={(v) => { pushSnapshot(); update({ size: v }); }} />
         <NumericInput label="Profund." value={config.depth} step={0.05} onChange={(v) => { pushSnapshot(); update({ depth: v }); }} />
       </div>
       <NumericInput label="Segmentos" value={config.curveSegments} step={1} onChange={(v) => { pushSnapshot(); update({ curveSegments: Math.max(1, Math.round(v)) }); }} />
       <ToggleRow label="Bisel" enabled={config.bevelEnabled} onChange={() => { pushSnapshot(); update({ bevelEnabled: !config.bevelEnabled }); }} />
       {config.bevelEnabled && (
-        <div className="grid grid-cols-3 gap-2">
+        <div className="grid grid-cols-3 gap-2 xl:grid-cols-3 lg:grid-cols-2">
           <NumericInput label="Espessura" value={config.bevelThickness} step={0.01} onChange={(v) => update({ bevelThickness: v })} />
           <NumericInput label="Tamanho" value={config.bevelSize} step={0.01} onChange={(v) => update({ bevelSize: v })} />
           <NumericInput label="Segments" value={config.bevelSegments} step={1} onChange={(v) => update({ bevelSegments: Math.max(1, Math.round(v)) })} />
@@ -938,7 +1165,7 @@ function GroupPanel({ object, objects }: { object: SceneObject; objects: SceneOb
 
   return (
     <Section title="Grupo" icon={<Folder size={11} className="text-emerald-400" />}>
-      <div className="grid grid-cols-2 gap-2">
+      <div className="grid grid-cols-2 gap-2 xl:grid-cols-2 lg:grid-cols-1">
         <div className="rounded-md border border-neutral-800 bg-neutral-950/50 p-2">
           <span className={labelClass}>Filhos diretos</span>
           <div className="mt-1 text-lg font-semibold text-neutral-100">{children.length}</div>
@@ -977,7 +1204,7 @@ function MeshInfoPanel({ object }: { object: SceneObject }) {
 
   return (
     <Section title="Mesh" icon={<Grid3X3 size={11} className="text-sky-400" />}>
-      <div className="grid grid-cols-3 gap-2">
+      <div className="grid grid-cols-3 gap-2 xl:grid-cols-3 lg:grid-cols-2">
         <div className="rounded-md border border-neutral-800 bg-neutral-950/50 p-2">
           <span className={labelClass}>Geometria</span>
           <div className="mt-1 truncate text-xs text-neutral-200">
@@ -1062,7 +1289,7 @@ function ActionButton({
 /* ── Main Properties ── */
 
 export default function Properties() {
-  const selectedObjectId = useEditorStore((s) => s.selectedObjectId);
+  const selectedObjectIds = useEditorStore((s) => s.selectedObjectIds);
   const selectedReferenceId = useEditorStore((s) => s.selectedReferenceId);
   const objects = useSceneStore((s) => s.objects);
   const updateObject = useSceneStore((s) => s.updateObject);
@@ -1073,7 +1300,7 @@ export default function Properties() {
   const updateMaterial = useMaterialStore((s) => s.updateMaterial);
   const [materialScope, setMaterialScope] = useState<MaterialApplicationScope>('self');
   const [selectedMaterialId, setSelectedMaterialId] = useState<string | null>(null);
-  const object = objects.find((item) => item.uuid === selectedObjectId);
+  const object = objects.find((item) => item.uuid === (selectedObjectIds[0] ?? null));
   const materialIds = object?.materialIds?.length ? object.materialIds : object ? [object.materialId] : [];
   const activeMaterialId = materialIds.includes(selectedMaterialId ?? '') ? selectedMaterialId! : object?.materialId;
   const material = activeMaterialId ? allMaterials[activeMaterialId] ?? null : null;
@@ -1226,6 +1453,8 @@ export default function Properties() {
         {(object.type === 'Group' || object.kind === 'group' || object.kind === 'object3d') && <GroupPanel object={object} objects={objects} />}
 
         {object.type === 'Mesh' && <MeshInfoPanel object={object} />}
+
+        <PhysicsPanel object={object} objects={objects} />
 
         {/* Material */}
         {canEditMaterial && material && !object.effect && !object.lightConfig && (

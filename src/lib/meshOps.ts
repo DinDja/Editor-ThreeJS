@@ -28,6 +28,26 @@ const toVec3 = (value: THREE.Vector3): Vec3 => [
 const keyForVector = (value: THREE.Vector3) =>
   `${Math.round(value.x * WELD_PRECISION)},${Math.round(value.y * WELD_PRECISION)},${Math.round(value.z * WELD_PRECISION)}`;
 
+const keyForVertex = (
+  value: THREE.Vector3,
+  uvAttribute: THREE.BufferAttribute | THREE.InterleavedBufferAttribute | undefined,
+  sourceIndex: number,
+) => {
+  if (!uvAttribute) return `${keyForVector(value)}|uv:none`;
+
+  return `${keyForVector(value)}|uv:${Math.round(uvAttribute.getX(sourceIndex) * WELD_PRECISION)},${Math.round(
+    uvAttribute.getY(sourceIndex) * WELD_PRECISION,
+  )}`;
+};
+
+const uvFromAttribute = (
+  uvAttribute: THREE.BufferAttribute | THREE.InterleavedBufferAttribute | undefined,
+  sourceIndex: number,
+): Vec2 =>
+  uvAttribute
+    ? [Number(uvAttribute.getX(sourceIndex).toFixed(5)), Number(uvAttribute.getY(sourceIndex).toFixed(5))]
+    : [0, 0];
+
 const createBuilder = () => ({
   vertices: [] as Vec3[],
   indices: [] as number[],
@@ -69,21 +89,14 @@ const appendGeometry = (
     const sourceIndex = indexAttribute ? indexAttribute.getX(cursor) : cursor;
     point.fromBufferAttribute(positionAttribute, sourceIndex).applyMatrix4(matrix);
 
-    const key = keyForVector(point);
+    const key = keyForVertex(point, uvAttribute, sourceIndex);
     let vertexIndex = builder.lookup.get(key);
 
     if (vertexIndex === undefined) {
       vertexIndex = builder.vertices.length;
       builder.lookup.set(key, vertexIndex);
       builder.vertices.push(toVec3(point));
-      builder.uvs.push(
-        uvAttribute
-          ? [
-              Number(uvAttribute.getX(sourceIndex).toFixed(5)),
-              Number(uvAttribute.getY(sourceIndex).toFixed(5)),
-            ]
-          : [0, 0],
-      );
+      builder.uvs.push(uvFromAttribute(uvAttribute, sourceIndex));
     }
 
     builder.indices.push(vertexIndex);
@@ -165,13 +178,52 @@ export const editableMeshFromObject3D = (root: THREE.Object3D): EditableMesh | n
   };
 };
 
+const normalizeUvValue = (value: number, min: number, size: number) => {
+  if (Math.abs(size) < 0.00001) return 0;
+  return Number(((value - min) / size).toFixed(5));
+};
+
+const generatePlanarUvs = (mesh: EditableMesh): Vec2[] => {
+  if (mesh.vertices.length === 0) return [];
+
+  const min = new THREE.Vector3(Infinity, Infinity, Infinity);
+  const max = new THREE.Vector3(-Infinity, -Infinity, -Infinity);
+
+  for (const vertex of mesh.vertices) {
+    min.x = Math.min(min.x, vertex[0]);
+    min.y = Math.min(min.y, vertex[1]);
+    min.z = Math.min(min.z, vertex[2]);
+    max.x = Math.max(max.x, vertex[0]);
+    max.y = Math.max(max.y, vertex[1]);
+    max.z = Math.max(max.z, vertex[2]);
+  }
+
+  const size = new THREE.Vector3(max.x - min.x, max.y - min.y, max.z - min.z);
+  const projectXY = size.z <= size.x && size.z <= size.y;
+  const projectXZ = !projectXY && size.y <= size.x && size.y <= size.z;
+
+  return mesh.vertices.map((vertex) => {
+    if (projectXY) {
+      return [normalizeUvValue(vertex[0], min.x, size.x), normalizeUvValue(vertex[1], min.y, size.y)];
+    }
+
+    if (projectXZ) {
+      return [normalizeUvValue(vertex[0], min.x, size.x), normalizeUvValue(vertex[2], min.z, size.z)];
+    }
+
+    return [normalizeUvValue(vertex[2], min.z, size.z), normalizeUvValue(vertex[1], min.y, size.y)];
+  });
+};
+
 export const editableMeshToBufferGeometry = (mesh: EditableMesh, materialIds: string[] = []) => {
   const geometry = new THREE.BufferGeometry();
   geometry.setAttribute('position', new THREE.Float32BufferAttribute(mesh.vertices.flat(), 3));
   geometry.setIndex(mesh.indices);
 
-  if (mesh.uvs?.length === mesh.vertices.length) {
-    geometry.setAttribute('uv', new THREE.Float32BufferAttribute(mesh.uvs.flat(), 2));
+  const uvs = mesh.uvs?.length === mesh.vertices.length ? mesh.uvs : generatePlanarUvs(mesh);
+
+  if (uvs.length === mesh.vertices.length && uvs.length > 0) {
+    geometry.setAttribute('uv', new THREE.Float32BufferAttribute(uvs.flat(), 2));
   }
 
   if (mesh.faceMaterialIds?.length && materialIds.length > 1) {

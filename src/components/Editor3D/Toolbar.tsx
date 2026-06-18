@@ -2,9 +2,11 @@
 
 import { useEffect, useRef, useState, type MutableRefObject, useCallback } from 'react';
 import {
+  Atom,
   Box,
   Boxes,
   Brush,
+  Check,
   ChevronDown,
   Download,
   Grid3X3,
@@ -13,10 +15,14 @@ import {
   Magnet,
   MousePointer2,
   Move3D,
+  Pause,
+  Play,
+  PlugZap,
   Redo2,
   Rotate3D,
   RotateCcw,
   Scale3D,
+  ScanLine,
   Type,
   Upload,
   Undo2,
@@ -32,12 +38,14 @@ import { createPrimitiveEditableMesh } from '@/lib/meshOps';
 import { useEditorStore } from '@/store/editorStore';
 import { useHistoryStore } from '@/store/historyStore';
 import { useMaterialStore } from '@/store/materialStore';
+import { usePhysicsStore } from '@/store/physicsStore';
 import { useSceneStore } from '@/store/sceneStore';
 import { useTimelineStore } from '@/store/timelineStore';
 import type { ActiveTool, EffectKind, LightConfig, ObjectSelectionMode, PrimitiveGeometry, PrimitiveKind, ViewportDisplayMode
 } from '@/store/types';
 import { DEFAULT_LIGHT_CONFIG } from '@/store/types';
 import { EFFECT_KINDS, EFFECT_LABELS, EFFECT_PRESETS } from '@/lib/effects';
+import { getPhysicsConfig, isPhysicsEnabled } from '@/lib/physics';
 
 type ToolbarProps = {
   sceneRootRef: MutableRefObject<THREE.Group | null>;
@@ -162,7 +170,8 @@ export default function Toolbar({ sceneRootRef, onOpenTutorial }: ToolbarProps) 
   const objectSelectionMode = useEditorStore((state) => state.objectSelectionMode);
   const setObjectSelectionMode = useEditorStore((state) => state.setObjectSelectionMode);
   const setSelectedObject = useEditorStore((state) => state.setSelectedObject);
-  const selectedObjectId = useEditorStore((state) => state.selectedObjectId);
+  const clearSelectedObjects = useEditorStore((state) => state.clearSelectedObjects);
+  const selectedObjectIds = useEditorStore((state) => state.selectedObjectIds);
   const objects = useSceneStore((state) => state.objects);
   const addObject = useSceneStore((state) => state.addObject);
   const addObjects = useSceneStore((state) => state.addObjects);
@@ -181,7 +190,28 @@ export default function Toolbar({ sceneRootRef, onOpenTutorial }: ToolbarProps) 
   const pushSnapshot = useHistoryStore((state) => state.pushSnapshot);
   const undoCount = useHistoryStore((state) => state.undoStack.length);
   const redoCount = useHistoryStore((state) => state.redoStack.length);
-  const selectedObject = objects.find((object) => object.uuid === selectedObjectId);
+  const simulationMode = usePhysicsStore((state) => state.mode);
+  const simulationPlayback = usePhysicsStore((state) => state.playback);
+  const gravityEnabled = usePhysicsStore((state) => state.gravityEnabled);
+  const showColliders = usePhysicsStore((state) => state.showColliders);
+  const showPhysicsDebug = usePhysicsStore((state) => state.showDebug);
+  const hasSimulationResult = usePhysicsStore((state) => state.hasSimulationResult);
+  const playSimulation = usePhysicsStore((state) => state.playSimulation);
+  const pauseSimulation = usePhysicsStore((state) => state.pauseSimulation);
+  const stopSimulation = usePhysicsStore((state) => state.stopSimulation);
+  const resetSimulation = usePhysicsStore((state) => state.resetSimulation);
+  const stepSimulation = usePhysicsStore((state) => state.stepSimulation);
+  const toggleGravity = usePhysicsStore((state) => state.toggleGravity);
+  const setShowColliders = usePhysicsStore((state) => state.setShowColliders);
+  const setShowPhysicsDebug = usePhysicsStore((state) => state.setShowDebug);
+  const requestApplySimulation = usePhysicsStore((state) => state.requestApplySimulation);
+  const requestImpulse = usePhysicsStore((state) => state.requestImpulse);
+  const selectedObject = objects.find((object) => object.uuid === (selectedObjectIds[0] ?? null));
+  const physicsObjectCount = objects.filter(isPhysicsEnabled).length;
+  const selectedPhysics = selectedObject ? getPhysicsConfig(selectedObject) : null;
+  const canImpulseSelected =
+    simulationMode === 'simulation' &&
+    Boolean(selectedObjectIds[0] && selectedPhysics?.enabled && selectedPhysics.bodyType === 'dynamic');
 
   const handleAddPrimitive = (primitive: PrimitiveKind) => {
     pushSnapshot();
@@ -280,9 +310,9 @@ export default function Toolbar({ sceneRootRef, onOpenTutorial }: ToolbarProps) 
   };
 
   const handleGroupSelected = () => {
-    if (!selectedObjectId) return;
+    if (selectedObjectIds.length === 0) return;
     pushSnapshot();
-    const group = groupObjects([selectedObjectId], 'Grupo');
+    const group = groupObjects(selectedObjectIds, 'Grupo');
     if (group) {
       createMaterialForObject(group.uuid, group.materialId, `Material ${group.name}`);
       setSelectedObject(group.uuid);
@@ -295,7 +325,7 @@ export default function Toolbar({ sceneRootRef, onOpenTutorial }: ToolbarProps) 
     pushSnapshot();
     ungroupObject(selectedObject.uuid);
     removeMaterialsForObjects([selectedObject.uuid]);
-    setSelectedObject(null);
+    clearSelectedObjects();
   };
 
   const keyframes = useTimelineStore((state) => state.keyframes);
@@ -339,7 +369,7 @@ export default function Toolbar({ sceneRootRef, onOpenTutorial }: ToolbarProps) 
     pushSnapshot();
     resetScene();
     resetMaterials();
-    setSelectedObject(null);
+    clearSelectedObjects();
     setActiveTool('select');
   };
 
@@ -583,7 +613,125 @@ export default function Toolbar({ sceneRootRef, onOpenTutorial }: ToolbarProps) 
         <ChevronDown size={12} className={selectChevron} />
       </div>
 
-      <button type="button" title="Agrupar selecionado" aria-label="Agrupar" onClick={handleGroupSelected} disabled={!selectedObjectId} className={btnBase}>
+      <ToolbarDivider />
+
+      {/* ── Simulation Controls ── */}
+      <div className="flex shrink-0 items-center gap-0.5 rounded-md bg-neutral-900/60 p-0.5">
+        <span
+          title={`${physicsObjectCount} objetos com fisica`}
+          className={`grid h-8 min-w-8 place-items-center rounded-md px-2 text-[10px] font-semibold ${
+            simulationMode === 'simulation' ? 'bg-cyan-400/10 text-cyan-300' : 'text-neutral-500'
+          }`}
+        >
+          <Atom size={14} />
+        </span>
+        <button
+          type="button"
+          title="Play simulation"
+          aria-label="Play simulation"
+          onClick={playSimulation}
+          disabled={physicsObjectCount === 0}
+          className={`${btnToggle} ${simulationPlayback === 'playing' ? btnToggleActive : ''}`}
+        >
+          <Play size={14} />
+        </button>
+        <button
+          type="button"
+          title="Pause simulation"
+          aria-label="Pause simulation"
+          onClick={pauseSimulation}
+          disabled={simulationMode !== 'simulation'}
+          className={`${btnToggle} ${simulationPlayback === 'paused' && simulationMode === 'simulation' ? btnToggleActive : ''}`}
+        >
+          <Pause size={14} />
+        </button>
+        <button
+          type="button"
+          title="Stop simulation e voltar ao estado original"
+          aria-label="Stop simulation"
+          onClick={stopSimulation}
+          disabled={simulationMode !== 'simulation'}
+          className={btnToggle}
+        >
+          <Box size={14} />
+        </button>
+        <button
+          type="button"
+          title="Reset simulation"
+          aria-label="Reset simulation"
+          onClick={resetSimulation}
+          disabled={physicsObjectCount === 0}
+          className={btnToggle}
+        >
+          <RotateCcw size={14} />
+        </button>
+        <button
+          type="button"
+          title="Step simulation"
+          aria-label="Step simulation"
+          onClick={stepSimulation}
+          disabled={physicsObjectCount === 0}
+          className={btnToggle}
+        >
+          <Redo2 size={14} />
+        </button>
+      </div>
+
+      <button
+        type="button"
+        title={gravityEnabled ? 'Desativar gravidade global' : 'Ativar gravidade global'}
+        aria-label="Toggle gravity"
+        onClick={toggleGravity}
+        className={`${btnToggle} ${gravityEnabled ? btnToggleActive : ''}`}
+      >
+        <Move3D size={14} />
+      </button>
+      <button
+        type="button"
+        title={showColliders ? 'Ocultar colliders' : 'Mostrar colliders'}
+        aria-label="Toggle colliders"
+        onClick={() => setShowColliders(!showColliders)}
+        className={`${btnToggle} ${showColliders ? btnToggleActive : ''}`}
+      >
+        <Boxes size={14} />
+      </button>
+      <button
+        type="button"
+        title={showPhysicsDebug ? 'Ocultar debug physics' : 'Mostrar debug physics'}
+        aria-label="Toggle physics debug"
+        onClick={() => setShowPhysicsDebug(!showPhysicsDebug)}
+        className={`${btnToggle} ${showPhysicsDebug ? btnToggleActive : ''}`}
+      >
+        <ScanLine size={14} />
+      </button>
+      <button
+        type="button"
+        title="Aplicar impulso no selecionado"
+        aria-label="Aplicar impulso"
+        onClick={() => {
+          const selectedId = selectedObjectIds[0];
+          if (selectedId) requestImpulse(selectedId);
+        }}
+        disabled={!canImpulseSelected}
+        className={btnToggle}
+      >
+        <PlugZap size={14} />
+      </button>
+      <button
+        type="button"
+        title="Aplicar resultado da simulacao na cena"
+        aria-label="Aplicar resultado da simulacao"
+        onClick={requestApplySimulation}
+        disabled={!hasSimulationResult}
+        className={btnAction}
+      >
+        <Check size={12} />
+        <span>Aplicar</span>
+      </button>
+
+      <ToolbarDivider />
+
+      <button type="button" title="Agrupar selecionado" aria-label="Agrupar" onClick={handleGroupSelected} disabled={selectedObjectIds.length === 0} className={btnBase}>
         <Boxes size={14} />
       </button>
       <button type="button" title="Desagrupar selecionado" aria-label="Desagrupar" onClick={handleUngroupSelected} disabled={!selectedObject || selectedObject.children.length === 0} className={btnBase}>

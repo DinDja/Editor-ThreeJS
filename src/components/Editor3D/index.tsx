@@ -117,10 +117,10 @@ function MobileTabBar() {
 function useViewportInfo() {
   const activeTool = useEditorStore((s) => s.activeTool);
   const viewportDisplayMode = useEditorStore((s) => s.viewportDisplayMode);
-  const selectedObjectId = useEditorStore((s) => s.selectedObjectId);
+  const selectedObjectIds = useEditorStore((s) => s.selectedObjectIds);
   const objects = useSceneStore((s) => s.objects);
-  const selectedObject = objects.find((o) => o.uuid === selectedObjectId);
-  return { activeTool, viewportDisplayMode, selectedObjectName: selectedObject?.name ?? 'Sem selecao' };
+  const selectedObject = objects.find((o) => o.uuid === (selectedObjectIds[0] ?? null));
+  return { activeTool, viewportDisplayMode, selectedObjectName: selectedObject?.name ?? 'Nenhum selecionado' };
 }
 
 function DesktopHUD() {
@@ -175,8 +175,8 @@ export default function Editor3D() {
     [rightPanelWidth, setRightPanelWidth],
   );
 
-  const leftCol = leftPanelCollapsed ? `48px` : `${leftPanelWidth}px`;
-  const rightCol = rightPanelCollapsed ? `48px` : `${rightPanelWidth}px`;
+  const leftCol = leftPanelCollapsed ? `48px` : `min(${leftPanelWidth}px, 40vw)`;
+  const rightCol = rightPanelCollapsed ? `48px` : `min(${rightPanelWidth}px, 42vw)`;
 
   /* Sync collapse state → activeMobilePanel on mobile */
   useEffect(() => {

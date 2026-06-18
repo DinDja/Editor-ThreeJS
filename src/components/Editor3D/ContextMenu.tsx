@@ -211,7 +211,7 @@ function ObjectMenu({ objectId }: { objectId: string }) {
         const ids = getSubtreeIds(scene.objects, object.uuid);
         scene.removeObject(object.uuid);
         mats.removeMaterialsForObjects(ids);
-        editor.setSelectedObject(null);
+        useEditorStore.getState().clearSelectedObjects();
       },
     },
     { separator: true, onClick: () => {} },

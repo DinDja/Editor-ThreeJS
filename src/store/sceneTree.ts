@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import {
+  cloneSceneObjectMetadata,
   cloneSceneObject,
   createId,
   type MaterialApplicationScope,
@@ -77,7 +78,7 @@ export const normalizeSceneObject = (object: SceneObject): SceneObject => {
     children: [...(object.children ?? [])],
     materialId,
     materialIds: object.materialIds ? [...object.materialIds] : [materialId],
-    metadata: { ...(object.metadata ?? {}) },
+    metadata: cloneSceneObjectMetadata(object.metadata ?? {}),
   };
 };
 

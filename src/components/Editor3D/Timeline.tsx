@@ -119,8 +119,9 @@ export default function Timeline() {
   const moveSelectedKeyframes = useTimelineStore((state) => state.moveSelectedKeyframes);
   const duplicateSelectedKeyframes = useTimelineStore((state) => state.duplicateSelectedKeyframes);
   const setSelectedInterpolation = useTimelineStore((state) => state.setSelectedInterpolation);
-  const selectedObjectId = useEditorStore((state) => state.selectedObjectId);
+  const selectedObjectIds = useEditorStore((state) => state.selectedObjectIds);
   const objects = useSceneStore((state) => state.objects);
+  const selectedObjectId = selectedObjectIds[0] ?? null;
   const selectedObject = objects.find((object) => object.uuid === selectedObjectId) ?? null;
   const currentFrame = Math.round(playheadFrame);
   const selectedKeyframes = keyframes.filter((keyframe) => selectedKeyframeIds.includes(keyframe.id));

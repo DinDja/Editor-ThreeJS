@@ -18,6 +18,7 @@
     "dist:all": "npx next build && npx electron-builder --win --x64 --mac --linux"
   },
   "dependencies": {
+    "@dimforge/rapier3d-compat": "^0.19.3",
     "@react-three/drei": "^10.7.7",
     "@react-three/fiber": "^9.6.1",
     "jsonrepair": "^3.14.0",

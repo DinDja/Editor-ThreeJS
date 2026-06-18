@@ -40,7 +40,7 @@ export default function MeshEditOverlay({ object }: MeshEditOverlayProps) {
   const mesh = object.editableMesh;
   const activeTool = useEditorStore((state) => state.activeTool);
   const viewportDisplayMode = useEditorStore((state) => state.viewportDisplayMode);
-  const selectedObjectId = useEditorStore((state) => state.selectedObjectId);
+  const selectedObjectIds = useEditorStore((state) => state.selectedObjectIds);
   const selectionMode = useEditorStore((state) => state.meshSelectionMode);
   const selectedVertexIndices = useEditorStore((state) => state.selectedVertexIndices);
   const selectedEdgeVertexIndices = useEditorStore((state) => state.selectedEdgeVertexIndices);
@@ -139,7 +139,7 @@ export default function MeshEditOverlay({ object }: MeshEditOverlayProps) {
     dragRef.current = null;
   };
 
-  if (!mesh || selectedObjectId !== object.uuid || viewportDisplayMode === 'primitive') return null;
+  if (!mesh || !selectedObjectIds.includes(object.uuid) || viewportDisplayMode === 'primitive') return null;
 
   const isEditMode = activeTool === 'edit';
   const isSculptMode = activeTool === 'sculpt';

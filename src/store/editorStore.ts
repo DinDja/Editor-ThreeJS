@@ -2,7 +2,7 @@ import { create } from 'zustand';
 import type { ActiveTool, MeshSelectionMode, MobilePanel, ObjectSelectionMode, PointerType, SculptFalloff, SculptMode, Vec3, ViewportDisplayMode } from './types';
 
 type EditorState = {
-  selectedObjectId: string | null;
+  selectedObjectIds: string[];
   activeTool: ActiveTool;
   objectSelectionMode: ObjectSelectionMode;
   viewportDisplayMode: ViewportDisplayMode;
@@ -35,7 +35,9 @@ type EditorState = {
   rightPanelWidth: number;
   activeMobilePanel: MobilePanel | null;
   selectedReferenceId: string | null;
-  setSelectedObject: (uuid: string | null) => void;
+  setSelectedObject: (uuid: string | null, additive?: boolean) => void;
+  toggleSelectedObject: (uuid: string) => void;
+  clearSelectedObjects: () => void;
   setSelectedReference: (id: string | null) => void;
   setActiveTool: (tool: ActiveTool) => void;
   setObjectSelectionMode: (mode: ObjectSelectionMode) => void;
@@ -72,7 +74,7 @@ type EditorState = {
 };
 
 export const useEditorStore = create<EditorState>((set) => ({
-  selectedObjectId: null,
+  selectedObjectIds: [],
   activeTool: 'select',
   objectSelectionMode: 'subelement',
   viewportDisplayMode: 'textured',
@@ -101,15 +103,46 @@ export const useEditorStore = create<EditorState>((set) => ({
   leftPanelCollapsed: false,
   rightPanelCollapsed: false,
   timelineCollapsed: false,
-  leftPanelWidth: 280,
-  rightPanelWidth: 360,
+  leftPanelWidth: 300,
+  rightPanelWidth: 380,
   activeMobilePanel: null,
   selectedReferenceId: null,
 
-  setSelectedObject: (selectedObjectId) =>
+  setSelectedObject: (uuid, additive = false) =>
+    set((state) => {
+      if (additive && uuid) {
+        const exists = state.selectedObjectIds.includes(uuid);
+        const next = exists
+          ? state.selectedObjectIds.filter((id) => id !== uuid)
+          : [...state.selectedObjectIds, uuid];
+        return {
+          selectedObjectIds: next,
+          selectedReferenceId: null,
+          selectedVertexIndices: [],
+          selectedEdgeVertexIndices: null,
+          selectedFaceIndex: null,
+        };
+      }
+      return {
+        selectedObjectIds: uuid ? [uuid] : [],
+        selectedReferenceId: null,
+        selectedVertexIndices: [],
+        selectedEdgeVertexIndices: null,
+        selectedFaceIndex: null,
+      };
+    }),
+  toggleSelectedObject: (uuid) =>
+    set((state) => {
+      const exists = state.selectedObjectIds.includes(uuid);
+      return {
+        selectedObjectIds: exists
+          ? state.selectedObjectIds.filter((id) => id !== uuid)
+          : [...state.selectedObjectIds, uuid],
+      };
+    }),
+  clearSelectedObjects: () =>
     set({
-      selectedObjectId,
-      selectedReferenceId: null,
+      selectedObjectIds: [],
       selectedVertexIndices: [],
       selectedEdgeVertexIndices: null,
       selectedFaceIndex: null,
@@ -117,7 +150,7 @@ export const useEditorStore = create<EditorState>((set) => ({
   setSelectedReference: (selectedReferenceId) =>
     set({
       selectedReferenceId,
-      selectedObjectId: null,
+      selectedObjectIds: [],
       selectedVertexIndices: [],
       selectedEdgeVertexIndices: null,
       selectedFaceIndex: null,
@@ -128,6 +161,7 @@ export const useEditorStore = create<EditorState>((set) => ({
         ? { activeTool }
         : {
             activeTool,
+            selectedObjectIds: [],
             selectedVertexIndices: [],
             selectedEdgeVertexIndices: null,
             selectedFaceIndex: null,
@@ -201,7 +235,7 @@ export const useEditorStore = create<EditorState>((set) => ({
   setLeftPanelCollapsed: (leftPanelCollapsed) => set({ leftPanelCollapsed }),
   setRightPanelCollapsed: (rightPanelCollapsed) => set({ rightPanelCollapsed }),
   setTimelineCollapsed: (timelineCollapsed) => set({ timelineCollapsed }),
-  setLeftPanelWidth: (leftPanelWidth) => set({ leftPanelWidth: Math.max(180, Math.min(480, leftPanelWidth)) }),
-  setRightPanelWidth: (rightPanelWidth) => set({ rightPanelWidth: Math.max(220, Math.min(600, rightPanelWidth)) }),
+  setLeftPanelWidth: (leftPanelWidth) => set({ leftPanelWidth: Math.max(160, Math.min(480, leftPanelWidth)) }),
+  setRightPanelWidth: (rightPanelWidth) => set({ rightPanelWidth: Math.max(200, Math.min(600, rightPanelWidth)) }),
   setActiveMobilePanel: (activeMobilePanel) => set({ activeMobilePanel }),
 }));

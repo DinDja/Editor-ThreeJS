@@ -310,7 +310,7 @@ export default function ModelingTools({ object, material }: ModelingToolsProps) 
     const ids = getSubtreeIds(objects, object.uuid);
     removeObject(object.uuid);
     removeMaterialsForObjects(ids);
-    setSelectedObject(null);
+    useEditorStore.getState().clearSelectedObjects();
   };
 
   const handleResetTransform = () => {
