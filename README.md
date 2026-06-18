@@ -4,7 +4,7 @@
 
 **Editor 3D experimental — Next.js + React Three Fiber + Electron**
 
-Base de editor de cena e modelagem: projeto em branco, primitivas, import/export GLB/GLTF, materiais com textura, edicao de malha, sculpt, fisica, animacao, behaviors, efeitos, scripts e atalhos de produtividade.
+Base de editor de cena e modelagem: projeto em branco, primitivas, import/export GLB/GLTF, materiais com textura, modelagem poligonal com Draw Polygon/Knife/Edge Loop, edicao de malha, sculpt com fallback de pressao para mouse, fisica, animacao, behaviors, efeitos, scripts, geracao de malhas via IA e atalhos de produtividade.
 
 [![Tutorial](https://img.shields.io/badge/Abrir-Tutorial-10b981?style=for-the-badge)](./TUTORIAL.md)
 [![Download Desktop](https://img.shields.io/badge/Baixar-Desktop_Windows-0078D4?style=for-the-badge&logo=windows&logoColor=white)](#desktop)
@@ -41,6 +41,7 @@ Base de editor de cena e modelagem: projeto em branco, primitivas, import/export
 - [Estrutura](#estrutura)
 - [Fluxo de Uso](#fluxo-de-uso)
 - [Modelagem](#modelagem)
+- [Modelagem Poligonal](#modelagem-poligonal)
 - [Sculpt](#sculpt)
 - [Fisica](#fisica)
 - [Animacao](#animacao)
@@ -74,7 +75,7 @@ Base de editor de cena e modelagem: projeto em branco, primitivas, import/export
 
 ### Objetos e Ferramentas
 
-- Ferramentas: Select, Mover, Girar, Escalar, Editar e Sculpt.
+- Ferramentas: Select, Mover, Girar, Escalar, Editar, Sculpt, Draw Polygon e Knife.
 - Gizmo com `TransformControls` para transforms e selecoes de malha.
 - Primitivas: cubo, esfera, cilindro, cone, toro e plano.
 - Texto 3D com depth e bevel.
@@ -97,14 +98,19 @@ Base de editor de cena e modelagem: projeto em branco, primitivas, import/export
 
 ### Edit Mode
 
-- Selecao e movimento de vertices e faces.
-- Operacoes: extrudar face, subdividir face, apagar face e soldar vertices.
+- Selecao e movimento de vertices, arestas e faces (multipla para vertices/faces).
+- Operacoes: extrudar face, subdividir face, apagar face, soldar vertices, bevel de aresta, loop cut, booleanos (union/subtract/intersect), bridge edges, fill face, inset face, flip normals, merge by distance, edge loop select e edge ring select.
+- Estrutura interna `PolygonMesh` com vertices/edges/faces explicitos (IDs + adjacencia) para operacoes topologicas.
+- Conversao bidirecional entre `PolygonMesh` e `EditableMesh` (Three.js BufferGeometry).
 
 ### Sculpt
 
 - Pincel para amassar, puxar, agarrar, inflar, suavizar, clay, crease, flatten, pinch e mask.
 - Falloff suave, esferico, afiado e linear.
 - Controles de raio e forca.
+- Fallback de pressao para mouse baseado em velocidade do cursor (mouse rapido = menos forca, mouse lento = mais forca).
+- Smoothing default 0.35 para estabilizar strokes de mouse.
+- Simetria X, front faces only, accumulate, spacing e estabilizador de caneta configuraveis.
 
 ### Fisica
 
@@ -138,7 +144,11 @@ Base de editor de cena e modelagem: projeto em branco, primitivas, import/export
 
 ### IA
 
-- Agente NVIDIA NIM para gerar cenas com primitivas via prompt.
+- Agente NVIDIA NIM para gerar malhas 3D (vertices + faces) via prompt.
+- Decomposicao automatica em varias partes com hierarquia via parentName.
+- Retry automatico quando a cena fica simples demais.
+- Compactacao de layout para manter a composicao centralizada.
+- Subdivisao e suavizacao procedural das malhas geradas.
 
 ---
 
@@ -155,7 +165,7 @@ Base de editor de cena e modelagem: projeto em branco, primitivas, import/export
 | Icones | Lucide React |
 | Performance | three-mesh-bvh |
 | Desktop | Electron 35, electron-builder |
-| IA | NVIDIA NIM (meta/llama-3.1-8b-instruct) |
+| IA | NVIDIA NIM (nvidia/llama-3.1-nemotron-70b-instruct, meta/llama-3.1-8b-instruct) |
 
 ---
 
@@ -265,8 +275,10 @@ src/
       Canvas3D.tsx
       CollapsibleSection.tsx
       ContextMenu.tsx
+      DrawPolygonOverlay.tsx
       EditorShortcuts.tsx
       index.tsx
+      KnifeOverlay.tsx
       MaterialEditor.tsx
       MeshEditOverlay.tsx
       ModelingTools.tsx
@@ -280,6 +292,7 @@ src/
     ModelViewer.tsx
 
   lib/
+    aiMeshEnhancer.ts
     animation.ts
     behaviors.tsx
     effects.tsx
@@ -290,6 +303,7 @@ src/
     meshOps.ts
     nvidiaNim.ts
     physics.ts
+    polygonMesh.ts
     scriptEngine.tsx
 
   store/
@@ -299,6 +313,7 @@ src/
     initialScene.ts
     materialStore.ts
     physicsStore.ts
+    polygonMeshStore.ts
     sceneStore.ts
     sceneTree.ts
     timelineStore.ts
@@ -312,35 +327,39 @@ src/
 ## Fluxo de Uso
 
 ```text
- Add / Importar GLB
-        |
-        v
- Selecionar objeto (viewport ou Scene Graph)
-        |
-        v
- Transformar (Mover / Girar / Escalar)
-        |
-        v
- Editar Properties (transforms, material, modelagem)
-        |
-        +---> Edit Mode (vertices / faces)
-        +---> Sculpt (pincel)
-        +---> Fisica / Behaviors / Scripts / Efeitos
-        +---> Animar (Timeline + keyframes)
-        |
-        v
- Exportar cena -> .glb
+ Add / Importar GLB / Gerar IA
+         |
+         v
+  Selecionar objeto (viewport ou Scene Graph)
+         |
+         v
+  Transformar (Mover / Girar / Escalar)
+         |
+         v
+  Editar Properties (transforms, material, modelagem)
+         |
+         +---> Edit Mode (vertices / arestas / faces)
+         +---> Draw Polygon (desenhar poligonos do zero)
+         +---> Knife (cortar faces interativamente)
+         +---> Sculpt (pincel)
+         +---> Fisica / Behaviors / Scripts / Efeitos
+         +---> Animar (Timeline + keyframes)
+         |
+         v
+  Exportar cena -> .glb
 ```
 
-1. Use `Add` para inserir uma primitiva ou `Importar` para carregar `.glb`/`.gltf`.
+1. Use `Add` para inserir uma primitiva, `Importar` para carregar `.glb`/`.gltf`, ou `Gerar IA` para criar malhas via prompt.
 2. Selecione um objeto no Scene Graph ou diretamente no viewport.
 3. Use Mover, Girar e Escalar para transformar o objeto.
 4. Edite transforms, modelagem e material no painel Properties.
-5. Use `Editar` para selecionar vertices ou faces e mover a selecao com o gizmo.
-6. Use `Sculpt` para deformar a malha com pincel.
-7. Aplique fisica, behaviors, efeitos ou scripts conforme necessario.
-8. Crie keyframes na Timeline para animar objetos.
-9. Use `Exportar` para baixar a cena atual como `.glb`.
+5. Use `Editar` para selecionar vertices, arestas ou faces e mover a selecao com o gizmo.
+6. Use `Draw Polygon` para desenhar poligonos clicando no viewport e fechando faces.
+7. Use `Knife` para cortar faces interativamente com preview de linha.
+8. Use `Sculpt` para deformar a malha com pincel.
+9. Aplique fisica, behaviors, efeitos ou scripts conforme necessario.
+10. Crie keyframes na Timeline para animar objetos.
+11. Use `Exportar` para baixar a cena atual como `.glb`.
 
 ---
 
@@ -354,11 +373,20 @@ O modo Editar converte primitivas e modelos importados para uma malha editavel. 
 No painel Modelagem:
 
 - **Vertices**: seleciona pontos individuais; use Shift para selecao multipla.
-- **Faces**: seleciona triangulos da malha.
+- **Edges**: seleciona arestas (atalho `2`); use Shift para selecao multipla.
+- **Faces**: seleciona triangulos da malha; use Shift para selecao multipla.
 - **Extrudar**: cria volume a partir da face selecionada.
 - **Subdividir**: divide uma face selecionada em triangulos menores.
 - **Soldar**: junta vertices selecionados no centro da selecao.
-- **Face**: apaga a face selecionada.
+- **Bevel Edge**: chanfra uma aresta selecionada criando novos vertices e faces.
+- **Loop Cut**: corta todas as arestas paralelas a selecionada inserindo midpoints.
+- **Boolean**: union, subtract e intersect com outro objeto da cena.
+- **Bridge Edges**: une duas arestas selecionadas com faces.
+- **Fill Face**: preenche uma face a partir de vertices selecionados.
+- **Inset Face**: cria inset de uma face selecionada.
+- **Flip Normals**: inverte a ordem dos vertices de faces selecionadas.
+- **Merge by Distance**: funde vertices proximos por threshold.
+- **Delete Vertex/Edge/Face**: remove o subelemento selecionado.
 
 </details>
 
@@ -375,6 +403,54 @@ No painel Modelagem:
 Mais segmentos deixam a malha melhor para edicao e sculpt.
 
 </details>
+
+---
+
+## Modelagem Poligonal
+
+Alem do Edit Mode classico, o editor tem ferramentas dedicadas para modelagem poligonal manual, inspiradas no Edit Mode do Blender.
+
+### Draw Polygon
+
+Desenhe poligonos do zero clicando no viewport.
+
+1. Ative a ferramenta com `P` ou botao `Draw Polygon` (icone caneta) na toolbar.
+2. Clique no grid XZ para criar vertices. Uma linha amarela conecta os pontos.
+3. Ao aproximar do 1º vertice (esfera fica verde) e clicar, a face se fecha.
+4. Alternativamente, pressione `Enter` ou clique com o botao direito para fechar.
+5. `Esc` cancela o desenho.
+
+Se houver um objeto de malha selecionado, a nova face e adicionada a ele. Caso contrario, um novo objeto `Mesh` e criado.
+
+### Knife Tool
+
+Corte faces interativamente com preview de linha.
+
+1. Ative com `K` ou botao `Knife` (icone tesoura) na toolbar.
+2. Clique na superficie da malha para definir pontos de corte. Uma linha vermelha mostra o caminho.
+3. Pressione `Enter` ou clique com o botao direito para aplicar o corte.
+4. `Esc` cancela.
+
+O corte cria novos vertices nos pontos de intersecao e divide as faces atravessadas em duas.
+
+### Edge Loop / Edge Ring Select
+
+- **Edge Loop**: seleciona um loop continuo de arestas a partir de uma aresta. Disponivel no `polygonMeshStore`.
+- **Edge Ring**: seleciona um ring de arestas paralelas. Disponivel no `polygonMeshStore`.
+
+### Estrutura PolygonMesh
+
+A estrutura interna `PolygonMesh` mantem vertices, edges e faces com IDs explicitos e adjacencia:
+
+```typescript
+type PolygonMesh = {
+  vertices: Map<VertexId, { id, position }>;
+  edges: Map<EdgeId, { id, a, b, faces[] }>;
+  faces: Map<FaceId, { id, vertices[], edges[] }>;
+};
+```
+
+Conversao bidirecional com `EditableMesh` (triangulado) permite renderizar via Three.js e exportar GLB.
 
 ---
 
@@ -398,6 +474,23 @@ O modo Sculpt deforma a malha com um pincel:
 Falloff: suave, esferico, afiado e linear.
 
 Use os controles **Raio** e **Forca** no painel Modelagem para ajustar o pincel.
+
+<details>
+<summary><b>Suporte a mouse e caneta</b></summary>
+
+| Recurso | Comportamento |
+| --- | --- |
+| Pressao (caneta) | Usa pressao real do tablet quando `Pressao na Forca` ou `Pressao no Raio` estao ativos |
+| Pressao (mouse) | Fallback por velocidade do cursor: mouse rapido = menos forca (35-100%) |
+| Smoothing | Estabilizador de stroke, default 0.35 para suavizar tremores de mouse |
+| Spacing | Distancia minima entre stamps do pincel |
+| Symmetry X | Espelha o stroke no eixo X |
+| Front Faces Only | Afeta apenas faces voltadas para a camera |
+| Accumulate | Permite acumular deformacao no mesmo vertice durante um stroke |
+
+O dispositivo ativo (mouse/caneta/toque) e detectado automaticamente.
+
+</details>
 
 ---
 
@@ -564,11 +657,20 @@ Props comuns: cor, intensidade, `castShadow`, `shadowBias`, `shadowRadius`.
 | `S` | Escalar |
 | `E` | Entrar em Edit Mode ou extrudar face selecionada |
 | `V` | Selecao de vertices |
+| `2` | Selecao de arestas |
 | `F` | Selecao de faces |
 | `B` | Sculpt |
+| `P` | Draw Polygon (ou toggle pressao se estiver em Sculpt) |
+| `K` | Knife Tool |
+| `X` | Inverte modo do sculpt (push<->pull, inflate<->pinch) |
+| `Shift+F` | Cicla falloff do sculpt |
+| `Arrow Up` | Aumenta forca do sculpt |
+| `Arrow Down` | Diminui forca do sculpt |
 | `Esc` | Limpar selecao e voltar para Select |
 | `[` | Diminuir raio do pincel |
 | `]` | Aumentar raio do pincel |
+| `;` | Aumentar smoothing do pen |
+| `'` | Diminuir smoothing do pen |
 
 Os atalhos nao disparam enquanto voce esta digitando em inputs, selects ou textareas.
 
@@ -582,7 +684,9 @@ Modelos colocados em `public/` podem ser servidos diretamente pelo app. A rota `
 
 ## Agente IA (NVIDIA NIM)
 
-O editor tem um agente para gerar cenas com primitivas via NVIDIA NIM usando o modelo `meta/llama-3.1-8b-instruct`.
+O editor tem um agente para gerar **malhas 3D** (vertices + faces) via NVIDIA NIM. Usa o modelo `nvidia/llama-3.1-nemotron-70b-instruct` como primario e `meta/llama-3.1-8b-instruct` como fallback.
+
+A IA retorna objetos com geometria real (arrays de vertices e faces trianguladas), decompostos em varias partes com hierarquia via `parentName`. As malhas passam por subdivisao e suavizacao procedural antes de entrar na cena.
 
 <details>
 <summary><b>Variaveis de ambiente</b></summary>
@@ -591,7 +695,8 @@ Crie o arquivo `.env` (ou use `.env.local`) com:
 
 ```env
 NVIDIA_NIM_API_KEY=your_nvidia_nim_api_key
-NVIDIA_NIM_MODEL=meta/llama-3.1-8b-instruct
+NVIDIA_NIM_MODEL_PRIMARY=nvidia/llama-3.1-nemotron-70b-instruct
+NVIDIA_NIM_MODEL_FALLBACK=meta/llama-3.1-8b-instruct
 NVIDIA_NIM_BASE_URL=https://integrate.api.nvidia.com/v1
 ```
 
@@ -608,7 +713,7 @@ Body:
 
 ```json
 {
-  "prompt": "cidade sci-fi com torres e uma plataforma central"
+  "prompt": "robo futurista com base metalica, luzes neon e pedestal"
 }
 ```
 
@@ -619,11 +724,12 @@ Resposta:
   "objects": [
     {
       "name": "Torre Central",
-      "primitive": "cylinder",
+      "vertices": [[-0.5,-0.5,-0.5],[0.5,-0.5,-0.5],...],
+      "faces": [[0,1,2],[0,2,3],...],
       "position": [0, 1.5, 0],
       "rotation": [0, 0, 0],
       "scale": [1, 1, 1],
-      "geometry": { "radiusTop": 0.8, "radiusBottom": 1.1, "height": 3 },
+      "parentName": "Base",
       "material": {
         "color": "#9fb3ff",
         "metalness": 0.45,
@@ -637,9 +743,18 @@ Resposta:
 }
 ```
 
+Cada objeto tem 20-60 vertices e 40-120 faces em media, formando superficies solidas reconhaveis.
+
 </details>
 
-Na toolbar, use o botao `Gerar IA`, descreva a cena e o app cria automaticamente primitivas e materiais.
+<details>
+<summary><b>Retry automatico</b></summary>
+
+Se a primeira geracao ficar simples demais (<40 vertices totais ou <3 objetos), o agente refaca com um prompt reforcado pedindo mais decomposicao e detalhes. Um segundo retry acontece se ainda estiver simples.
+
+</details>
+
+Na toolbar, use o botao `Gerar IA` (icone sparkles fucsia), descreva a cena e o app cria automaticamente as malhas com materiais.
 
 ---
 
@@ -675,7 +790,7 @@ Confira se existe algum objeto na cena e tente novamente em um navegador moderno
 ## Roadmap
 
 - [x] Cena, materiais, import/export, atalhos
-- [x] Edicao de malha (vertices/faces) e sculpt
+- [x] Edicao de malha (vertices/arestas/faces) e sculpt
 - [x] Fisica com Rapier3D
 - [x] Timeline com keyframes
 - [x] Behaviors procedurais
@@ -683,11 +798,17 @@ Confira se existe algum objeto na cena e tente novamente em um navegador moderno
 - [x] Scripts por objeto
 - [x] Layers e imagens de referencia
 - [x] Desktop Electron
-- [x] Agente IA (NVIDIA NIM)
-- [ ] Operacoes de aresta (bevel, loop cut)
-- [ ] Booleanos entre malhas
+- [x] Agente IA (NVIDIA NIM) gerando malhas com vertices/faces
+- [x] Operacoes de aresta (bevel, loop cut)
+- [x] Booleanos entre malhas
+- [x] Modelagem poligonal: Draw Polygon, Knife, Edge Loop/Ring, Bridge, Fill, Inset
+- [x] Sculpt com fallback de pressao para mouse
+- [ ] Box / Lasso select de sub-elementos
+- [ ] Hover preview antes de clicar
+- [ ] Flip/Recalculate Normals e Smooth/Flat Shading na UI
 - [ ] Timeline com keyframes reais exportaveis
 - [ ] Multi-materiais por face avancado
+- [ ] Snap to vertex/edge/face durante transform de sub-elemento
 
 ---
 
@@ -705,7 +826,7 @@ PRs sao bem-vindas. Para bugs, abra uma [Issue](https://github.com/DinDja/Editor
 
 ## Status
 
-Este projeto esta em desenvolvimento ativo. A base atual cobre cena, materiais, import/export, atalhos, edicao de malha, sculpt, fisica, animacao, behaviors, efeitos e scripts.
+Este projeto esta em desenvolvimento ativo. A base atual cobre cena, materiais, import/export, atalhos, edicao de malha, modelagem poligonal (Draw Polygon, Knife, Edge Loop/Ring), sculpt com suporte a mouse, fisica, animacao, behaviors, efeitos, scripts e geracao de malhas via IA.
 
 <div align="center">
 
