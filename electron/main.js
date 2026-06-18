@@ -29,19 +29,30 @@ function waitForServer(url, retries = 60) {
   });
 }
 
+function getProjectDir() {
+  if (isDev()) return path.join(__dirname, '..');
+  return path.join(process.resourcesPath, 'app');
+}
+
+function getNextCliPath() {
+  const dir = getProjectDir();
+  return path.join(dir, 'node_modules', 'next', 'dist', 'cli', 'next-start');
+}
+
 function startNextServer() {
   return new Promise((resolve, reject) => {
-    const cwd = path.join(__dirname, '..');
-    const cmd = isDev() ? 'next' : 'next';
-    const args = isDev()
-      ? ['dev', '-p', String(PORT)]
-      : ['start', '-p', String(PORT)];
+    const projectDir = getProjectDir();
+    const nextCli = getNextCliPath();
 
-    serverProcess = spawn('npx', [cmd, ...args], {
-      cwd,
+    const args = isDev()
+      ? [nextCli, 'dev', '-p', String(PORT)]
+      : [nextCli, 'start', '-p', String(PORT)];
+
+    serverProcess = spawn(process.execPath, args, {
+      cwd: projectDir,
       stdio: ['pipe', 'pipe', 'pipe'],
-      shell: true,
-      env: { ...process.env, PORT: String(PORT) },
+      shell: false,
+      env: { ...process.env, NODE_ENV: isDev() ? 'development' : 'production' },
     });
 
     serverProcess.stdout.on('data', (data) => {
@@ -83,7 +94,7 @@ function createWindow() {
     minWidth: 1024,
     minHeight: 700,
     title: 'Editor 3D',
-    icon: path.join(__dirname, '..', 'public', 'favicon.ico'),
+    icon: path.join(getProjectDir(), 'public', 'favicon.ico'),
     webPreferences: {
       preload: path.join(__dirname, 'preload.js'),
       nodeIntegration: false,
