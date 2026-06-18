@@ -7,6 +7,7 @@ import {
   ChevronDown,
   Download,
   Grid3X3,
+  Heart,
   HelpCircle,
   Magnet,
   MousePointer2,
@@ -111,6 +112,7 @@ function ToolbarDivider() {
 
 export default function Toolbar({ sceneRootRef, onOpenTutorial }: ToolbarProps) {
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const refImageInputRef = useRef<HTMLInputElement>(null);
   const toolbarRef = useRef<HTMLElement>(null);
   const toolbarDragRef = useRef({
     pointerId: -1,
@@ -138,6 +140,7 @@ export default function Toolbar({ sceneRootRef, onOpenTutorial }: ToolbarProps) 
   const objects = useSceneStore((state) => state.objects);
   const addObject = useSceneStore((state) => state.addObject);
   const addPrimitive = useSceneStore((state) => state.addPrimitive);
+  const addReferenceImage = useSceneStore((state) => state.addReferenceImage);
   const updateObject = useSceneStore((state) => state.updateObject);
   const resetScene = useSceneStore((state) => state.resetScene);
   const createMaterialForObject = useMaterialStore((state) => state.createMaterialForObject);
@@ -187,6 +190,16 @@ export default function Toolbar({ sceneRootRef, onOpenTutorial }: ToolbarProps) 
     createMaterialForObject(object.uuid, object.materialId, `Material ${name}`);
     setSelectedObject(object.uuid);
     setActiveTool('translate');
+  };
+
+  const handleReferenceFile = (file: File | undefined) => {
+    if (!file) return;
+    if (!file.type.startsWith('image/')) return;
+
+    pushSnapshot();
+    const url = URL.createObjectURL(file);
+    const name = file.name.replace(/\.[^.]+$/, '').replace(/[_-]+/g, ' ');
+    addReferenceImage(url, name);
   };
 
   const keyframes = useTimelineStore((state) => state.keyframes);
@@ -531,6 +544,20 @@ export default function Toolbar({ sceneRootRef, onOpenTutorial }: ToolbarProps) 
             event.currentTarget.value = '';
           }}
         />
+        <input
+          ref={refImageInputRef}
+          type="file"
+          accept="image/*"
+          className="sr-only"
+          onChange={(event) => {
+            handleReferenceFile(event.target.files?.[0]);
+            event.currentTarget.value = '';
+          }}
+        />
+        <button type="button" onClick={() => refImageInputRef.current?.click()} className={buttonClass}>
+          <Heart size={14} />
+          <span className="hidden sm:inline">Referencia</span>
+        </button>
         <button type="button" onClick={() => setAssetBrowserOpen(true)} className={buttonClass}>
           <Box size={14} />
           <span className="hidden sm:inline">Assets</span>

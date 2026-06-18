@@ -1,6 +1,6 @@
 'use client';
 
-import { Eye, EyeOff, Move3D, PanelRight, Plus, Rotate3D, Scale3D, Trash2 } from 'lucide-react';
+import { Eye, EyeOff, Heart, Image, Move3D, PanelRight, Plus, Rotate3D, Scale3D, Trash2 } from 'lucide-react';
 import * as THREE from 'three';
 import CollapsibleSection from './CollapsibleSection';
 import MaterialEditor from './MaterialEditor';
@@ -12,7 +12,7 @@ import { useHistoryStore } from '@/store/historyStore';
 import { useMaterialStore } from '@/store/materialStore';
 import { useSceneStore } from '@/store/sceneStore';
 import { useTimelineStore } from '@/store/timelineStore';
-import type { BehaviorConfig, BehaviorKind, EffectConfig, EffectKind, SceneObject, Script, Vec3 } from '@/store/types';
+import type { BehaviorConfig, BehaviorKind, EffectConfig, EffectKind, ReferenceImage, SceneObject, Script, Vec3 } from '@/store/types';
 import { EFFECT_KINDS, EFFECT_LABELS, EFFECT_PRESETS } from '@/lib/effects';
 import { BEHAVIOR_KINDS, BEHAVIOR_LABELS, BEHAVIOR_DEFAULTS } from '@/lib/behaviors';
 import { createId } from '@/store/types';
@@ -522,8 +522,140 @@ function ScriptPanel({ object }: { object: SceneObject }) {
   );
 }
 
+function ReferenceManager() {
+  const referenceImages = useSceneStore((state) => state.referenceImages);
+  const removeReferenceImage = useSceneStore((state) => state.removeReferenceImage);
+  const updateReferenceImage = useSceneStore((state) => state.updateReferenceImage);
+  const selectedReferenceId = useEditorStore((state) => state.selectedReferenceId);
+  const setSelectedReference = useEditorStore((state) => state.setSelectedReference);
+  const pushSnapshot = useHistoryStore((state) => state.pushSnapshot);
+  const selectedRef = referenceImages.find((r) => r.id === selectedReferenceId);
+
+  return (
+    <div className="grid gap-3 p-3 sm:p-4">
+      <div className="flex items-center gap-2">
+        <Heart size={15} className="text-rose-300" />
+        <h2 className="text-xs font-semibold uppercase tracking-[0.18em] text-neutral-400">Referencias</h2>
+      </div>
+
+      {referenceImages.length === 0 && (
+        <p className="text-xs text-neutral-500">
+          Nenhuma referencia. Use o botao "Referencia" na toolbar para adicionar.
+        </p>
+      )}
+
+      <div className="grid gap-1">
+        {referenceImages.map((ref) => (
+          <button
+            key={ref.id}
+            type="button"
+            onClick={() => setSelectedReference(selectedReferenceId === ref.id ? null : ref.id)}
+            className={`flex min-h-11 items-center gap-2 rounded-md border px-3 text-left text-xs transition ${
+              selectedReferenceId === ref.id
+                ? 'border-rose-400/50 bg-rose-400/10 text-rose-100'
+                : 'border-neutral-800 bg-neutral-950 text-neutral-300 hover:border-neutral-700'
+            }`}
+          >
+            <Image size={14} className="shrink-0 text-neutral-500" />
+            <span className="min-w-0 flex-1 truncate">{ref.name}</span>
+            <div className="flex items-center gap-1">
+              <button
+                type="button"
+                onClick={(e) => { e.stopPropagation(); pushSnapshot(); updateReferenceImage(ref.id, { visible: !ref.visible }); }}
+                className={`grid min-h-8 min-w-8 place-items-center rounded ${ref.visible ? 'text-emerald-300' : 'text-neutral-600'}`}
+              >
+                {ref.visible ? <Eye size={13} /> : <EyeOff size={13} />}
+              </button>
+              <button
+                type="button"
+                onClick={(e) => { e.stopPropagation(); pushSnapshot(); removeReferenceImage(ref.id); setSelectedReference(null); }}
+                className="grid min-h-8 min-w-8 place-items-center rounded text-neutral-500 hover:bg-red-500/15 hover:text-red-200"
+              >
+                <Trash2 size={13} />
+              </button>
+            </div>
+          </button>
+        ))}
+      </div>
+
+      {selectedRef && (
+        <div className="grid gap-3 rounded-md border border-neutral-800 bg-neutral-950/60 p-3">
+          <label className="grid gap-1">
+            <span className="text-[11px] font-medium uppercase tracking-[0.14em] text-neutral-500">Nome</span>
+            <input
+              type="text"
+              value={selectedRef.name}
+              onFocus={pushSnapshot}
+              onChange={(e) => updateReferenceImage(selectedRef.id, { name: e.target.value })}
+              className="h-9 rounded-md border border-neutral-700/80 bg-[#0d0f10] px-2.5 text-sm text-neutral-100 outline-none focus:border-emerald-400"
+            />
+          </label>
+
+          <label className="grid gap-1">
+            <div className="flex items-center justify-between">
+              <span className="text-[11px] font-medium uppercase tracking-[0.14em] text-neutral-500">Opacidade</span>
+              <span className="text-xs tabular-nums text-neutral-400">{Math.round(selectedRef.opacity * 100)}%</span>
+            </div>
+            <input
+              type="range"
+              min={0.05}
+              max={1}
+              step={0.05}
+              value={selectedRef.opacity}
+              onChange={(e) => updateReferenceImage(selectedRef.id, { opacity: Number(e.target.value) })}
+              className="h-1.5 w-full cursor-pointer accent-rose-400"
+            />
+          </label>
+
+          <div className="grid gap-2">
+            <span className="flex items-center gap-2 text-[11px] font-medium uppercase tracking-[0.14em] text-neutral-500">
+              <Move3D size={12} className="text-neutral-600" />
+              Posicao
+            </span>
+            <div className="grid grid-cols-3 gap-2">
+              {(['X', 'Y', 'Z'] as const).map((axis, i) => (
+                <label key={axis} className="grid gap-1">
+                  <span className={`text-[10px] font-semibold ${['text-red-300', 'text-emerald-300', 'text-sky-300'][i]}`}>{axis}</span>
+                  <input
+                    type="number"
+                    step={0.1}
+                    value={Number(selectedRef.position[i].toFixed(3))}
+                    onFocus={pushSnapshot}
+                    onChange={(e) => {
+                      const pos = [...selectedRef.position] as Vec3;
+                      pos[i] = Number(e.target.value);
+                      updateReferenceImage(selectedRef.id, { position: pos });
+                    }}
+                    className="h-8 rounded-md border border-neutral-700/80 bg-[#0d0f10] px-2 text-sm text-neutral-100 outline-none focus:border-emerald-400"
+                  />
+                </label>
+              ))}
+            </div>
+          </div>
+
+          <label className="grid gap-1">
+            <span className="text-[11px] font-medium uppercase tracking-[0.14em] text-neutral-500">Tamanho</span>
+            <input
+              type="number"
+              step={0.5}
+              value={Number(selectedRef.scale[1].toFixed(2))}
+              onFocus={pushSnapshot}
+              onChange={(e) => {
+                const s = Number(e.target.value);
+                updateReferenceImage(selectedRef.id, { scale: [s, s, s] });
+              }}
+              className="h-9 rounded-md border border-neutral-700/80 bg-[#0d0f10] px-2.5 text-sm text-neutral-100 outline-none focus:border-emerald-400"
+            />
+          </label>
+        </div>
+      )}
+    </div>
+  );
+}
+
 export default function Properties() {
   const selectedObjectId = useEditorStore((state) => state.selectedObjectId);
+  const selectedReferenceId = useEditorStore((state) => state.selectedReferenceId);
   const objects = useSceneStore((state) => state.objects);
   const updateObject = useSceneStore((state) => state.updateObject);
   const materials = useMaterialStore((state) => state.materials);
@@ -573,6 +705,7 @@ export default function Properties() {
     return (
       <aside className="flex h-full min-h-0 flex-col border-l border-neutral-800 bg-[#151719]">
         {headerContent}
+        {!rightPanelCollapsed && <ReferenceManager />}
       </aside>
     );
   }

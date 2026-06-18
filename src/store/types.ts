@@ -92,6 +92,17 @@ export type BehaviorConfig = {
   deformReturnSpeed?: number;
 };
 
+export type ReferenceImage = {
+  id: string;
+  name: string;
+  imageUrl: string;
+  position: Vec3;
+  rotation: Vec3;
+  scale: Vec3;
+  opacity: number;
+  visible: boolean;
+};
+
 export type Layer = {
   id: string;
   name: string;
@@ -183,5 +194,12 @@ export const cloneSceneObject = (object: SceneObject): SceneObject => ({
 });
 
 export const cloneLayer = (layer: Layer): Layer => ({ ...layer });
+
+export const cloneReferenceImage = (ref: ReferenceImage): ReferenceImage => ({
+  ...ref,
+  position: cloneVec3(ref.position),
+  rotation: cloneVec3(ref.rotation),
+  scale: cloneVec3(ref.scale),
+});
 
 export const cloneMaterial = (material: EditorMaterial): EditorMaterial => ({ ...material });

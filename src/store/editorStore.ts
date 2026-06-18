@@ -33,7 +33,9 @@ type EditorState = {
   leftPanelWidth: number;
   rightPanelWidth: number;
   activeMobilePanel: MobilePanel | null;
+  selectedReferenceId: string | null;
   setSelectedObject: (uuid: string | null) => void;
+  setSelectedReference: (id: string | null) => void;
   setActiveTool: (tool: ActiveTool) => void;
   setViewportDisplayMode: (mode: ViewportDisplayMode) => void;
   setMeshSelectionMode: (mode: MeshSelectionMode) => void;
@@ -99,10 +101,20 @@ export const useEditorStore = create<EditorState>((set) => ({
   leftPanelWidth: 280,
   rightPanelWidth: 360,
   activeMobilePanel: null,
+  selectedReferenceId: null,
 
   setSelectedObject: (selectedObjectId) =>
     set({
       selectedObjectId,
+      selectedReferenceId: null,
+      selectedVertexIndices: [],
+      selectedEdgeVertexIndices: null,
+      selectedFaceIndex: null,
+    }),
+  setSelectedReference: (selectedReferenceId) =>
+    set({
+      selectedReferenceId,
+      selectedObjectId: null,
       selectedVertexIndices: [],
       selectedEdgeVertexIndices: null,
       selectedFaceIndex: null,

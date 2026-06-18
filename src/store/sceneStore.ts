@@ -3,10 +3,12 @@ import { INITIAL_OBJECTS } from './initialScene';
 import {
   cloneEditableMesh,
   cloneLayer,
+  cloneReferenceImage,
   cloneSceneObject,
   createId,
   type Layer,
   type PrimitiveKind,
+  type ReferenceImage,
   type SceneObject,
   type SceneObjectInput,
 } from './types';
@@ -20,6 +22,7 @@ const DEFAULT_LAYERS: Layer[] = [
 type SceneState = {
   objects: SceneObject[];
   layers: Layer[];
+  referenceImages: ReferenceImage[];
   addObject: (input: SceneObjectInput) => SceneObject;
   addPrimitive: (primitive: PrimitiveKind) => SceneObject;
   updateObject: (uuid: string, patch: Partial<Omit<SceneObject, 'uuid'>>) => void;
@@ -32,6 +35,10 @@ type SceneState = {
   reorderLayers: (fromOrder: number, toOrder: number) => void;
   moveObjectsToLayer: (objectIds: string[], layerId: string) => void;
   setLayers: (layers: Layer[]) => void;
+  addReferenceImage: (imageUrl: string, name?: string) => ReferenceImage;
+  updateReferenceImage: (id: string, patch: Partial<Omit<ReferenceImage, 'id'>>) => void;
+  removeReferenceImage: (id: string) => void;
+  setReferenceImages: (images: ReferenceImage[]) => void;
 };
 
 const createSceneObject = (input: SceneObjectInput): SceneObject => {
@@ -71,6 +78,7 @@ const primitiveNames: Record<PrimitiveKind, string> = {
 export const useSceneStore = create<SceneState>((set) => ({
   objects: INITIAL_OBJECTS.map(cloneSceneObject),
   layers: DEFAULT_LAYERS.map(cloneLayer),
+  referenceImages: [],
 
   addObject: (input) => {
     const object = createSceneObject(input);
@@ -147,4 +155,37 @@ export const useSceneStore = create<SceneState>((set) => ({
     })),
 
   setLayers: (layers) => set({ layers: layers.map(cloneLayer) }),
+
+  addReferenceImage: (imageUrl, name) => {
+    let created: ReferenceImage | null = null;
+    set((state) => {
+      const ref: ReferenceImage = {
+        id: createId(),
+        name: name ?? 'Referencia',
+        imageUrl,
+        position: [0, 1.5, -2],
+        rotation: [0, 0, 0],
+        scale: [2, 2, 2],
+        opacity: 0.6,
+        visible: true,
+      };
+      created = ref;
+      return { referenceImages: [...state.referenceImages, ref] };
+    });
+    return created!;
+  },
+
+  updateReferenceImage: (id, patch) =>
+    set((state) => ({
+      referenceImages: state.referenceImages.map((ref) =>
+        ref.id === id ? { ...ref, ...patch } : ref,
+      ),
+    })),
+
+  removeReferenceImage: (id) =>
+    set((state) => ({
+      referenceImages: state.referenceImages.filter((ref) => ref.id !== id),
+    })),
+
+  setReferenceImages: (images) => set({ referenceImages: images.map(cloneReferenceImage) }),
 }));

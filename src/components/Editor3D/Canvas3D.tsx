@@ -14,7 +14,7 @@ import { useMaterialStore } from '@/store/materialStore';
 import { useSceneStore } from '@/store/sceneStore';
 import { useContextMenu } from '@/store/contextMenuStore';
 import ContextMenu from './ContextMenu';
-import type { EditableMesh, EditorMaterial, PointerType, SceneObject, ViewportDisplayMode } from '@/store/types';
+import type { EditableMesh, EditorMaterial, PointerType, ReferenceImage, SceneObject, ViewportDisplayMode } from '@/store/types';
 import { EffectAsset } from '@/lib/effects';
 import { BehaviorEngine } from '@/lib/behaviors';
 import { ScriptEngine } from '@/lib/scriptEngine';
@@ -691,9 +691,40 @@ function GridHelper({ show }: { show: boolean }) {
   return null;
 }
 
+function ReferenceImagePlane({ refImg }: { refImg: ReferenceImage }) {
+  const texture = useLoader(THREE.TextureLoader, refImg.imageUrl);
+  const selectedReferenceId = useEditorStore((s) => s.selectedReferenceId);
+  const setSelectedReference = useEditorStore((s) => s.setSelectedReference);
+
+  useEffect(() => () => texture.dispose(), [texture]);
+
+  const aspect = texture.image ? texture.image.width / texture.image.height : 1;
+  const scale: [number, number, number] = [refImg.scale[0] * aspect, refImg.scale[1], 1];
+
+  return (
+    <mesh
+      position={refImg.position}
+      rotation={refImg.rotation}
+      scale={scale}
+      onClick={(e) => { e.stopPropagation(); setSelectedReference(refImg.id); }}
+    >
+      <planeGeometry />
+      <meshBasicMaterial
+        map={texture}
+        transparent
+        opacity={refImg.opacity}
+        depthWrite={false}
+        side={THREE.DoubleSide}
+        toneMapped={false}
+      />
+    </mesh>
+  );
+}
+
 function EditorScene({ sceneRootRef }: Canvas3DProps) {
   const objects = useSceneStore((state) => state.objects);
   const layers = useSceneStore((state) => state.layers);
+  const referenceImages = useSceneStore((state) => state.referenceImages);
   const materials = useMaterialStore((state) => state.materials);
   const selectedObjectId = useEditorStore((state) => state.selectedObjectId);
   const showGrid = useEditorStore((state) => state.showGrid);
@@ -845,6 +876,10 @@ function EditorScene({ sceneRootRef }: Canvas3DProps) {
       <directionalLight position={[-4, 3, -5]} intensity={0.45} />
       <hemisphereLight args={['#dbeafe', '#1f2937', 0.75]} />
       <GridHelper show={showGrid} />
+
+      {referenceImages.filter((r) => r.visible).map((ref) => (
+        <ReferenceImagePlane key={ref.id} refImg={ref} />
+      ))}
 
       <group ref={rootRef}>
         {sortedObjects.map((object) => {
