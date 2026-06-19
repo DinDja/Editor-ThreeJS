@@ -18,7 +18,6 @@ import {
   FlipHorizontal2,
   Folder,
   Grid3X3,
-  Heart,
   Image,
   ImagePlus,
   Layers,
@@ -75,6 +74,7 @@ import {
 } from '@/lib/physics';
 import { createId } from '@/store/types';
 import ModelingTools from './ModelingTools';
+import ImageTo3DPanel from './ImageTo3D/ImageTo3DPanel';
 import { canObjectHaveMaterial, getDescendantIds, getMaterialTargetObjects } from '@/store/sceneTree';
 
 /* ── Shared styling constants ── */
@@ -985,7 +985,7 @@ function ReferenceManager() {
   return (
     <div className="grid gap-2 px-2 pb-2">
       <div className="flex items-center gap-2 px-2 py-2">
-        <Heart size={13} className="text-rose-400" />
+        <ImagePlus size={13} className="text-rose-400" />
         <h2 className="text-[10px] font-semibold uppercase tracking-[0.16em] text-neutral-400">Referencias</h2>
       </div>
 
@@ -1475,6 +1475,8 @@ export default function Properties() {
         </Section>
 
         <div className="mx-3 border-t border-neutral-800/60" />
+
+        {Boolean(object.metadata?.imageTo3D) && <ImageTo3DPanel object={object} />}
 
         {(object.type === 'Group' || object.kind === 'group' || object.kind === 'object3d') && <GroupPanel object={object} objects={objects} />}
 

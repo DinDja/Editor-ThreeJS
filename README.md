@@ -4,7 +4,7 @@
 
 **Editor 3D experimental — Next.js + React Three Fiber + Electron**
 
-Base de editor de cena e modelagem: projeto em branco, primitivas, import/export GLB/GLTF, materiais com textura, modelagem poligonal com Draw Polygon/Knife/Edge Loop, edicao de malha, sculpt com fallback de pressao para mouse, fisica, animacao, behaviors, efeitos, scripts, geracao de malhas via IA e atalhos de produtividade.
+Editor de cena e modelagem 3D com viewport interativo, primitivas, import/export GLB/GLTF, materiais PBR com texturas, modelagem poligonal (Draw Polygon, Knife, Edge Loop/Ring, Bridge, Fill, Inset), edit mode (vertices/arestas/faces), sculpt com 10 modos e fallback de pressao para mouse, fisica Rapier3D, timeline com keyframes, behaviors procedurais, efeitos de particulas, fluid, scripts JavaScript por objeto, geracao de malhas via IA (NVIDIA NIM), layers, imagens de referencia, asset browser (Poly Haven), atalhos de produtividade e app desktop Windows.
 
 [![Tutorial](https://img.shields.io/badge/Abrir-Tutorial-10b981?style=for-the-badge)](./TUTORIAL.md)
 [![Download Desktop](https://img.shields.io/badge/Baixar-Desktop_Windows-0078D4?style=for-the-badge&logo=windows&logoColor=white)](#desktop)
@@ -34,6 +34,7 @@ Base de editor de cena e modelagem: projeto em branco, primitivas, import/export
 ## Sumario
 
 - [Recursos](#recursos)
+- [Analise para Editor Profissional](#analise-para-editor-profissional)
 - [Stack](#stack)
 - [Como Rodar](#como-rodar)
 - [Desktop](#desktop)
@@ -149,6 +150,57 @@ Base de editor de cena e modelagem: projeto em branco, primitivas, import/export
 - Retry automatico quando a cena fica simples demais.
 - Compactacao de layout para manter a composicao centralizada.
 - Subdivisao e suavizacao procedural das malhas geradas.
+
+---
+
+## Analise para Editor Profissional
+
+O editor possui uma base solida para manipulacao 3D, mas para atingir o nivel de editores profissionais (Blender, Unity, Unreal, Maya), as seguintes areas precisam de desenvolvimento:
+
+### Prioridade Alta (Core)
+| Funcionalidade | Descricao | Impacto |
+| --- | --- | --- |
+| Save/Load de Projeto | Formato `.e3d` com compressao e versionamento | Essencial para fluxo de trabalho real |
+| Export multi-formato | FBX, OBJ, USD, STL, DAE | Compatibilidade com outros softwares |
+| Import multi-formato | FBX, OBJ, USD, 3DS | Importar assets de diversas fontes |
+| Node Editor (Materiais) | Sistema de nos para shaders PBR e custom | Criacao de materiais complexos |
+| Editor de UVs | Unwrapping, painting, alinhamento | Texturizacao profissional |
+| Rigging/Skinning | Bones, IK/FK, weight painting | Animacao de personagens |
+
+### Prioridade Media (Avancado)
+| Funcionalidade | Descricao | Impacto |
+| --- | --- | --- |
+| Modifiers | Mirror, Array, Solidify, Subdivision, Decimate | Modelagem nao-destrutiva |
+| Constraints | Look At, Copy Transform, Limit Distance | Animacao e controle procedural |
+| Particle System | Editor visual com curvas, colisao, sub-emitters | Efeitos visuais complexos |
+| Post-Processing | Bloom, SSAO, DOF, Motion Blur, Tonemap | Qualidade visual final |
+| Lightmap Baking | Baking de luz estatica | Performance em cenas grandes |
+| Terrain Editor | Heightmap, sculpting, texturizacao | Criacao de mundos |
+
+### Prioridade Baixa (Especializado)
+| Funcionalidade | Descricao | Impacto |
+| --- | --- | --- |
+| Fluid Simulation | Liquidos, gases, SPH/FLIP | Efeitos especiais |
+| Cloth Simulation | Tecidos, bandeiras, roupas | Realismo fisico |
+| Hair/Fur System | Cabelos, pelos, grama | Personagens realistas |
+| NavMesh/Pathfinding | Navegacao para IA | Games e simulacoes |
+| Plugin System | API para extensoes | Extensibilidade |
+| Multi-user Editing | Edicao colaborativa | Trabalho em equipe |
+
+### Comparativo com Editores Profissionais
+| Recurso | Este Editor | Blender | Unity | Unreal |
+| --- | --- | --- | --- | --- |
+| Modelagem poligonal | Sim | Sim | Basico | Basico |
+| Sculpt | Sim | Sim | Nao | Nao |
+| Node Materials | Nao | Sim | Sim | Sim |
+| Rigging/Animation | Basico | Sim | Sim | Sim |
+| UV Editor | Nao | Sim | Sim | Sim |
+| Physics | Sim | Sim | Sim | Sim |
+| Particle System | Basico | Sim | Sim | Sim |
+| Terrain | Nao | Sim | Sim | Sim |
+| Post-Processing | Nao | Sim | Sim | Sim |
+| Scripting | Sim | Sim | Sim | Sim |
+| VR/AR | Nao | Nao | Sim | Sim |
 
 ---
 
@@ -789,6 +841,7 @@ Confira se existe algum objeto na cena e tente novamente em um navegador moderno
 
 ## Roadmap
 
+### Concluído
 - [x] Cena, materiais, import/export, atalhos
 - [x] Edicao de malha (vertices/arestas/faces) e sculpt
 - [x] Fisica com Rapier3D
@@ -803,12 +856,94 @@ Confira se existe algum objeto na cena e tente novamente em um navegador moderno
 - [x] Booleanos entre malhas
 - [x] Modelagem poligonal: Draw Polygon, Knife, Edge Loop/Ring, Bridge, Fill, Inset
 - [x] Sculpt com fallback de pressao para mouse
+
+### Em Progresso / Planejado
 - [ ] Box / Lasso select de sub-elementos
 - [ ] Hover preview antes de clicar
 - [ ] Flip/Recalculate Normals e Smooth/Flat Shading na UI
 - [ ] Timeline com keyframes reais exportaveis
 - [ ] Multi-materiais por face avancado
 - [ ] Snap to vertex/edge/face durante transform de sub-elemento
+
+### Funcionalidades ausentes/não planejadas
+
+#### Core
+- [ ] **Save/Load de Projeto** - Formato `.e3d` com compressao
+- [ ] **Exportacao multi-formato** - FBX, OBJ, USD, STL, DAE
+- [ ] **Importacao multi-formato** - FBX, OBJ, USD, 3DS, DAE
+- [ ] **Sistema de Preferences** - Configuracoes do usuario, temas, atalhos customizaveis
+- [ ] **Sistema de Templates/Presets** - Templates de cena, materiais, iluminacao
+
+#### Modelagem Avancada
+- [ ] **Node Editor (Geometry Nodes)** - Geometria procedural visual
+- [ ] **Modifiers nao-destrutivos** - Mirror, Array, Solidify, Subdivision, Decimate, Weld
+- [ ] **Editor de UVs** - Unwrapping, painting, alinhamento
+- [ ] **Sistema de Constraints** - Look At, Copy Transform, Limit Distance, Clamp To, Path Follow
+- [ ] **Curvas e Splines** - Bezier, NURBS, extrusao ao longo de curva
+- [ ] **Voxel Sculpting** - Sculpting volumetrico com Dyntopo
+
+#### Animacao e Rigging
+- [ ] **Sistema de Ossos (Armature)** - Bones, joints, IK/FK
+- [ ] **Skinning/Weight Painting** - Vertex weights, influence
+- [ ] **Shape Keys/Morph Targets** - Blend shapes para expressoes
+- [ ] **Graph Editor** - Curvas de animacao editaveis
+- [ ] **Motion Capture** - Import BVH, retargeting
+- [ ] **Constraint Animation** - Animar constraints
+
+#### Materiais e Shaders
+- [ ] **Node-Based Material Editor** - Sistema de nos para shaders (PBR, custom)
+- [ ] **Shader Generator** - GLSL/HLSL customizado
+- [ ] **Texture Painting** - Pintura direta no modelo 3D
+- [ ] **Procedural Textures** - Noise, gradients, patterns
+- [ ] **Material Layers/Blending** - Mascara, mistura de materiais
+
+#### Iluminacao e Render
+- [ ] **Lightmap Baking** - Baking de luz estatica
+- [ ] **Global Illumination** - GI em tempo real ou baked
+- [ ] **Post-Processing Stack** - Bloom, SSAO, DOF, Motion Blur, Tonemap, LUT
+- [ ] **Raytracing/Pathtracing** - Render offline de alta qualidade
+- [ ] **HDRI Environment** - Iluminacao por imagem HDR
+- [ ] **Area Lights** - Luzes retangulares, discos, esferas
+
+#### Efeitos e Simulacao
+- [ ] **Particle System avancado** - Editor visual com curvas, emissao, colisao, sub-emitters
+- [ ] **Fluid Simulation** - Liquidos, gases, SPH/FLIP
+- [ ] **Cloth Simulation** - Tecidos, bandeiras, roupas
+- [ ] **Hair/Fur System** - Cabelos, pelos, grama
+- [ ] **Destruction/Fracture** - Destruicao procedural
+- [ ] **Soft Body** - Corpos moles, gelatina
+
+#### Cena e Mundo
+- [ ] **Terrain Editor** - Heightmap, sculpting, texturizacao de terreno
+- [ ] **Foliage/Scatter System** - Pintura de vegetacao, rocks, detalhes
+- [ ] **Water System** - Oceanos, rios, lagos com shaders
+- [ ] **Sky/Atmosphere** - Ceus procedurais, nuvens, neblina volumetrica
+- [ ] **Volumetric Lighting** - God rays, fog volumetrico
+
+#### Audio e Interatividade
+- [ ] **Audio Spatial** - Audio 3D posicional, HRTF
+- [ ] **Audio Triggers** - Sons por evento, zonas
+- [ ] **Dialogue System** - Sistema de dialogo/in-game UI
+- [ ] **Input System** - Mapeamento de controles, gamepads
+
+#### Performance e Debug
+- [ ] **Profiling Tools** - Draw calls, triangulos, FPS, memory, GPU stats
+- [ ] **LOD System** - Level of Detail automatico
+- [ ] **Occlusion Culling** - PVS, portais
+- [ ] **Shader Debugger** - Visualizar normals, UVs, lightmaps, overdraw
+- [ ] **Physics Debugger** - Visualizar colliders, contacts, rays
+
+#### IA e Automacao
+- [ ] **NavMesh/Pathfinding** - Navegacao para personagens
+- [ ] **Behavior Trees** - IA para NPCs
+- [ ] **Scripting avancado** - TypeScript/JavaScript com API completa
+- [ ] **Plugin System** - API para extensoes, marketplace
+
+#### Colaboracao
+- [ ] **Version Control** - Git-like para cenas, merge/diff visual
+- [ ] **Multi-user Editing** - Edicao colaborativa em tempo real
+- [ ] **Cloud Sync** - Salvamento na nuvem, compartilhamento
+- [ ] **Asset Library** - Biblioteca compartilhada de assets
 
 ---
 
@@ -827,6 +962,8 @@ PRs sao bem-vindas. Para bugs, abra uma [Issue](https://github.com/DinDja/Editor
 ## Status
 
 Este projeto esta em desenvolvimento ativo. A base atual cobre cena, materiais, import/export, atalhos, edicao de malha, modelagem poligonal (Draw Polygon, Knife, Edge Loop/Ring), sculpt com suporte a mouse, fisica, animacao, behaviors, efeitos, scripts e geracao de malhas via IA.
+
+
 
 <div align="center">
 

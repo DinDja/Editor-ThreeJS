@@ -6,12 +6,14 @@ import {
   Box,
   Boxes,
   Brush,
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars -- usado pelo botão Image to 3D (oculto temporariamente)
+  Camera,
   Check,
   ChevronDown,
   Download,
   Grid3X3,
-  Heart,
   HelpCircle,
+  ImagePlus,
   Magnet,
   MousePointer2,
   Move3D,
@@ -45,6 +47,7 @@ import { useMaterialStore } from '@/store/materialStore';
 import { usePhysicsStore } from '@/store/physicsStore';
 import { useSceneStore } from '@/store/sceneStore';
 import { useTimelineStore } from '@/store/timelineStore';
+import { useImageTo3DStore } from '@/store/imageTo3DStore';
 import type { ActiveTool, EffectKind, LightConfig, ObjectSelectionMode, PrimitiveKind, ViewportDisplayMode
 } from '@/store/types';
 import { DEFAULT_LIGHT_CONFIG } from '@/store/types';
@@ -168,6 +171,8 @@ export default function Toolbar({ sceneRootRef, onOpenTutorial }: ToolbarProps) 
   const [assetBrowserOpen, setAssetBrowserOpen] = useState(false);
   const [toolbarDragging, setToolbarDragging] = useState(false);
   const [aiError, setAiError] = useState<string | null>(null);
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars -- Image to 3D oculto temporariamente
+  const setImageTo3DOpen = useImageTo3DStore((state) => state.setOpen);
 
   const activeTool = useEditorStore((state) => state.activeTool);
   const setActiveTool = useEditorStore((state) => state.setActiveTool);
@@ -865,6 +870,20 @@ export default function Toolbar({ sceneRootRef, onOpenTutorial }: ToolbarProps) 
       <ToolbarDivider />
 
       {/* ── AI Generation ── */}
+      {/* Image to 3D — oculto temporariamente (backend de geração real pendente)
+      <button
+        type="button"
+        title="Image to 3D — gerar avatar/modelo a partir de imagens"
+        aria-label="Image to 3D"
+        data-tutorial="image-to-3d"
+        onClick={() => setImageTo3DOpen(true)}
+        className="inline-flex items-center justify-center shrink-0 h-8 gap-1.5 rounded-md border border-emerald-600/40 bg-gradient-to-r from-emerald-950/40 to-teal-950/40 px-3 text-[11px] font-semibold text-emerald-300 transition-colors hover:border-emerald-500/60 hover:from-emerald-900/50 hover:to-teal-900/50 hover:text-emerald-200"
+      >
+        <Camera size={12} />
+        <span>Image to 3D</span>
+      </button>
+      */}
+
       {/* <button
         type="button"
         title="Gerar cena com IA (NVIDIA NIM)"
@@ -905,7 +924,7 @@ export default function Toolbar({ sceneRootRef, onOpenTutorial }: ToolbarProps) 
         <span>Assets</span>
       </button>
       <button type="button" title="Adicionar imagem de referencia" aria-label="Referencia" onClick={() => refImageInputRef.current?.click()} className={btnAction}>
-        <Heart size={12} />
+        <ImagePlus size={12} />
         <span>Ref.</span>
       </button>
       <button type="button" title="Exportar cena como GLB" aria-label="Exportar" onClick={handleExport} disabled={exporting} className={btnAction}>

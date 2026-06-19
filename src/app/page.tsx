@@ -1,9 +1,5 @@
-'use client';
-
-import dynamic from 'next/dynamic';
-
-const Editor3D = dynamic(() => import('@/components/Editor3D'), { ssr: false });
+import { redirect } from 'next/navigation';
 
 export default function Home() {
-  return <Editor3D />;
+  redirect('/login');
 }

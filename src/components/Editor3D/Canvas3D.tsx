@@ -1050,6 +1050,75 @@ function SelectionBox({ object }: { object: THREE.Object3D | null }) {
   return null;
 }
 
+function CameraFramer({
+  objectRefs,
+}: {
+  objectRefs: React.MutableRefObject<Map<string, THREE.Object3D>>;
+}) {
+  const camera = useThree((state) => state.camera);
+  const controls = useThree((state) => state.controls) as
+    | (THREE.EventDispatcher & { target?: THREE.Vector3; update?: () => void })
+    | null;
+  const frameRequestCount = useEditorStore((state) => state.frameRequestCount);
+  const frameTargetObjectId = useEditorStore((state) => state.frameTargetObjectId);
+
+  useEffect(() => {
+    if (frameRequestCount === 0 || !frameTargetObjectId) return;
+
+    let cancelled = false;
+    const box = new THREE.Box3();
+    const center = new THREE.Vector3();
+    const size = new THREE.Vector3();
+    const targetDir = new THREE.Vector3();
+
+    const attemptFrame = (attempt: number) => {
+      if (cancelled) return;
+      const target = objectRefs.current.get(frameTargetObjectId);
+      if (!target) {
+        if (attempt < 20) {
+          setTimeout(() => attemptFrame(attempt + 1), 80);
+        }
+        return;
+      }
+
+      box.setFromObject(target);
+      if (box.isEmpty()) {
+        box.setFromCenterAndSize(target.position, new THREE.Vector3(1, 1, 1));
+      }
+      box.getCenter(center);
+      box.getSize(size);
+      const maxDim = Math.max(size.x, size.y, size.z) || 1;
+      const fov = (camera as THREE.PerspectiveCamera).fov ?? 45;
+      const fitDistance = (maxDim / 2) / Math.tan((Math.PI / 180) * (fov / 2));
+      const distance = fitDistance * 1.4 + 0.5;
+
+      targetDir.set(0.8, 0.55, 1).normalize();
+      camera.position.set(
+        center.x + targetDir.x * distance,
+        center.y + targetDir.y * distance,
+        center.z + targetDir.z * distance,
+      );
+      camera.near = Math.max(0.01, distance / 1000);
+      camera.far = distance * 100 + 100;
+      camera.updateProjectionMatrix();
+      camera.lookAt(center);
+
+      if (controls && 'target' in controls && controls.target) {
+        controls.target.copy(center);
+      }
+      controls?.update?.();
+    };
+
+    attemptFrame(0);
+
+    return () => {
+      cancelled = true;
+    };
+  }, [camera, controls, frameRequestCount, frameTargetObjectId, objectRefs]);
+
+  return null;
+}
+
 function ObjectLoading({ object }: { object: SceneObject }) {
   return (
     <Html position={object.position} center>
@@ -1468,6 +1537,8 @@ function EditorScene({ sceneRootRef }: Canvas3DProps) {
       )}
 
       <PhysicsRuntime objects={objects} objectRefs={objectRefs} />
+
+      <CameraFramer objectRefs={objectRefs} />
 
       {activeTool !== 'edit' && selectedObjectIds.map((uuid) => (
         <SelectionBox key={uuid} object={objectRefs.current.get(uuid) ?? null} />

@@ -5,6 +5,7 @@ import * as THREE from 'three';
 import { Boxes, Clock, PanelRight } from 'lucide-react';
 import Canvas3D from './Canvas3D';
 import EditorShortcuts from './EditorShortcuts';
+import ImageTo3DModal from './ImageTo3D/ImageTo3DModal';
 import Properties from './Properties';
 import SceneGraph from './SceneGraph';
 import Timeline from './Timeline';
@@ -241,6 +242,7 @@ export default function Editor3D() {
 
       <MobileTabBar />
       <TutorialSpotlight open={tutorialOpen} onClose={() => setTutorialOpen(false)} />
+      <ImageTo3DModal />
     </main>
   );
 }

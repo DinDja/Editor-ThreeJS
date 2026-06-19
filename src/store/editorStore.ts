@@ -43,7 +43,10 @@ type EditorState = {
   rightPanelWidth: number;
   activeMobilePanel: MobilePanel | null;
   selectedReferenceId: string | null;
+  frameRequestCount: number;
+  frameTargetObjectId: string | null;
   setSelectedObject: (uuid: string | null, additive?: boolean) => void;
+  requestFrameObject: (objectId: string) => void;
   toggleSelectedObject: (uuid: string) => void;
   clearSelectedObjects: () => void;
   setSelectedReference: (id: string | null) => void;
@@ -137,6 +140,8 @@ export const useEditorStore = create<EditorState>((set) => ({
   rightPanelWidth: 380,
   activeMobilePanel: null,
   selectedReferenceId: null,
+  frameRequestCount: 0,
+  frameTargetObjectId: null,
 
   setSelectedObject: (uuid, additive = false) =>
     set((state) => {
@@ -329,4 +334,9 @@ export const useEditorStore = create<EditorState>((set) => ({
   setLeftPanelWidth: (leftPanelWidth) => set({ leftPanelWidth: Math.max(160, Math.min(480, leftPanelWidth)) }),
   setRightPanelWidth: (rightPanelWidth) => set({ rightPanelWidth: Math.max(200, Math.min(600, rightPanelWidth)) }),
   setActiveMobilePanel: (activeMobilePanel) => set({ activeMobilePanel }),
+  requestFrameObject: (objectId) =>
+    set((state) => ({
+      frameRequestCount: state.frameRequestCount + 1,
+      frameTargetObjectId: objectId,
+    })),
 }));
