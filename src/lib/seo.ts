@@ -40,7 +40,7 @@ export function buildMetadata(overrides?: Partial<Metadata>): Metadata {
       template: `%s | ${SITE.name}`,
     },
     description: SITE.description,
-    keywords: SITE.keywords,
+    keywords: [...SITE.keywords],
     authors: [{ name: SITE.author }],
     creator: SITE.creator,
     publisher: SITE.publisher,
