@@ -69,7 +69,8 @@ const toolLabels: Record<ActiveTool, string> = {
   sculpt: 'Sculpt',
   drawPolygon: 'Draw Polygon',
   knife: 'Knife',
-};
+  draw3D: 'Draw 3D',
+ };
 
 const toolIcons: Record<ActiveTool, LucideIcon> = {
   select: MousePointer2,
@@ -80,10 +81,11 @@ const toolIcons: Record<ActiveTool, LucideIcon> = {
   sculpt: Brush,
   drawPolygon: PenTool,
   knife: Scissors,
-};
+  draw3D: PenTool,
+ };
 
 const tools: ActiveTool[] = ['select', 'translate', 'rotate', 'scale', 'edit', 'sculpt'];
-const editTools: ActiveTool[] = ['drawPolygon', 'knife'];
+const editTools: ActiveTool[] = ['drawPolygon', 'knife', 'draw3D'];
 
 const viewportDisplayLabels: Record<ViewportDisplayMode, string> = {
   textured: 'Textura',
@@ -396,7 +398,7 @@ export default function Toolbar({ sceneRootRef, onOpenTutorial }: ToolbarProps) 
   };
 
   const handleTool = (tool: ActiveTool) => {
-    if (tool !== 'edit' && tool !== 'sculpt' && tool !== 'drawPolygon' && tool !== 'knife') {
+    if (tool !== 'edit' && tool !== 'sculpt' && tool !== 'drawPolygon' && tool !== 'knife' && tool !== 'draw3D') {
       setActiveTool(tool);
       return;
     }
@@ -620,7 +622,7 @@ export default function Toolbar({ sceneRootRef, onOpenTutorial }: ToolbarProps) 
       </div>
 
       {/* ── Edit Mesh Tools ── */}
-      {(activeTool === 'edit' || activeTool === 'drawPolygon' || activeTool === 'knife') && (
+      {(activeTool === 'edit' || activeTool === 'drawPolygon' || activeTool === 'knife' || activeTool === 'draw3D') && (
         <>
           <ToolbarDivider />
           <div className="flex shrink-0 items-center gap-0.5 rounded-md bg-fuchsia-950/30 p-0.5">

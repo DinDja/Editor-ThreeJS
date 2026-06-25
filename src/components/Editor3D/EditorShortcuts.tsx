@@ -163,6 +163,12 @@ export default function EditorShortcuts() {
         return;
       }
 
+      if (key === 'd' && !meta && !event.shiftKey) {
+        event.preventDefault();
+        editor.setActiveTool('draw3D');
+        return;
+      }
+
       if (key === 'delete' || key === 'backspace') {
         if (timeline.selectedKeyframeIds.length > 0) {
           event.preventDefault();

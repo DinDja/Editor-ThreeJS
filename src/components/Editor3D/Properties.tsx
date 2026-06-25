@@ -75,6 +75,7 @@ import {
 import { createId } from '@/store/types';
 import ModelingTools from './ModelingTools';
 import ImageTo3DPanel from './ImageTo3D/ImageTo3DPanel';
+import Draw3DPanel from './Draw3DPanel';
 import { canObjectHaveMaterial, getDescendantIds, getMaterialTargetObjects } from '@/store/sceneTree';
 
 /* ── Shared styling constants ── */
@@ -1485,6 +1486,7 @@ export default function Properties() {
         break;
       case 'edit':
       case 'sculpt':
+      case 'draw3D':
         sectionId = 'section-modelagem';
         break;
     }
@@ -1568,6 +1570,7 @@ export default function Properties() {
           </button>
         </div>
         <div className="min-h-0 flex-1 overflow-auto pt-3">
+          {activeTool === 'draw3D' && <Draw3DPanel />}
           <ReferenceManager />
         </div>
       </aside>
@@ -1617,6 +1620,11 @@ export default function Properties() {
 
       {/* ── Body ── */}
       <div ref={propertiesBodyRef} className="min-h-0 flex-1 space-y-1 overflow-auto py-3">
+        {activeTool === 'draw3D' && (
+          <Section title="Draw 3D" icon={<Brush size={11} className="text-emerald-400" />}>
+            <Draw3DPanel />
+          </Section>
+        )}
         {/* Transform */}
         <Section title="Transformar" icon={<Move3D size={11} className="text-neutral-500" />}>
           <TransformRow object={object} field="position" />

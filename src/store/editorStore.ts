@@ -1,5 +1,6 @@
 import { create } from 'zustand';
-import type { ActiveTool, MeshEditMode, MeshSelectionMode, MobilePanel, ObjectSelectionMode, PointerType, SculptFalloff, SculptMode, Vec3, ViewportDisplayMode } from './types';
+import type { ActiveTool, Draw3DConfig, Draw3DMode, Draw3DPlane, MeshEditMode, MeshSelectionMode, MobilePanel, ObjectSelectionMode, PointerType, SculptFalloff, SculptMode, Vec3, ViewportDisplayMode } from './types';
+import { DEFAULT_DRAW3D_CONFIG } from '@/lib/draw3DGeometryFactory';
 
 export type MeshSelectMode = 'click' | 'box' | 'lasso';
 
@@ -40,6 +41,11 @@ type EditorState = {
   sculptPressureRadius: boolean;
   sculptPenSmoothing: number;
   sculptPointerType: PointerType;
+  draw3DConfig: Draw3DConfig;
+  draw3DPoints: Vec3[];
+  draw3DActive: boolean;
+  draw3DSnapEnabled: boolean;
+  draw3DPlaneOrigin: Vec3 | null;
   showGrid: boolean;
   snapping: boolean;
   snapStep: number;
@@ -97,6 +103,16 @@ type EditorState = {
   setSculptPressureRadius: (enabled: boolean) => void;
   setSculptPenSmoothing: (smoothing: number) => void;
   setSculptPointerType: (pointerType: PointerType) => void;
+  setDraw3DConfig: (config: Partial<Draw3DConfig>) => void;
+  setDraw3DMode: (mode: Draw3DMode) => void;
+  setDraw3DPlane: (plane: Draw3DPlane) => void;
+  setDraw3DPoints: (points: Vec3[]) => void;
+  addDraw3DPoint: (point: Vec3) => void;
+  clearDraw3D: () => void;
+  setDraw3DActive: (active: boolean) => void;
+  setDraw3DSnapEnabled: (enabled: boolean) => void;
+  setDraw3DPlaneOrigin: (origin: Vec3 | null) => void;
+  finalizeDraw3D: () => void;
   setShowGrid: (showGrid: boolean) => void;
   setSnapping: (snapping: boolean) => void;
   setSnapStep: (snapStep: number) => void;
@@ -143,6 +159,11 @@ export const useEditorStore = create<EditorState>((set) => ({
   sculptPressureRadius: false,
   sculptPenSmoothing: 0.35,
   sculptPointerType: 'mouse',
+  draw3DConfig: { ...DEFAULT_DRAW3D_CONFIG },
+  draw3DPoints: [],
+  draw3DActive: false,
+  draw3DSnapEnabled: false,
+  draw3DPlaneOrigin: null,
   showGrid: true,
   snapping: false,
   snapStep: 0.25,
@@ -205,7 +226,7 @@ export const useEditorStore = create<EditorState>((set) => ({
     }),
   setActiveTool: (activeTool) =>
     set(() =>
-      activeTool === 'edit' || activeTool === 'sculpt' || activeTool === 'drawPolygon' || activeTool === 'knife'
+      activeTool === 'edit' || activeTool === 'sculpt' || activeTool === 'drawPolygon' || activeTool === 'knife' || activeTool === 'draw3D'
         ? { activeTool }
         : {
             activeTool,
@@ -217,6 +238,8 @@ export const useEditorStore = create<EditorState>((set) => ({
             selectedFaceIndices: [],
             drawPolygonPoints: [],
             knifePoints: [],
+            draw3DPoints: [],
+            draw3DActive: false,
             hoverVertexIndex: null,
             hoverEdgeIndex: null,
             hoverFaceIndex: null,
@@ -341,6 +364,16 @@ export const useEditorStore = create<EditorState>((set) => ({
   setSculptPressureRadius: (sculptPressureRadius) => set({ sculptPressureRadius }),
   setSculptPenSmoothing: (sculptPenSmoothing) => set({ sculptPenSmoothing: Math.max(0, Math.min(1, sculptPenSmoothing)) }),
   setSculptPointerType: (sculptPointerType) => set({ sculptPointerType }),
+  setDraw3DConfig: (partial) => set((s) => ({ draw3DConfig: { ...s.draw3DConfig, ...partial } })),
+  setDraw3DMode: (mode) => set((s) => ({ draw3DConfig: { ...s.draw3DConfig, mode }, draw3DPoints: [], draw3DActive: false })),
+  setDraw3DPlane: (plane) => set((s) => ({ draw3DConfig: { ...s.draw3DConfig, plane }, draw3DPoints: [], draw3DActive: false })),
+  setDraw3DPoints: (draw3DPoints) => set({ draw3DPoints }),
+  addDraw3DPoint: (point) => set((s) => ({ draw3DPoints: [...s.draw3DPoints, point] })),
+  clearDraw3D: () => set({ draw3DPoints: [], draw3DActive: false }),
+  setDraw3DActive: (draw3DActive) => set({ draw3DActive }),
+  setDraw3DSnapEnabled: (draw3DSnapEnabled) => set({ draw3DSnapEnabled }),
+  setDraw3DPlaneOrigin: (draw3DPlaneOrigin) => set({ draw3DPlaneOrigin }),
+  finalizeDraw3D: () => set({ draw3DPoints: [], draw3DActive: false }),
   setShowGrid: (showGrid) => set({ showGrid }),
   setSnapping: (snapping) => set({ snapping }),
   setSnapStep: (snapStep) => set({ snapStep }),

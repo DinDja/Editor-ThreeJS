@@ -7,6 +7,7 @@ import * as THREE from 'three';
 import MeshEditOverlay from './MeshEditOverlay';
 import DrawPolygonOverlay from './DrawPolygonOverlay';
 import KnifeOverlay from './KnifeOverlay';
+import Draw3DOverlay from './Draw3DOverlay';
 import TransformGizmo from './TransformGizmo';
 import { installMeshBVH, mergePrimitiveGeometry } from '@/lib/geometryOps';
 import { editableMeshFromBufferGeometry, editableMeshFromObject3D, editableMeshToBufferGeometry, grabMeshVertices, sculptMesh } from '@/lib/meshOps';
@@ -1549,7 +1550,7 @@ function EditorScene({ sceneRootRef }: Canvas3DProps) {
       };
     }
 
-    if (activeTool === 'sculpt' || activeTool === 'edit') {
+    if (activeTool === 'sculpt' || activeTool === 'edit' || activeTool === 'draw3D') {
       return {
         LEFT: null as unknown as THREE.MOUSE,
         MIDDLE: THREE.MOUSE.DOLLY,
@@ -1569,7 +1570,7 @@ function EditorScene({ sceneRootRef }: Canvas3DProps) {
   }, []);
 
   useEffect(() => {
-    if (activeTool === 'sculpt') {
+    if (activeTool === 'sculpt' || activeTool === 'draw3D') {
       document.body.style.cursor = 'crosshair';
     } else {
       document.body.style.cursor = 'default';
@@ -1632,6 +1633,9 @@ function EditorScene({ sceneRootRef }: Canvas3DProps) {
       )}
       {activeTool === 'knife' && selectedObjectIds[0] && (
         <KnifeOverlay objectUuid={selectedObjectIds[0]} />
+      )}
+      {activeTool === 'draw3D' && (
+        <Draw3DOverlay />
       )}
 
       <PhysicsRuntime objects={objects} objectRefs={objectRefs} />

@@ -2,14 +2,33 @@ export type Vec3 = [number, number, number];
 
 export type Vec2 = [number, number];
 
+export type Draw3DMode = 'stroke' | 'polyline' | 'shape' | 'surface' | 'extrude';
+
+export type Draw3DPlane = 'camera' | 'xy' | 'xz' | 'yz' | 'surface';
+
+export type Draw3DConfig = {
+  mode: Draw3DMode;
+  radius: number;
+  smoothing: number;
+  tubularSegments: number;
+  radialSegments: number;
+  extrudeDepth: number;
+  autoConvertToMesh: boolean;
+  autoClose: boolean;
+  plane: Draw3DPlane;
+  color: string;
+  metalness: number;
+  roughness: number;
+};
+
 export type ActiveTool = 'select' | 'translate' | 'rotate' | 'scale' | 'edit' | 'sculpt'
-  | 'drawPolygon' | 'knife';
+  | 'drawPolygon' | 'knife' | 'draw3D';
 
 export type ViewportDisplayMode = 'textured' | 'solid' | 'wireframe' | 'vertices' | 'polygons' | 'primitive';
 
 export type MeshSelectionMode = 'vertex' | 'edge' | 'face';
 
-export type MeshEditMode = 'object' | 'edit' | 'drawPolygon' | 'knife';
+export type MeshEditMode = 'object' | 'edit' | 'drawPolygon' | 'knife' | 'draw3D';
 
 export type SculptMode =
   | 'push'
