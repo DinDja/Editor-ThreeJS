@@ -167,6 +167,7 @@ O produto deixou de ser somente um editor de cena/modelagem 3D e passou a ter um
 - Navegacao principal por modos:
   - `Cena`: mantem o editor 3D existente, sem recriar ou remover funcionalidades.
   - `Pagina`: monta uma pagina visual usando elementos web e a cena 3D atual, com drag-and-drop e reparenting.
+  - `Dados`: inicia o System Builder com modelo de dados visual para colecoes, campos, validacoes e queries.
   - `Interacoes`: conecta elementos HTML da pagina com objetos/luzes/camera da cena.
   - `Preview`: executa a experiencia como site, com desktop/tablet/mobile e metricas reais (FPS, draw calls, triangulos, resolucao de texturas, heap JS, tamanho de assets).
   - `Exportar`: gera arquivos reais para projetos web, com ZIP incluindo assets organizados.
@@ -174,7 +175,7 @@ O produto deixou de ser somente um editor de cena/modelagem 3D e passou a ter um
 - Persistencia de projeto em JSON versionado:
   - schema `ProjectExperience` v1
   - arquivo `.web3d.json`
-  - snapshot de pagina, cena, materiais, layers, imagens de referencia, timeline e interacoes
+  - snapshot de pagina, cena, materiais, layers, imagens de referencia, timeline, interacoes e schema de dados
   - catalogo de assets referenciados por cena, materiais, pagina e referencias
   - autosave em localStorage (debounce 4s) + historico de versoes (ate 24 entradas)
   - migracoes de schema entre versoes
@@ -198,6 +199,12 @@ O produto deixou de ser somente um editor de cena/modelagem 3D e passou a ter um
   - `Ctrl+D` duplica ao lado do elemento original
   - setas movem o elemento selecionado via `top/left`
   - `Shift + setas` move em passos maiores
+- Logica de multiplas paginas/rotas:
+  - `ProjectExperience` agora preserva `pages[]` e `activePageId`
+  - cada pagina tem `path`, `title`, `description` e flag `protected`
+  - Project Tree permite criar, selecionar, duplicar, remover e editar metadados de paginas
+  - a pagina ativa alimenta canvas, propriedades, preview e export
+  - o Preview intercepta links internos para rotas cadastradas e troca a pagina ativa sem recarregar o editor
 - Painel de propriedades web expandido com edição por breakpoint (`base`, `tablet`, `mobile`) e controles de position, top/left/right/bottom, flex/grid, transform, background image, border, overflow, object fit, opacity e transition.
 - Novos modelos de dados para:
   - `ProjectExperience`
@@ -205,8 +212,13 @@ O produto deixou de ser somente um editor de cena/modelagem 3D e passou a ter um
   - `PageNode`
   - `InteractionDocument`
   - `ProjectSettings`
+  - `DataSchema`
+  - `DataCollection`
+  - `DataField`
+  - `SavedQuery`
 - Nova arquitetura em camadas:
   - `src/lib/page-builder/`
+  - `src/lib/data-model/`
   - `src/lib/interaction-engine/`
   - `src/lib/preview-runtime/` via componentes runtime do editor
   - `src/lib/export-engine/`
@@ -277,11 +289,26 @@ O produto deixou de ser somente um editor de cena/modelagem 3D e passou a ter um
 - Estruturas exportadas:
   - `scene-data.json`
   - `page-data.json`
+  - `pages-data.json`
   - `interactions-data.json`
+  - `data-schema.json` quando o projeto tem schema de dados
+  - `schema.prisma` ou `database-schema.ts` quando o ORM alvo e Prisma/Drizzle
   - componentes `SceneCanvas` (com `AnimationPlayer`), `PageExperience`, `Hero3D` e `sections`
   - `main.js` standalone com Three.js + OrbitControls + GLTFLoader via CDN
 - Autosave e historico de versoes do `ProjectExperience` em localStorage (ate 24 entradas, com restauracao via toolbar)
 - Drag-and-drop e reparenting no Page Builder (com indicadores visuais de posicao before/after/inside)
+- System Builder / Fase 1:
+  - tipos centrais em `src/lib/data-model/types.ts`
+  - defaults e clonagem de schema em `src/lib/data-model/defaults.ts`
+  - store Zustand em `src/store/dataModelStore.ts`
+  - Modo `Dados` no editor
+  - editor visual de colecoes, campos, validacoes, relacoes e queries salvas
+  - persistencia do `dataSchema` no `.web3d.json`, autosave e historico
+  - exportacao do schema em JSON e geracao inicial para Prisma/Drizzle em `src/lib/export-engine/generateSchema.ts`
+- Tutorial guiado expandido para o construtor web:
+  - spotlight especifico para Modo Pagina, paginas/rotas, Project Tree, canvas, handles, propriedades e breakpoints
+  - guia dedicado para Modo Dados com colecoes, campos, variaveis, queries e impacto nos componentes conectados
+  - passos que mudam automaticamente entre Pagina, Dados, Interacoes e Preview
 - Templates iniciais:
   - Hero 3D texto/modelo
   - Hero background WebGL
@@ -345,6 +372,27 @@ O primeiro runtime do Modo Pagina estava simples demais e nao respeitava a cena 
 
 ### O que ainda falta fazer
 
+#### System Builder
+
+- [x] Fase 1: Data Model Designer com `DataSchema`, colecoes, campos, validacoes, relacoes e queries salvas.
+- [x] Persistir `dataSchema` em save/load, autosave/historico e exportar `data-schema.json`.
+- [x] Gerar schema inicial para Prisma e Drizzle.
+- [x] Fase 2: componentes de pagina conectados a dados (`dataTable`, `dataForm`, `dataList`, `dataChart`, `dataStat`, `pageRoute`).
+- [x] Fase 2: sistema de variaveis e binding `{{var}}` no runtime da pagina.
+- [x] Fase 2: acoes de interacao para `createRecord`, `updateRecord`, `deleteRecord`, `loadCollection`, `runQuery`, `setVariable`, `incrementVariable`, `toggleVariable`, `showToast`, `setLoading` e `setError`.
+- [x] Fase 2: geracao inicial de API routes por colecao (`generateApiRoutes.ts`) com handlers CRUD para Next.
+- [ ] Fase 2 pendente: persistencia real em banco nos componentes de dados do editor/preview; hoje o preview usa registros em memoria e dados de exemplo.
+- [ ] Fase 2 pendente: ligar `dataForm` exportado aos API routes gerados fora do preview standalone.
+- [ ] Fase 2 pendente: resolver `{{record.campo}}` em todos os contextos de lista/tabela/export com a mesma engine do editor.
+- [ ] Fase 3: Workflow Engine com triggers, actions, condicoes, delay, email/webhook/script e execucao visual.
+- [ ] Fase 3: Formula Engine para expressoes calculadas e binding de dados.
+- [ ] Fase 3: validacao server-side com Zod gerada a partir do `DataSchema`.
+- [ ] Fase 4: Auth visual com roles, permissions, paginas publicas/protegidas e guards reais.
+- [x] Fase 4 parcial: multipage no editor com `pages[]`, `activePageId`, rotas, metadados e navegacao interna no Preview.
+- [ ] Fase 4 pendente: parametros dinamicos de rota, SEO completo por pagina, historico/back do navegador sincronizado com o store e guards de autenticacao reais.
+- [ ] Fase 5: export full-stack com `package.json`, Prisma/Drizzle completo, migrations, seed, `.env.example`, Docker opcional e instrucoes por target.
+- [ ] Fase 5: deploy adapters para Vercel/Netlify/Node self-hosted.
+
 #### Fidelidade total entre Modo Cena e Modo Pagina
 
 - [ ] Reaproveitar mais codigo do renderer do `Canvas3D` sem carregar ferramentas de edicao.
@@ -381,7 +429,9 @@ O primeiro runtime do Modo Pagina estava simples demais e nao respeitava a cena 
 - [x] Reparenting na arvore (com indicadores visuais before/after/inside).
 - [x] Selecao direta mais precisa no canvas de pagina.
 - [x] Guias, snapping e handles para layout web.
-- [ ] Editor de breakpoints mais completo.
+- [x] Editor de breakpoints mais completo: criar, renomear, remover breakpoints e ajustar largura via slider no painel de propriedades.
+- [x] Gerenciamento de multiplas paginas/rotas no Project Tree.
+- [x] Tutorial guiado com spotlight para Page Builder, rotas, propriedades, Dados, campos e queries.
 - [ ] Estados hover/active/focus para elementos web.
 - [ ] Sistema de componentes reutilizaveis.
 - [ ] Formularios, modais reais e menus.
@@ -396,6 +446,8 @@ O primeiro runtime do Modo Pagina estava simples demais e nao respeitava a cena 
 - [x] Alertar modelos pesados por contagem de vertices/triangulos.
 - [x] Alertar texturas grandes por resolucao real.
 - [x] Medir draw calls, memoria e FPS com mais precisao (via `gl.info` e `performance.memory`).
+- [x] Navegar entre paginas cadastradas quando botoes/menu items apontam para uma rota interna.
+- [ ] Sincronizar botao voltar/avancar do navegador com `activePageId`.
 - [ ] Testar preload/loading da cena.
 - [ ] Adicionar overlay de erros de runtime.
 
@@ -410,6 +462,8 @@ O primeiro runtime do Modo Pagina estava simples demais e nao respeitava a cena 
 - [ ] Gerar `package.json`, `tsconfig`, configs e instrucoes por target.
 - [x] Exportar React/Next/Vite com runtime Three.js completo e player de animacao.
 - [x] Exportar HTML/CSS/JS com carregamento Three.js funcional (standalone via CDN).
+- [x] Exportar `pages-data.json` junto do `page-data.json` ativo.
+- [ ] Gerar rotas reais por pagina nos targets Next/React/Vite/HTML, em vez de exportar somente a pagina ativa como entrada principal.
 - [ ] Gerar componentes Tailwind quando `settings.tailwind = true`.
 - [ ] Preservar scripts customizados em arquivos separados.
 - [x] Exportar interacoes como engine standalone (no main.js do HTML exportado).
@@ -1241,8 +1295,32 @@ Confira se existe algum objeto na cena e tente novamente em um navegador moderno
 - [x] Runtime exportado standalone com Three.js via CDN e todas as interacoes (HTML/CSS/JS puro, sem build)
 - [x] Preview com tamanho real de arquivos, resolucao de texturas, draw calls, geometries, triangulos, memoria JS heap e FPS preciso
 - [x] Selecao direta mais precisa no canvas de pagina (hover preview com tooltip, Alt+Click para selecionar pai, breadcrumb de ancestrais, hit areas ampliadas para texto/botao)
+- [x] Editor de breakpoints completo: criar, renomear e remover breakpoints customizados com largura ajustavel via slider, preview dinamico no toolbar e edicao de estilos por breakpoint no painel de propriedades
+- [x] Estados hover/active/focus para elementos web: edicao de pseudo-estilos no painel de propriedades com preview no canvas via CSS real e indicacao visual
+- [x] Sistema de componentes reutilizaveis: criar componentes da selecao de elementos, biblioteca no painel arvore com lista de componentes salvos, instancias vinculadas com badge visual, sincronizar todas as instancias ao editar o mestre, desvincular (detach) e persistencia no arquivo de projeto
+- [x] Formularios, modais reais e menus: novos tipos de node (form, input, select, textarea, label, modal, menu, menuitem) com renderizacao no canvas, editores de propriedades no painel e exportacao para runtime React/Vite/HTML
+- [x] Camadas/z-index com visualizacao clara: painel de camadas no arvore listando elementos da pagina ordenados por z-index, barra de profundidade visual e botoes para aumentar/diminuir z-index de cada elemento
+- [x] Diff visual do documento de pagina: modal de comparacao entre versoes salvas no historico, exibindo arvore de nos com status (adicionado/removido/modificado) e detalhes das alteracoes de estilos e propriedades
+- [x] System Builder Fase 1: Modo Dados, `DataSchema`, colecoes/campos/validacoes/relacoes/queries salvas, store Zustand, persistencia no `.web3d.json`, autosave/historico e schema exportado em JSON/Prisma/Drizzle
+- [x] System Builder Fase 2 inicial: componentes `dataTable`, `dataForm`, `dataList`, `dataChart`, `dataStat`, `pageRoute`, variaveis/bindings `{{var}}`, actions de dados/variaveis/toast/loading/error e API routes CRUD geradas para Next
+- [x] Logica inicial de paginas e navegacao: `pages[]`, `activePageId`, rotas editaveis, criar/duplicar/remover paginas, navegacao interna no Preview e `pages-data.json` exportado
+- [x] Tutorial com spotlight guiado para Page Builder, rotas, canvas, propriedades, Modo Dados, campos, queries, Interacoes e Preview
 
 ### Em Progresso / Planejado
+
+#### System Builder
+- [x] **Data components** - `dataTable`, `dataForm`, `dataList`, `dataChart`, `dataStat` e `pageRoute`
+- [x] **Bindings e variaveis** - sintaxe `{{var}}`, variaveis editaveis no Modo Dados e persistencia no projeto
+- [x] **Data actions iniciais** - CRUD em memoria no preview, queries, set/increment/toggle variable, loading/error/toast
+- [x] **API Routes geradas** - CRUD inicial por colecao para Next via `generateApiRoutes.ts`
+- [ ] **Data runtime persistente** - conectar preview/export a banco real ou adapter local persistente
+- [ ] **Data forms exportados** - `dataForm` chamando API gerada em Next/React/Vite/HTML
+- [ ] **Bindings avancados** - `{{record.campo}}`, filtros, transformacoes e expressoes em todos os componentes/export targets
+- [ ] **Workflow Engine** - automacoes com triggers, conditions, actions, delay, webhook/email/script
+- [ ] **Formula Engine** - expressoes calculadas para bindings, campos derivados e interacoes
+- [ ] **Auth e permissoes** - roles, guards, paginas protegidas, perfil do usuario e regras por colecao
+- [ ] **Multipage avancado** - parametros dinamicos, SEO completo por pagina, layout compartilhado, browser back/forward, guards e rotas reais geradas no export
+- [ ] **Export full-stack** - Prisma/Drizzle completo, migrations, seed, `.env.example`, configs e deploy adapters
 
 #### Core
 - [ ] **Save/Load avancado de Projeto** - Formato `.e3d`/binario com compressao, diff e empacotamento de assets
@@ -1340,7 +1418,9 @@ PRs sao bem-vindas. Para bugs, abra uma [Issue](https://github.com/DinDja/Editor
 
 Este projeto esta em desenvolvimento ativo. A base atual cobre cena, materiais, import/export, atalhos, edicao de malha, modelagem poligonal (Draw Polygon, Knife, Edge Loop/Ring), sculpt com suporte a mouse, fisica, animacao, behaviors, efeitos, scripts e geracao de malhas via IA.
 
-A camada de construtor visual de sites 3D interativos (Modo Pagina, Modo Interacoes, Modo Preview, Modo Exportar) agora conta com paridade total com o renderer do Modo Cena, exportacao ZIP com assets reais organizados, runtime standalone em HTML/CSS/JS puro via Three.js CDN, autosave com historico de versoes, drag-and-drop e reparenting no Page Builder, alem de metricas reais de preview (draw calls, triangulos, resolucao de texturas, heap JS e FPS). O Edit Mode ganhou Box/Lasso select, hover preview, Flip/Recalculate Normals, Smooth/Flat Shading, multi-materiais por face em lote e snap de sub-elementos. A timeline agora exporte keyframes reais que rodam no runtime exportado.
+A camada de construtor visual de sites 3D interativos (Modo Pagina, Modo Dados, Modo Interacoes, Modo Preview, Modo Exportar) agora conta com paridade total com o renderer do Modo Cena, exportacao ZIP com assets reais organizados, runtime standalone em HTML/CSS/JS puro via Three.js CDN, autosave com historico de versoes, drag-and-drop e reparenting no Page Builder, alem de metricas reais de preview (draw calls, triangulos, resolucao de texturas, heap JS e FPS). O Edit Mode ganhou Box/Lasso select, hover preview, Flip/Recalculate Normals, Smooth/Flat Shading, multi-materiais por face em lote e snap de sub-elementos. A timeline agora exporta keyframes reais que rodam no runtime exportado.
+
+O System Builder esta na Fase 2 inicial: ja existe modelo de dados visual com colecoes, campos, validacoes, relacoes e queries salvas, persistido no `.web3d.json`, no autosave/historico e no export como JSON/Prisma/Drizzle. A pagina agora tem componentes conectados a dados, variaveis com binding `{{var}}`, actions de dados/variaveis/toast/loading/error, geracao inicial de API routes CRUD para Next, multipage inicial com rotas editaveis e navegacao interna no Preview, alem de tutorial guiado com spotlight para Page Builder e Dados. Ainda faltam persistencia real em banco no runtime, formularios exportados chamando APIs, bindings avancados por registro, Workflow Engine, Formula Engine, Auth/guards reais, parametros dinamicos e export multipage completo.
 
 
 

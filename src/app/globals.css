@@ -95,3 +95,80 @@ input:disabled {
 @media (prefers-reduced-motion: reduce) {
   [data-reveal] { opacity: 1 !important; transform: none !important; }
 }
+
+/* --------------------------- Editor Design Tokens -------------------------- */
+/*
+ * Premium editor surface palette + utilities used by the page builder.
+ * Centralized here so every panel/toolbar/canvas shares the same look.
+ */
+:root {
+  --ed-surface-0: #0b0d0e;       /* deepest (canvas page) */
+  --ed-surface-1: #101214;       /* canvas frame */
+  --ed-surface-2: #151719;       /* panels */
+  --ed-surface-3: #1a1d20;       /* toolbar / hover */
+  --ed-surface-4: #212529;       /* raised */
+  --ed-border: #2a2e33;          /* default border */
+  --ed-border-soft: #1f2327;     /* subtle border */
+  --ed-accent: #34d399;          /* emerald */
+  --ed-accent-soft: rgba(52, 211, 153, 0.14);
+  --ed-accent-line: rgba(52, 211, 153, 0.45);
+  --ed-hint: #59c3ff;            /* hover hint blue */
+  --ed-hint-soft: rgba(89, 195, 255, 0.16);
+  --ed-danger: #fb7185;
+  --ed-warn: #fbbf24;
+  --ed-text: #f5f5f4;
+  --ed-text-dim: #a1a1aa;
+  --ed-text-mute: #71717a;
+  --ed-grid: rgba(255, 255, 255, 0.035);
+}
+
+/* Dotted reference backdrop for the page canvas (editor-only) */
+.ed-canvas-backdrop {
+  background-color: var(--ed-surface-0);
+  background-image: radial-gradient(circle at 1px 1px, var(--ed-grid) 1.4px, transparent 0);
+  background-size: 22px 22px;
+}
+
+/* Subtle top ruler for the canvas frame */
+.ed-ruler {
+  background-image:
+    linear-gradient(to right, var(--ed-border-soft) 1px, transparent 1px),
+    linear-gradient(to right, var(--ed-border-soft) 1px, transparent 1px);
+  background-size: 80px 100%, 20px 100%;
+  background-position: 0 0, 0 0;
+}
+
+/* Thin, refined scrollbars for editor panels only (page builder surfaces) */
+.ed-scroll {
+  scrollbar-width: thin;
+  scrollbar-color: var(--ed-border) transparent;
+}
+.ed-scroll::-webkit-scrollbar { width: 8px; height: 8px; display: block; }
+.ed-scroll::-webkit-scrollbar-track { background: transparent; }
+.ed-scroll::-webkit-scrollbar-thumb {
+  background: var(--ed-border);
+  border-radius: 999px;
+  border: 2px solid transparent;
+  background-clip: padding-box;
+}
+.ed-scroll::-webkit-scrollbar-thumb:hover { background: #3a3f45; background-clip: padding-box; }
+
+/* Focus ring shared by editor inputs */
+.ed-focus:focus-visible {
+  outline: none;
+  border-color: var(--ed-accent);
+  box-shadow: 0 0 0 3px var(--ed-accent-soft);
+}
+
+/* Animated selection pulse for the canvas selection box */
+@keyframes ed-select-pulse {
+  0%, 100% { box-shadow: 0 0 0 1px var(--ed-accent-line), 0 0 22px rgba(52, 211, 153, 0.18); }
+  50% { box-shadow: 0 0 0 1px var(--ed-accent-line), 0 0 30px rgba(52, 211, 153, 0.30); }
+}
+.ed-select-glow { animation: ed-select-pulse 2.6s ease-in-out infinite; }
+
+/* Premium panel section divider */
+.ed-divider {
+  height: 1px;
+  background: linear-gradient(to right, transparent, var(--ed-border-soft) 18%, var(--ed-border-soft) 82%, transparent);
+}

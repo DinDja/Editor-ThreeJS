@@ -12,13 +12,18 @@ import {
   getExportAssets,
 } from '@/lib/export-engine/exportExperience';
 import { createSceneDocument } from '@/lib/scene-engine/sceneDocument';
+import { useDataModelStore } from '@/store/dataModelStore';
 import { useExperienceStore } from '@/store/experienceStore';
 import { useMaterialStore } from '@/store/materialStore';
 import { useSceneStore } from '@/store/sceneStore';
 import { useTimelineStore } from '@/store/timelineStore';
+import { useVariableStore } from '@/store/variableStore';
+import CodeHighlighter from './CodeHighlighter';
 
 export default function ExportWorkspace() {
   const page = useExperienceStore((state) => state.page);
+  const pages = useExperienceStore((state) => state.pages);
+  const activePageId = useExperienceStore((state) => state.activePageId);
   const interactions = useExperienceStore((state) => state.interactions);
   const settings = useExperienceStore((state) => state.settings);
   const exportTarget = useExperienceStore((state) => state.exportTarget);
@@ -27,11 +32,13 @@ export default function ExportWorkspace() {
   const referenceImages = useSceneStore((state) => state.referenceImages);
   const materials = useMaterialStore((state) => state.materials);
   const keyframes = useTimelineStore((state) => state.keyframes);
+  const dataSchema = useDataModelStore((state) => state.schema);
+  const variables = useVariableStore((state) => state.document);
 
   const snapshot = useMemo(() => {
     const scene = createSceneDocument({ objects, materials, keyframes, layers, referenceImages });
-    return createExperienceSnapshot({ page, scene, interactions, settings: { ...settings, exportTarget } });
-  }, [exportTarget, interactions, keyframes, layers, materials, objects, page, referenceImages, settings]);
+    return createExperienceSnapshot({ page, pages, activePageId, scene, interactions, settings: { ...settings, exportTarget }, dataSchema, variables });
+  }, [activePageId, dataSchema, exportTarget, interactions, keyframes, layers, materials, objects, page, pages, referenceImages, settings, variables]);
 
   const bundle = useMemo(() => generateExportBundle(snapshot, exportTarget), [exportTarget, snapshot]);
   const assets = useMemo(() => getExportAssets(snapshot), [snapshot]);
@@ -110,8 +117,8 @@ export default function ExportWorkspace() {
             Baixar
           </button>
         </div>
-        <pre className="min-h-0 flex-1 overflow-auto whitespace-pre-wrap bg-[#0f1113] p-4 text-xs leading-6 text-neutral-300">
-          <code>{selectedFile.content}</code>
+        <pre className="min-h-0 flex-1 overflow-auto whitespace-pre-wrap bg-[#0f1113] p-4 text-xs leading-6">
+          <CodeHighlighter code={selectedFile.content} language={selectedFile.language} />
         </pre>
       </section>
     </div>

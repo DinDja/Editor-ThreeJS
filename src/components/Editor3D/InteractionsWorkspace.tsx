@@ -22,7 +22,7 @@ export default function InteractionsWorkspace() {
     (id === 'current-scene' ? 'Scene atual' : id);
 
   return (
-    <div className="h-full overflow-auto bg-[#0d0f10] p-5">
+    <div data-tutorial="interactions-workspace" className="h-full overflow-auto bg-[#0d0f10] p-5">
       <div className="mx-auto grid max-w-5xl gap-3">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.16em] text-neutral-500">

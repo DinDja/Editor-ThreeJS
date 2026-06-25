@@ -1,22 +1,25 @@
 import type { InteractionDocument } from '@/lib/interaction-engine/types';
 import type { PageEffectsConfig } from '@/lib/effects-system/types';
+import type { DataSchema } from '@/lib/data-model/types';
+import type { VariableDocument } from '@/lib/variables/types';
 import type { SceneDocument } from '@/lib/scene-engine/types';
 
 export type { PageEffect, PageEffectsConfig } from '@/lib/effects-system/types';
 
-export type EditorMode = 'scene' | 'page' | 'interactions' | 'preview' | 'export';
+export type EditorMode = 'scene' | 'page' | 'data' | 'interactions' | 'preview' | 'export';
 
 export type PreviewDevice = 'desktop' | 'tablet' | 'mobile';
 
 export type ExportTarget = 'next' | 'react' | 'vite' | 'html' | 'json';
 
-export type Breakpoint = 'base' | 'tablet' | 'mobile';
+export type Breakpoint = 'base' | 'tablet' | 'mobile' | (string & {});
 
-export type ResponsiveSettings = {
-  desktop: number;
-  tablet: number;
-  mobile: number;
+export type BreakpointDef = {
+  name: string;
+  width: number;
 };
+
+export type ResponsiveSettings = BreakpointDef[];
 
 export type ScrollBehavior = 'normal' | 'sticky' | 'parallax' | 'pinned' | 'none';
 
@@ -30,21 +33,41 @@ export type PageNodeType =
   | 'card'
   | 'navbar'
   | 'footer'
-  | 'sceneCanvas';
+  | 'sceneCanvas'
+  | 'form'
+  | 'input'
+  | 'select'
+  | 'textarea'
+  | 'label'
+  | 'modal'
+  | 'menu'
+  | 'menuitem'
+  | 'dataTable'
+  | 'dataForm'
+  | 'dataList'
+  | 'dataChart'
+  | 'dataStat'
+  | 'pageRoute';
 
 export type CSSLength = string | number;
 
 export type PageStyle = Partial<{
   width: CSSLength;
   height: CSSLength;
+  minWidth: CSSLength;
   minHeight: CSSLength;
   maxWidth: CSSLength;
   padding: CSSLength;
   margin: CSSLength;
+  marginTop: CSSLength;
+  marginBottom: CSSLength;
   display: 'block' | 'flex' | 'grid' | 'none';
+  flex: string | number;
+  flexWrap: 'wrap' | 'nowrap' | 'wrap-reverse';
   flexDirection: 'row' | 'column';
   alignItems: string;
   justifyContent: string;
+  alignSelf: string;
   placeItems: string;
   gap: CSSLength;
   gridTemplateColumns: string;
@@ -53,6 +76,7 @@ export type PageStyle = Partial<{
   right: CSSLength;
   bottom: CSSLength;
   left: CSSLength;
+  inset: CSSLength;
   zIndex: number;
   transform: string;
   opacity: number | string;
@@ -70,6 +94,7 @@ export type PageStyle = Partial<{
   letterSpacing: CSSLength;
   textAlign: 'left' | 'center' | 'right';
   textTransform: string;
+  textDecoration: string;
   borderRadius: CSSLength;
   border: string;
   borderTop: string;
@@ -79,9 +104,27 @@ export type PageStyle = Partial<{
   objectFit: 'cover' | 'contain' | 'fill';
 }>;
 
-export type ResponsiveStyles = Partial<Record<Breakpoint, PageStyle>> & {
+export type ResponsiveStyles = {
   base: PageStyle;
+  tablet?: PageStyle;
+  mobile?: PageStyle;
+  [breakpoint: string]: PageStyle | undefined;
 };
+
+export type PseudoClass = 'hover' | 'active' | 'focus';
+
+export type ComponentDefinition = {
+  id: string;
+  name: string;
+  description?: string;
+  nodes: PageNode[];
+  createdAt: string;
+};
+
+export type ComponentOverride = Partial<{
+  props: Record<string, unknown>;
+  styles: ResponsiveStyles;
+}>;
 
 export type PageNode = {
   id: string;
@@ -89,15 +132,24 @@ export type PageNode = {
   name: string;
   props: Record<string, unknown>;
   styles: ResponsiveStyles;
-  responsive?: Partial<Record<Breakpoint, { visible: boolean }>>;
+  pseudo?: Partial<Record<PseudoClass, ResponsiveStyles>>;
+  responsive?: Record<string, { visible: boolean }>;
   scrollBehavior?: ScrollBehavior;
   children?: PageNode[];
+  /** If set, this node is a component instance linked to ComponentDefinition.id */
+  componentId?: string;
+  /** Per-child overrides keyed by the child's original definition-node ID */
+  instanceOverrides?: Record<string, ComponentOverride>;
 };
 
 export type PageDocument = {
   id: string;
   type: 'page';
   name: string;
+  path?: string;
+  title?: string;
+  description?: string;
+  protected?: boolean;
   children: PageNode[];
   responsive: ResponsiveSettings;
   /**
@@ -154,10 +206,15 @@ export type ProjectExperience = {
   id: string;
   name: string;
   page: PageDocument;
+  pages?: PageDocument[];
+  activePageId?: string;
   scene: SceneDocument;
   interactions: InteractionDocument[];
   settings: ProjectSettings;
   assets?: ProjectAsset[];
   seo?: ProjectSeoSettings;
   renderer?: ProjectRendererSettings;
+  components?: ComponentDefinition[];
+  dataSchema?: DataSchema;
+  variables?: VariableDocument;
 };

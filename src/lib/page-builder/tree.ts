@@ -1,4 +1,15 @@
-import type { PageDocument, PageNode, PageNodeType } from './types';
+import type { BreakpointDef, ComponentDefinition, ComponentOverride, PageDocument, PageNode, PageNodeType, ResponsiveSettings } from './types';
+
+export type PageDiffStatus = 'unchanged' | 'added' | 'removed' | 'modified';
+
+export type PageDiffNode = {
+  id: string;
+  name: string;
+  type: PageNodeType;
+  status: PageDiffStatus;
+  changes: string[];
+  children: PageDiffNode[];
+};
 
 export type PageTreeNode = {
   node: PageNode;
@@ -107,11 +118,21 @@ export const duplicatePageNodeTree = (node: PageNode, makeId: () => string): Pag
   id: makeId(),
   name: `${node.name} Copy`,
   props: { ...node.props },
-  styles: {
-    base: { ...node.styles.base },
-    tablet: node.styles.tablet ? { ...node.styles.tablet } : undefined,
-    mobile: node.styles.mobile ? { ...node.styles.mobile } : undefined,
-  },
+  styles: Object.fromEntries(
+    Object.entries(node.styles).map(([key, value]) => [key, value ? { ...value } : undefined]),
+  ) as PageNode['styles'],
+  pseudo: node.pseudo
+    ? Object.fromEntries(
+        Object.entries(node.pseudo).map(([pseudoClass, bpStyles]) => [
+          pseudoClass,
+          bpStyles
+            ? Object.fromEntries(
+                Object.entries(bpStyles).map(([bp, style]) => [bp, style ? { ...style } : undefined]),
+              )
+            : undefined,
+        ]),
+      )
+    : undefined,
   responsive: node.responsive
     ? Object.fromEntries(Object.entries(node.responsive).map(([key, value]) => [key, { ...value }]))
     : undefined,
@@ -185,7 +206,7 @@ const insertNodeIntoTree = (
 
 export const insertPageNodeTree = insertNodeIntoTree;
 
-const LEAF_TYPES: PageNodeType[] = ['text', 'button', 'image', 'video', 'sceneCanvas'];
+const LEAF_TYPES: PageNodeType[] = ['text', 'button', 'image', 'video', 'sceneCanvas', 'input', 'select', 'textarea', 'label', 'menuitem'];
 
 export const canNestPageNode = (parent: PageNode | null, childType: PageNodeType): boolean => {
   if (!parent) return true;
@@ -226,4 +247,175 @@ export const reparentPageNodeTree = (
     : index;
 
   return insertNodeIntoTree(afterRemoval, newParentId, removed, adjustedIndex);
+};
+
+export const isOldResponsiveFormat = (value: unknown): value is Record<string, number> =>
+  typeof value === 'object' && value !== null && !Array.isArray(value);
+
+export const migrateResponsiveSettings = (value: unknown): ResponsiveSettings => {
+  if (Array.isArray(value)) return value as ResponsiveSettings;
+  if (isOldResponsiveFormat(value)) {
+    const bp: BreakpointDef[] = [];
+    const old = value as Record<string, number>;
+    if (typeof old.desktop === 'number') bp.push({ name: 'desktop', width: old.desktop });
+    if (typeof old.tablet === 'number') bp.push({ name: 'tablet', width: old.tablet });
+    if (typeof old.mobile === 'number') bp.push({ name: 'mobile', width: old.mobile });
+    if (bp.length === 0) bp.push({ name: 'desktop', width: 1280 });
+    return bp;
+  }
+  return [
+    { name: 'desktop', width: 1280 },
+    { name: 'tablet', width: 820 },
+    { name: 'mobile', width: 390 },
+  ];
+};
+
+export const getActiveBreakpoint = (responsive: ResponsiveSettings, viewportWidth: number): string => {
+  const sorted = [...responsive].sort((a, b) => b.width - a.width);
+  for (const bp of sorted) {
+    if (viewportWidth <= bp.width) return bp.name;
+  }
+  return 'base';
+};
+
+/** Find all nodes with componentId in the tree */
+export const findComponentInstances = (nodes: PageNode[]): PageNode[] => {
+  const result: PageNode[] = [];
+  const walk = (list: PageNode[]) => {
+    for (const node of list) {
+      if (node.componentId) result.push(node);
+      if (node.children?.length) walk(node.children);
+    }
+  };
+  walk(nodes);
+  return result;
+};
+
+/** Deep-clone definition nodes onto an instance node's children, preserving overrides */
+export const syncComponentInstance = (
+  instance: PageNode,
+  definition: ComponentDefinition,
+): PageNode => {
+  const clonedChildren = definition.nodes.map((defNode) => deepCloneWithOverrides(defNode, instance.instanceOverrides ?? {}));
+  return { ...instance, children: clonedChildren };
+};
+
+/** Remove componentId and instanceOverrides from a node and its subtree, keeping current children as-is */
+export const detachComponentInstance = (node: PageNode): PageNode => {
+  const walk = (n: PageNode): PageNode => {
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    const { componentId, instanceOverrides, ...rest } = n;
+    return {
+      ...rest,
+      children: rest.children?.map((child) => walk(child)),
+    };
+  };
+  return walk(node);
+};
+
+const deepCloneWithOverrides = (
+  node: PageNode,
+  overrides: Record<string, ComponentOverride>,
+  makeId = (): string => `comp-${Math.random().toString(36).slice(2, 10)}`,
+): PageNode => {
+  const newId = makeId();
+  const override = overrides[node.id];
+  return {
+    ...node,
+    id: newId,
+    props: override?.props ? { ...node.props, ...override.props } : { ...node.props },
+    styles: override?.styles
+      ? mergeResponsiveStyles(node.styles, override.styles)
+      : (Object.fromEntries(
+          Object.entries(node.styles).map(([key, value]) => [key, value ? { ...value } : undefined]),
+        ) as PageNode['styles']),
+    children: node.children?.map((child) => deepCloneWithOverrides(child, overrides, makeId)),
+  };
+};
+
+const mergeResponsiveStyles = (base: PageNode['styles'], override: PageNode['styles']): PageNode['styles'] => {
+  const allKeys = new Set([...Object.keys(base), ...Object.keys(override)]);
+  const merged: PageNode['styles'] = {} as PageNode['styles'];
+  for (const key of allKeys) {
+    merged[key] = { ...(base[key] ?? {}), ...(override[key] ?? {}) } as PageNode['styles'][typeof key];
+  }
+  return merged;
+};
+
+const describeStyleChanges = (a: PageNode['styles'], b: PageNode['styles']): string[] => {
+  const changes: string[] = [];
+  const allKeys = new Set([...Object.keys(a), ...Object.keys(b)]);
+  for (const key of allKeys) {
+    if (key === 'base') {
+      const subA = a.base ?? {};
+      const subB = b.base ?? {};
+      for (const prop of Object.keys({ ...subA, ...subB })) {
+        const va = JSON.stringify((subA as Record<string, unknown>)[prop]);
+        const vb = JSON.stringify((subB as Record<string, unknown>)[prop]);
+        if (va !== vb) changes.push(`style.${prop}: ${va} → ${vb}`);
+      }
+    }
+  }
+  return changes;
+};
+
+const compareNodes = (a: PageNode | undefined, b: PageNode | undefined): PageDiffNode => {
+  const changes: string[] = [];
+  if (a && b) {
+    if (a.name !== b.name) changes.push(`nome: "${a.name}" → "${b.name}"`);
+    if (a.type !== b.type) changes.push(`tipo: ${a.type} → ${b.type}`);
+    if (JSON.stringify(a.props) !== JSON.stringify(b.props)) changes.push('props alterados');
+    const styleChanges = describeStyleChanges(a.styles, b.styles);
+    changes.push(...styleChanges);
+  }
+  const status: PageDiffStatus = !a ? 'added' : !b ? 'removed' : changes.length > 0 ? 'modified' : 'unchanged';
+  const node = b ?? a!;
+  return {
+    id: node.id,
+    name: node.name,
+    type: node.type,
+    status,
+    changes,
+    children: [],
+  };
+};
+
+const buildMap = (nodes: PageNode[]): Map<string, PageNode> => {
+  const map = new Map<string, PageNode>();
+  const walk = (list: PageNode[]) => {
+    for (const n of list) {
+      map.set(n.id, n);
+      if (n.children) walk(n.children);
+    }
+  };
+  walk(nodes);
+  return map;
+};
+
+export const comparePageDocuments = (oldDoc: PageDocument, newDoc: PageDocument): PageDiffNode[] => {
+  const oldMap = buildMap(oldDoc.children);
+  const newMap = buildMap(newDoc.children);
+
+  const rootIdsAdded = new Set(newDoc.children.map((n) => n.id));
+  const rootIdsRemoved = new Set(oldDoc.children.map((n) => n.id));
+  const rootIds = new Set([...rootIdsAdded, ...rootIdsRemoved]);
+
+  const nodeCache = new Map<string, PageDiffNode>();
+
+  const resolveNode = (id: string): PageDiffNode => {
+    if (nodeCache.has(id)) return nodeCache.get(id)!;
+    const oldNode = oldMap.get(id);
+    const newNode = newMap.get(id);
+    const diff = compareNodes(oldNode, newNode);
+    nodeCache.set(id, diff);
+
+    const oldChildren = oldNode?.children ?? [];
+    const newChildren = newNode?.children ?? [];
+    const childIds = new Set([...oldChildren.map((c) => c.id), ...newChildren.map((c) => c.id)]);
+    diff.children = [...childIds].map((cid) => resolveNode(cid));
+
+    return diff;
+  };
+
+  return [...rootIds].map((id) => resolveNode(id));
 };

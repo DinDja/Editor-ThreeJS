@@ -3,7 +3,7 @@ import type { ExportTarget, ProjectExperience } from '@/lib/page-builder/types';
 export type ExportFile = {
   path: string;
   content: string;
-  language: 'tsx' | 'ts' | 'json' | 'html' | 'css' | 'js';
+  language: 'tsx' | 'ts' | 'json' | 'html' | 'css' | 'js' | 'prisma';
 };
 
 export type ExportBundle = {

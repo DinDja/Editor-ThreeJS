@@ -21,6 +21,17 @@ const defaultParamsByAction: Record<InteractionAction, Record<string, unknown>> 
   openModal: { title: 'Detalhes', body: 'Conteudo da experiencia' },
   navigateToLink: { href: '#contato' },
   runCustomScript: { code: '' },
+  createRecord: { collectionId: 'leads', record: {} },
+  updateRecord: { collectionId: 'leads', recordId: '{{record.id}}', patch: {} },
+  deleteRecord: { collectionId: 'leads', recordId: '{{record.id}}' },
+  loadCollection: { collectionId: 'leads' },
+  runQuery: { collectionId: 'leads', queryId: '', resultVariable: 'queryResult' },
+  setVariable: { variableName: 'statusMessage', value: 'Atualizado' },
+  incrementVariable: { variableName: 'counter', amount: 1 },
+  toggleVariable: { variableName: 'isLoading' },
+  showToast: { message: 'Acao executada', tone: 'success' },
+  setLoading: { variableName: 'isLoading', value: true },
+  setError: { variableName: 'statusMessage', value: 'Erro ao executar acao' },
 };
 
 export const createDefaultInteraction = (

@@ -1,7 +1,11 @@
 import type { InteractionDocument } from '@/lib/interaction-engine/types';
+import type { DataSchema } from '@/lib/data-model/types';
+import type { VariableDocument } from '@/lib/variables/types';
 import { type ProjectAsset, type ExportTarget, type PageDocument, type ProjectExperience, type ProjectSettings } from '@/lib/page-builder/types';
 import { collectProjectAssets } from '@/lib/project-experience/persistence';
 import type { SceneDocument } from '@/lib/scene-engine/types';
+import { generateDatabaseSchema } from './generateSchema';
+import { generateApiRouteFiles } from './generateApiRoutes';
 import { arrayBufferToBytes, buildZipBlob, stringToBytes, type ZipFile } from './zip';
 import type { ExportBundle, ExportFile } from './types';
 
@@ -9,28 +13,57 @@ const asJson = (value: unknown) => JSON.stringify(value, null, 2);
 
 export const createExperienceSnapshot = ({
   page,
+  pages,
+  activePageId,
   scene,
   interactions,
   settings,
+  dataSchema,
+  variables,
 }: {
   page: PageDocument;
+  pages?: PageDocument[];
+  activePageId?: string;
   scene: SceneDocument;
   interactions: InteractionDocument[];
   settings: ProjectSettings;
+  dataSchema?: DataSchema;
+  variables?: VariableDocument;
 }): ProjectExperience => ({
   id: settings.id,
   name: settings.name,
   page,
+  pages: pages && pages.length > 0 ? pages : [page],
+  activePageId: activePageId ?? page.id,
   scene,
   interactions,
   settings,
+  dataSchema,
+  variables,
 });
 
-const dataFiles = (snapshot: ProjectExperience, basePath: string): ExportFile[] => [
-  { path: `${basePath}/scene-data.json`, content: asJson(snapshot.scene), language: 'json' },
-  { path: `${basePath}/page-data.json`, content: asJson(snapshot.page), language: 'json' },
-  { path: `${basePath}/interactions-data.json`, content: asJson(snapshot.interactions), language: 'json' },
-];
+const dataFiles = (snapshot: ProjectExperience, basePath: string): ExportFile[] => {
+  const files: ExportFile[] = [
+    { path: `${basePath}/scene-data.json`, content: asJson(snapshot.scene), language: 'json' },
+    { path: `${basePath}/page-data.json`, content: asJson(snapshot.page), language: 'json' },
+    { path: `${basePath}/pages-data.json`, content: asJson(snapshot.pages ?? [snapshot.page]), language: 'json' },
+    { path: `${basePath}/interactions-data.json`, content: asJson(snapshot.interactions), language: 'json' },
+  ];
+  if (snapshot.dataSchema) {
+    files.push({ path: `${basePath}/data-schema.json`, content: asJson(snapshot.dataSchema), language: 'json' });
+    if (snapshot.dataSchema.ormTarget !== 'none') {
+      files.push({
+        path: `${basePath}/${snapshot.dataSchema.ormTarget === 'drizzle' ? 'database-schema.ts' : 'schema.prisma'}`,
+        content: generateDatabaseSchema(snapshot.dataSchema),
+        language: snapshot.dataSchema.ormTarget === 'drizzle' ? 'ts' : 'prisma',
+      });
+    }
+  }
+  if (snapshot.variables) {
+    files.push({ path: `${basePath}/variables-data.json`, content: asJson(snapshot.variables), language: 'json' });
+  }
+  return files;
+};
 
 const ANIMATION_RUNTIME = `
 const sampleTransform = (keyframes, objectId, frame) => {
@@ -136,21 +169,66 @@ const pageExperience = (sceneImportPath = './SceneCanvas') => `'use client';
 import SceneCanvas from '${sceneImportPath}';
 import pageData from '../data/page-data.json';
 import interactionsData from '../data/interactions-data.json';
+import dataSchema from '../data/data-schema.json';
+import variablesData from '../data/variables-data.json';
 
 const mergeStyle = (node) => ({ ...(node.styles?.base ?? {}) });
+const variableValue = (name) => variablesData.variables?.find((v) => v.name === name)?.value ?? '';
+const bind = (value, record = {}) => String(value ?? '').replace(/\\{\\{\\s*([^}]+?)\\s*\\}\\}/g, (_, key) => {
+  const k = key.trim();
+  if (k.startsWith('record.')) return record[k.slice(7)] ?? '';
+  if (k.startsWith('vars.')) return variableValue(k.slice(5));
+  return variableValue(k) || record[k] || '';
+});
+const collectionFor = (ref) => dataSchema.collections?.find((c) => c.id === ref || c.name === ref) || dataSchema.collections?.[0];
+const sampleRecords = (collection, count = 4) => Array.from({ length: count }, (_, index) => Object.fromEntries((collection?.fields || []).map((field) => [field.name, field.name === 'id' ? 'rec_' + (index + 1) : field.type === 'number' ? (index + 1) * 10 : field.label + ' ' + (index + 1)])));
+const display = (value) => value === undefined || value === null ? '' : typeof value === 'object' ? JSON.stringify(value) : String(value);
 
 function ExperienceNode({ node }) {
   const style = mergeStyle(node);
   const dataAttrs = { 'data-experience-node': node.id };
+  if (node.type === 'dataTable') {
+    const collection = collectionFor(node.props?.collectionId);
+    const fields = (collection?.fields || []).filter((f) => !f.system).slice(0, 6);
+    const records = sampleRecords(collection, node.props?.limit || 6);
+    return <div {...dataAttrs} style={style}><table style={{ width: '100%', borderCollapse: 'collapse' }}><thead><tr>{fields.map((f) => <th key={f.id} style={{ textAlign: 'left', padding: 10 }}>{f.label}</th>)}</tr></thead><tbody>{records.map((r, i) => <tr key={i}>{fields.map((f) => <td key={f.id} style={{ padding: 10, borderTop: '1px solid rgba(255,255,255,.08)' }}>{display(r[f.name])}</td>)}</tr>)}</tbody></table></div>;
+  }
+  if (node.type === 'dataList') {
+    const collection = collectionFor(node.props?.collectionId);
+    const records = sampleRecords(collection, node.props?.limit || 6);
+    const titleField = node.props?.titleField || 'name';
+    const bodyField = node.props?.bodyField || 'message';
+    return <div {...dataAttrs} style={style}>{records.map((r, i) => <article key={i}><h3>{display(r[titleField])}</h3><p>{display(r[bodyField])}</p></article>)}</div>;
+  }
+  if (node.type === 'dataForm') {
+    const collection = collectionFor(node.props?.collectionId);
+    const fields = (collection?.fields || []).filter((f) => !f.system && f.type !== 'relation');
+    return <form {...dataAttrs} style={style} onSubmit={(e) => { e.preventDefault(); alert(node.props?.successMessage || 'Registro salvo'); }}>{fields.map((f) => <label key={f.id}>{f.label}<input name={f.name} required={Boolean(f.required)} /></label>)}<button type="submit">{node.props?.submitLabel || 'Salvar'}</button></form>;
+  }
+  if (node.type === 'dataChart') {
+    const collection = collectionFor(node.props?.collectionId);
+    const records = sampleRecords(collection, node.props?.limit || 5);
+    return <div {...dataAttrs} style={style}>{records.map((r, i) => <div key={i} style={{ flex: 1, height: ((i + 1) * 18) + '%', background: '#34d399', borderRadius: 6 }} title={display(r[node.props?.labelField || 'name'])} />)}</div>;
+  }
+  if (node.type === 'dataStat') {
+    const collection = collectionFor(node.props?.collectionId);
+    return <div {...dataAttrs} style={style}><span>{node.props?.label || collection?.label || 'Total'}</span><strong>{sampleRecords(collection).length}</strong></div>;
+  }
   if (node.type === 'sceneCanvas') return <div {...dataAttrs} style={style}><SceneCanvas /></div>;
   if (node.type === 'text') {
     const Tag = node.props?.as || 'p';
-    return <Tag {...dataAttrs} style={style}>{node.props?.text}</Tag>;
+    return <Tag {...dataAttrs} style={style}>{bind(node.props?.text)}</Tag>;
   }
-  if (node.type === 'button') return <a {...dataAttrs} href={node.props?.href || '#'} style={style}>{node.props?.label || 'Button'}</a>;
+  if (node.type === 'button') return <a {...dataAttrs} href={node.props?.href || '#'} style={style}>{bind(node.props?.label || 'Button')}</a>;
   if (node.type === 'image') return <img {...dataAttrs} src={node.props?.src || ''} alt={node.props?.alt || ''} style={style} />;
   if (node.type === 'video') return <video {...dataAttrs} src={node.props?.src || ''} poster={node.props?.poster || ''} controls={node.props?.controls !== false} autoPlay={Boolean(node.props?.autoplay)} muted style={style} />;
-  const Tag = node.type === 'navbar' ? 'nav' : node.type === 'footer' ? 'footer' : 'section';
+  if (node.type === 'input') return <div {...dataAttrs} style={style}><label>{node.props?.label}</label><input name={node.props?.name} type={node.props?.type || 'text'} placeholder={node.props?.placeholder} required={Boolean(node.props?.required)} /></div>;
+  if (node.type === 'select') return <div {...dataAttrs} style={style}><label>{node.props?.label}</label><select name={node.props?.name}>{(node.props?.options || []).map((o) => <option key={o} value={o}>{o}</option>)}</select></div>;
+  if (node.type === 'textarea') return <div {...dataAttrs} style={style}><label>{node.props?.label}</label><textarea name={node.props?.name} placeholder={node.props?.placeholder} rows={node.props?.rows || 4} /></div>;
+  if (node.type === 'label') return <label {...dataAttrs} htmlFor={node.props?.htmlFor} style={style}>{node.props?.text}</label>;
+  if (node.type === 'menuitem') return <a {...dataAttrs} href={node.props?.href || '#'} style={style}>{node.props?.label || 'Item'}</a>;
+  if (node.type === 'form') return <form {...dataAttrs} name={node.props?.name} action={node.props?.action} method={node.props?.method || 'POST'} style={style}>{(node.children || []).map((child) => <ExperienceNode key={child.id} node={child} />)}</form>;
+  const Tag = node.type === 'navbar' ? 'nav' : node.type === 'footer' ? 'footer' : node.type === 'menu' ? 'nav' : 'section';
   return (
     <Tag {...dataAttrs} style={style}>
       {node.props?.brand ? <strong>{node.props.brand}</strong> : null}
@@ -173,7 +251,9 @@ export default function PageExperience() {
 const nextPageExperience = () =>
   pageExperience('./SceneCanvas')
     .replace("import pageData from '../data/page-data.json';", "import pageData from '../lib/page-data.json';")
-    .replace("import interactionsData from '../data/interactions-data.json';", "import interactionsData from '../lib/interactions-data.json';");
+    .replace("import interactionsData from '../data/interactions-data.json';", "import interactionsData from '../lib/interactions-data.json';")
+    .replace("import dataSchema from '../data/data-schema.json';", "import dataSchema from '../lib/data-schema.json';")
+    .replace("import variablesData from '../data/variables-data.json';", "import variablesData from '../lib/variables-data.json';");
 
 const nextFiles = (snapshot: ProjectExperience): ExportFile[] => [
   { path: 'app/page.tsx', content: "import PageExperience from '../components/PageExperience';\n\nexport default function Page() {\n  return <PageExperience />;\n}\n", language: 'tsx' },
@@ -182,6 +262,7 @@ const nextFiles = (snapshot: ProjectExperience): ExportFile[] => [
   { path: 'components/PageExperience.tsx', content: nextPageExperience(), language: 'tsx' },
   { path: 'components/sections/SectionRenderer.tsx', content: "export { default } from '../PageExperience';\n", language: 'tsx' },
   ...dataFiles(snapshot, 'lib'),
+  ...generateApiRouteFiles(snapshot.dataSchema),
 ];
 
 const reactFiles = (snapshot: ProjectExperience, target: 'react' | 'vite'): ExportFile[] => [
@@ -203,6 +284,19 @@ import { GLTFLoader } from 'https://cdn.jsdelivr.net/npm/three@0.184.0/examples/
 const sceneData = window.__SCENE_DATA__;
 const pageData = window.__PAGE_DATA__;
 const interactionsData = window.__INTERACTIONS_DATA__;
+const dataSchema = window.__DATA_SCHEMA__ || { collections: [] };
+const variablesData = window.__VARIABLES_DATA__ || { variables: [] };
+
+const variableValue = (name) => variablesData.variables?.find((v) => v.name === name)?.value ?? '';
+const bind = (value, record = {}) => String(value ?? '').replace(/\\{\\{\\s*([^}]+?)\\s*\\}\\}/g, (_, key) => {
+  const k = key.trim();
+  if (k.startsWith('record.')) return record[k.slice(7)] ?? '';
+  if (k.startsWith('vars.')) return variableValue(k.slice(5));
+  return variableValue(k) || record[k] || '';
+});
+const collectionFor = (ref) => dataSchema.collections?.find((c) => c.id === ref || c.name === ref) || dataSchema.collections?.[0];
+const sampleRecords = (collection, count = 4) => Array.from({ length: count }, (_, index) => Object.fromEntries((collection?.fields || []).map((field) => [field.name, field.name === 'id' ? 'rec_' + (index + 1) : field.type === 'number' ? (index + 1) * 10 : field.label + ' ' + (index + 1)])));
+const display = (value) => value === undefined || value === null ? '' : typeof value === 'object' ? JSON.stringify(value) : String(value);
 
 ${ANIMATION_RUNTIME}
 
@@ -379,12 +473,26 @@ function mountScene(canvasHost) {
 function applyDomAction(interaction, active) {
   if (!active) return;
   const target = document.querySelector('[data-experience-node="' + interaction.targetId + '"]');
-  if (!target) return;
-  if (interaction.action === 'showElement') target.style.display = '';
-  if (interaction.action === 'hideElement') target.style.display = 'none';
-  if (interaction.action === 'changeText') target.textContent = interaction.params.text || '';
+  const needsDomTarget = ['showElement', 'hideElement', 'changeText', 'openModal', 'navigateToLink'].includes(interaction.action);
+  if (!target && needsDomTarget) return;
+  if (interaction.action === 'showElement' && target) target.style.display = '';
+  if (interaction.action === 'hideElement' && target) target.style.display = 'none';
+  if (interaction.action === 'changeText' && target) target.textContent = interaction.params.text || '';
   if (interaction.action === 'openModal') alert([interaction.params.title, interaction.params.body].filter(Boolean).join('\\\\n\\\\n'));
   if (interaction.action === 'navigateToLink') window.location.href = interaction.params.href || '#';
+  if (interaction.action === 'setVariable') {
+    const v = variablesData.variables?.find((item) => item.name === interaction.params.variableName);
+    if (v) v.value = interaction.params.value;
+  }
+  if (interaction.action === 'toggleVariable') {
+    const v = variablesData.variables?.find((item) => item.name === interaction.params.variableName);
+    if (v) v.value = !Boolean(v.value);
+  }
+  if (interaction.action === 'incrementVariable') {
+    const v = variablesData.variables?.find((item) => item.name === interaction.params.variableName);
+    if (v) v.value = Number(v.value || 0) + Number(interaction.params.amount || 1);
+  }
+  if (interaction.action === 'showToast') alert(interaction.params.message || 'Acao executada');
 }
 
 function wireInteractions() {
@@ -409,15 +517,48 @@ function renderPage() {
   const root = document.getElementById('experience-root');
   const applyStyle = (el, styles = {}) => { for (const [k, v] of Object.entries(styles)) el.style[k] = typeof v === 'number' ? v + 'px' : v; };
   const build = (node) => {
-    const tag = node.type === 'navbar' ? 'nav' : node.type === 'footer' ? 'footer' : node.type === 'button' ? 'a' : node.type === 'text' ? (node.props.as || 'p') : 'section';
+    const tag = node.type === 'navbar' ? 'nav' : node.type === 'footer' ? 'footer' : node.type === 'button' ? 'a' : node.type === 'text' ? (node.props.as || 'p') : node.type === 'input' || node.type === 'select' || node.type === 'textarea' ? 'div' : node.type === 'label' ? 'label' : node.type === 'menuitem' ? 'a' : node.type === 'form' || node.type === 'dataForm' ? 'form' : node.type === 'menu' ? 'nav' : 'section';
     const el = document.createElement(tag);
     el.dataset.experienceNode = node.id;
     applyStyle(el, node.styles?.base || {});
     if (node.type === 'sceneCanvas') { el.className = 'scene-canvas'; mountScene(el); }
     else if (node.type === 'button') { el.href = node.props.href || '#'; el.textContent = node.props.label || 'Button'; }
-    else if (node.type === 'text') el.textContent = node.props.text || '';
+    else if (node.type === 'text') el.textContent = bind(node.props.text || '');
+    else if (node.type === 'dataTable') {
+      const collection = collectionFor(node.props.collectionId);
+      const fields = (collection?.fields || []).filter((f) => !f.system).slice(0, 6);
+      const rows = sampleRecords(collection, node.props.limit || 6);
+      const table = document.createElement('table'); table.style.width = '100%'; table.style.borderCollapse = 'collapse';
+      const head = document.createElement('thead'); const trh = document.createElement('tr');
+      fields.forEach((f) => { const th = document.createElement('th'); th.textContent = f.label; th.style.textAlign = 'left'; th.style.padding = '10px'; trh.appendChild(th); });
+      head.appendChild(trh); table.appendChild(head);
+      const body = document.createElement('tbody');
+      rows.forEach((r) => { const tr = document.createElement('tr'); fields.forEach((f) => { const td = document.createElement('td'); td.textContent = display(r[f.name]); td.style.padding = '10px'; tr.appendChild(td); }); body.appendChild(tr); });
+      table.appendChild(body); el.appendChild(table);
+    }
+    else if (node.type === 'dataList') {
+      const collection = collectionFor(node.props.collectionId);
+      sampleRecords(collection, node.props.limit || 6).forEach((r) => { const article = document.createElement('article'); const h = document.createElement('h3'); h.textContent = display(r[node.props.titleField || 'name']); const p = document.createElement('p'); p.textContent = display(r[node.props.bodyField || 'message']); article.appendChild(h); article.appendChild(p); el.appendChild(article); });
+    }
+    else if (node.type === 'dataStat') {
+      const collection = collectionFor(node.props.collectionId); const s = document.createElement('span'); s.textContent = node.props.label || collection?.label || 'Total'; const strong = document.createElement('strong'); strong.textContent = String(sampleRecords(collection).length); el.appendChild(s); el.appendChild(strong);
+    }
+    else if (node.type === 'dataChart') {
+      const collection = collectionFor(node.props.collectionId); sampleRecords(collection, node.props.limit || 5).forEach((_r, i) => { const bar = document.createElement('div'); bar.style.flex = '1'; bar.style.height = ((i + 1) * 18) + '%'; bar.style.background = '#34d399'; bar.style.borderRadius = '6px'; el.appendChild(bar); });
+    }
+    else if (node.type === 'dataForm') {
+      const collection = collectionFor(node.props.collectionId);
+      (collection?.fields || []).filter((f) => !f.system && f.type !== 'relation').forEach((f) => { const label = document.createElement('label'); label.textContent = f.label; const input = document.createElement('input'); input.name = f.name; input.required = Boolean(f.required); label.appendChild(input); el.appendChild(label); });
+      const button = document.createElement('button'); button.type = 'submit'; button.textContent = node.props.submitLabel || 'Salvar'; el.appendChild(button); el.addEventListener('submit', (event) => { event.preventDefault(); alert(node.props.successMessage || 'Registro salvo'); });
+    }
     else if (node.type === 'image') { const img = document.createElement('img'); img.src = node.props.src || ''; img.alt = node.props.alt || ''; img.style.width = '100%'; el.appendChild(img); }
     else if (node.type === 'video') { const v = document.createElement('video'); v.src = node.props.src || ''; v.controls = node.props.controls !== false; v.muted = true; el.appendChild(v); }
+    else if (node.type === 'input') { if (node.props.label) { const lb = document.createElement('label'); lb.textContent = node.props.label; el.appendChild(lb); } const inp = document.createElement('input'); inp.name = node.props.name || ''; inp.type = node.props.type || 'text'; inp.placeholder = node.props.placeholder || ''; inp.required = Boolean(node.props.required); el.appendChild(inp); }
+    else if (node.type === 'select') { if (node.props.label) { const lb = document.createElement('label'); lb.textContent = node.props.label; el.appendChild(lb); } const sel = document.createElement('select'); sel.name = node.props.name || ''; (node.props.options || []).forEach((o) => { const opt = document.createElement('option'); opt.value = o; opt.textContent = o; sel.appendChild(opt); }); el.appendChild(sel); }
+    else if (node.type === 'textarea') { if (node.props.label) { const lb = document.createElement('label'); lb.textContent = node.props.label; el.appendChild(lb); } const ta = document.createElement('textarea'); ta.name = node.props.name || ''; ta.placeholder = node.props.placeholder || ''; ta.rows = node.props.rows || 4; el.appendChild(ta); }
+    else if (node.type === 'label') { el.htmlFor = node.props.htmlFor || ''; el.textContent = node.props.text || ''; }
+    else if (node.type === 'menuitem') { el.href = node.props.href || '#'; el.textContent = node.props.label || 'Item'; }
+    else if (node.type === 'form') { el.name = node.props.name || ''; el.action = node.props.action || '#'; el.method = node.props.method || 'POST'; }
     else {
       if (node.props.brand) { const b = document.createElement('strong'); b.textContent = node.props.brand; el.appendChild(b); }
       if (node.props.title) { const t = document.createElement('h3'); t.textContent = node.props.title; el.appendChild(t); }
@@ -437,6 +578,8 @@ const htmlFiles = (snapshot: ProjectExperience): ExportFile[] => {
   const sceneJson = asJson(snapshot.scene);
   const pageJson = asJson(snapshot.page);
   const interactionsJson = asJson(snapshot.interactions);
+  const dataSchemaJson = asJson(snapshot.dataSchema ?? null);
+  const variablesJson = asJson(snapshot.variables ?? null);
   return [
     {
       path: 'index.html',
@@ -452,6 +595,8 @@ const htmlFiles = (snapshot: ProjectExperience): ExportFile[] => {
       window.__SCENE_DATA__ = ${sceneJson};
       window.__PAGE_DATA__ = ${pageJson};
       window.__INTERACTIONS_DATA__ = ${interactionsJson};
+      window.__DATA_SCHEMA__ = ${dataSchemaJson};
+      window.__VARIABLES_DATA__ = ${variablesJson};
     </script>
   </head>
   <body>
@@ -628,4 +773,4 @@ export const downloadExportZip = async (bundle: ExportBundle, assets: ProjectAss
 };
 
 export const getExportAssets = (snapshot: ProjectExperience): ProjectAsset[] =>
-  snapshot.assets ?? collectProjectAssets(snapshot.page, snapshot.scene);
+  snapshot.assets ?? collectProjectAssets(snapshot.page, snapshot.scene, snapshot.pages);

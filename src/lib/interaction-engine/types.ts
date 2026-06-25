@@ -31,7 +31,18 @@ export type InteractionAction =
   | 'changeText'
   | 'openModal'
   | 'navigateToLink'
-  | 'runCustomScript';
+  | 'runCustomScript'
+  | 'createRecord'
+  | 'updateRecord'
+  | 'deleteRecord'
+  | 'loadCollection'
+  | 'runQuery'
+  | 'setVariable'
+  | 'incrementVariable'
+  | 'toggleVariable'
+  | 'showToast'
+  | 'setLoading'
+  | 'setError';
 
 export type InteractionCondition = {
   id: string;
@@ -101,6 +112,17 @@ export const INTERACTION_ACTION_LABELS: Record<InteractionAction, string> = {
   openModal: 'Abrir modal',
   navigateToLink: 'Navegar para link',
   runCustomScript: 'Script customizado',
+  createRecord: 'Criar registro',
+  updateRecord: 'Atualizar registro',
+  deleteRecord: 'Apagar registro',
+  loadCollection: 'Carregar colecao',
+  runQuery: 'Executar query',
+  setVariable: 'Definir variavel',
+  incrementVariable: 'Incrementar variavel',
+  toggleVariable: 'Alternar variavel',
+  showToast: 'Mostrar toast',
+  setLoading: 'Set loading',
+  setError: 'Set error',
 };
 
 export const INTERACTION_TRIGGERS = Object.keys(INTERACTION_TRIGGER_LABELS) as InteractionTrigger[];

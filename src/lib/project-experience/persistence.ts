@@ -1,7 +1,13 @@
 import type { InteractionDocument } from '@/lib/interaction-engine/types';
+import type { DataSchema } from '@/lib/data-model/types';
+import type { VariableDocument } from '@/lib/variables/types';
 import { createDefaultProjectSettings } from '@/lib/page-builder/defaults';
 import { walkPageNodes } from '@/lib/page-builder/tree';
+import {
+  migrateResponsiveSettings,
+} from '@/lib/page-builder/tree';
 import type {
+  ComponentDefinition,
   PageDocument,
   ProjectAsset,
   ProjectAssetKind,
@@ -40,7 +46,7 @@ const getNodeAssetKind = (type: string, prop: string): ProjectAssetKind => {
   return 'unknown';
 };
 
-export const collectProjectAssets = (page: PageDocument, scene: SceneDocument): ProjectAsset[] => {
+export const collectProjectAssets = (page: PageDocument, scene: SceneDocument, pages: PageDocument[] = [page]): ProjectAsset[] => {
   const assets: ProjectAsset[] = [];
   const seen = new Set<string>();
 
@@ -100,16 +106,18 @@ export const collectProjectAssets = (page: PageDocument, scene: SceneDocument): 
     });
   }
 
-  walkPageNodes(page.children, (node) => {
-    addAsset(getNodeAssetKind(node.type, 'src'), 'page', node.props.src, {
-      name: node.name,
-      pageNodeId: node.id,
+  for (const pageDoc of pages.length > 0 ? pages : [page]) {
+    walkPageNodes(pageDoc.children, (node) => {
+      addAsset(getNodeAssetKind(node.type, 'src'), 'page', node.props.src, {
+        name: node.name,
+        pageNodeId: node.id,
+      });
+      addAsset(getNodeAssetKind(node.type, 'poster'), 'page', node.props.poster, {
+        name: `${node.name} poster`,
+        pageNodeId: node.id,
+      });
     });
-    addAsset(getNodeAssetKind(node.type, 'poster'), 'page', node.props.poster, {
-      name: `${node.name} poster`,
-      pageNodeId: node.id,
-    });
-  });
+  }
 
   return assets;
 };
@@ -173,20 +181,30 @@ const normalizeRenderer = (renderer: unknown): ProjectRendererSettings => {
 
 export const createProjectExperienceFile = ({
   page,
+  pages,
+  activePageId,
   scene,
   interactions,
   settings,
   seo,
   renderer,
+  components,
+  dataSchema,
+  variables,
 }: {
   page: PageDocument;
+  pages?: PageDocument[];
+  activePageId?: string;
   scene: SceneDocument;
   interactions: InteractionDocument[];
   settings: ProjectSettings;
   seo?: Partial<ProjectSeoSettings>;
   renderer?: Partial<ProjectRendererSettings>;
+  components?: ComponentDefinition[];
+  dataSchema?: DataSchema;
+  variables?: VariableDocument;
 }): ProjectExperienceFile => {
-  const snapshot = createExperienceSnapshot({ page, scene, interactions, settings });
+  const snapshot = createExperienceSnapshot({ page, pages, activePageId, scene, interactions, settings, dataSchema, variables });
   const normalizedSeo = normalizeSeo(seo ?? {}, snapshot.name);
   const normalizedRenderer = normalizeRenderer(renderer ?? {});
 
@@ -195,9 +213,12 @@ export const createProjectExperienceFile = ({
     schemaVersion: PROJECT_EXPERIENCE_SCHEMA_VERSION,
     savedAt: new Date().toISOString(),
     editorVersion: PROJECT_EXPERIENCE_EDITOR_VERSION,
-    assets: collectProjectAssets(page, scene),
+    assets: collectProjectAssets(page, scene, snapshot.pages),
     seo: normalizedSeo,
     renderer: normalizedRenderer,
+    components,
+    dataSchema,
+    variables,
   };
 };
 
@@ -217,22 +238,46 @@ export const parseProjectExperienceFile = (content: string): ProjectExperienceFi
   const settings = normalizeSettings(parsed.settings);
   const name = stringProp(parsed, 'name') ?? settings.name;
   const page = parsed.page as PageDocument;
+  page.responsive = migrateResponsiveSettings(page.responsive);
+  const pages = Array.isArray(parsed.pages)
+    ? (parsed.pages as PageDocument[]).map((pageDoc, index) => ({
+        ...pageDoc,
+        path: pageDoc.path ?? (index === 0 ? '/' : `/${(pageDoc.name || `pagina-${index + 1}`).toLowerCase().replace(/[^a-z0-9]+/g, '-')}`),
+        title: pageDoc.title ?? pageDoc.name,
+        description: pageDoc.description ?? '',
+        protected: pageDoc.protected ?? false,
+        responsive: migrateResponsiveSettings(pageDoc.responsive),
+      }))
+    : [{
+        ...page,
+        path: page.path ?? '/',
+        title: page.title ?? page.name,
+        description: page.description ?? '',
+        protected: page.protected ?? false,
+      }];
+  const activePageId = stringProp(parsed, 'activePageId') ?? page.id;
+  const activePage = pages.find((pageDoc) => pageDoc.id === activePageId) ?? pages[0] ?? page;
   const scene = parsed.scene as SceneDocument;
   const interactions = parsed.interactions as InteractionDocument[];
 
   return {
     id: stringProp(parsed, 'id') ?? settings.id,
     name,
-    page,
+    page: activePage,
+    pages,
+    activePageId,
     scene,
     interactions,
     settings: { ...settings, name },
     schemaVersion: PROJECT_EXPERIENCE_SCHEMA_VERSION,
     savedAt: stringProp(parsed, 'savedAt') ?? new Date().toISOString(),
     editorVersion: stringProp(parsed, 'editorVersion') ?? PROJECT_EXPERIENCE_EDITOR_VERSION,
-    assets: Array.isArray(parsed.assets) ? (parsed.assets as ProjectAsset[]) : collectProjectAssets(page, scene),
+    assets: Array.isArray(parsed.assets) ? (parsed.assets as ProjectAsset[]) : collectProjectAssets(page, scene, pages),
     seo: normalizeSeo(parsed.seo, name),
     renderer: normalizeRenderer(parsed.renderer),
+    components: Array.isArray(parsed.components) ? (parsed.components as ComponentDefinition[]) : undefined,
+    dataSchema: isRecord(parsed.dataSchema) ? (parsed.dataSchema as DataSchema) : undefined,
+    variables: isRecord(parsed.variables) ? (parsed.variables as VariableDocument) : undefined,
   };
 };
 

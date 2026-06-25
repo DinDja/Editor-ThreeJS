@@ -16,10 +16,10 @@ import { useExperienceStore } from '@/store/experienceStore';
 import { useMaterialStore } from '@/store/materialStore';
 import { useSceneStore } from '@/store/sceneStore';
 
-const deviceWidths = {
-  desktop: '100%',
-  tablet: '820px',
-  mobile: '390px',
+const getBreakpointWidth = (breakpoints: Array<{ name: string; width: number }>, name: string): string => {
+  const bp = breakpoints.find((b) => b.name === name);
+  if (!bp || name === 'base') return '100%';
+  return `${bp.width}px`;
 };
 
 type ExtendedStats = {
@@ -33,10 +33,11 @@ type ExtendedStats = {
 export default function PreviewWorkspace() {
   const page = useExperienceStore((state) => state.page);
   const interactions = useExperienceStore((state) => state.interactions);
-  const previewDevice = useExperienceStore((state) => state.previewDevice);
+  const activeBreakpoint = useExperienceStore((state) => state.activeBreakpoint);
   const objects = useSceneStore((state) => state.objects);
   const materials = useMaterialStore((state) => state.materials);
   const rendererStats = usePreviewStatsStore((state) => state.stats);
+  const breakpoints = page.responsive;
 
   const baseMetrics = useMemo(
     () => computePreviewRuntimeMetrics({ page, objects, materials, settings: useExperienceStore.getState().settings }),
@@ -117,9 +118,9 @@ export default function PreviewWorkspace() {
       </div>
       <div
         className="mx-auto min-h-full overflow-hidden rounded-md border border-neutral-800 bg-[#101214] shadow-2xl transition-[width]"
-        style={{ width: deviceWidths[previewDevice], maxWidth: '100%' }}
+        style={{ width: getBreakpointWidth(breakpoints, activeBreakpoint), maxWidth: '100%' }}
       >
-        <PageExperience page={page} interactions={interactions} mode="preview" device={previewDevice} />
+        <PageExperience page={page} interactions={interactions} mode="preview" activeBreakpoint={activeBreakpoint} />
       </div>
       {baseMetrics.warnings.length > 0 && (
         <div className="mx-auto mt-3 max-w-3xl rounded-md border border-neutral-800 bg-neutral-950/60 p-3 text-[11px] text-neutral-400">

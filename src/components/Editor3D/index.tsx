@@ -4,6 +4,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import * as THREE from 'three';
 import { Boxes, Clock, PanelRight } from 'lucide-react';
 import Canvas3D from './Canvas3D';
+import DataModelPanel from './DataModel/DataModelPanel';
 import EditorModeBar from './EditorModeBar';
 import EditorShortcuts from './EditorShortcuts';
 import ExperienceProperties from './ExperienceProperties';
@@ -166,6 +167,7 @@ function ExperienceWorkspace() {
   const activeMode = useExperienceStore((state) => state.activeMode);
 
   if (activeMode === 'page') return <PageBuilderWorkspace />;
+  if (activeMode === 'data') return <DataModelPanel />;
   if (activeMode === 'interactions') return <InteractionsWorkspace />;
   if (activeMode === 'preview') return <PreviewWorkspace />;
   if (activeMode === 'export') return <ExportWorkspace />;
@@ -180,6 +182,7 @@ function ExperienceRightPanel() {
 export default function Editor3D() {
   const sceneRootRef = useRef<THREE.Group | null>(null);
   const [tutorialOpen, setTutorialOpen] = useState(false);
+  const [tutorialScope, setTutorialScope] = useState<'scene' | 'page-system'>('scene');
   useProjectAutosave();
   const activeMode = useExperienceStore((state) => state.activeMode);
   const leftPanelCollapsed = useEditorStore((state) => state.leftPanelCollapsed);
@@ -219,9 +222,20 @@ export default function Editor3D() {
       <EditorShortcuts />
       <EditorModeBar />
       {activeMode === 'scene' ? (
-        <Toolbar sceneRootRef={sceneRootRef} onOpenTutorial={() => setTutorialOpen(true)} />
+        <Toolbar
+          sceneRootRef={sceneRootRef}
+          onOpenTutorial={() => {
+            setTutorialScope('scene');
+            setTutorialOpen(true);
+          }}
+        />
       ) : (
-        <ExperienceToolbar />
+        <ExperienceToolbar
+          onOpenTutorial={() => {
+            setTutorialScope('page-system');
+            setTutorialOpen(true);
+          }}
+        />
       )}
 
       {activeMode === 'scene' ? (
@@ -276,41 +290,49 @@ export default function Editor3D() {
         </section>
       ) : (
         <section className="relative min-h-0 flex-1 overflow-hidden">
-          <div
-            className="hidden h-full min-h-0 lg:grid"
-            style={{ gridTemplateColumns: `${leftCol} minmax(0, 1fr) ${rightCol}` }}
-          >
-            <div className="relative min-h-0 overflow-hidden">
-              <ProjectTree />
-              {!leftPanelCollapsed && (
-                <ResizeHandle position="right" onDrag={handleLeftResize} />
-              )}
-            </div>
-            <div className="min-h-0 overflow-hidden">
+          {activeMode === 'data' ? (
+            <div className="h-full min-h-0 overflow-hidden">
               <ExperienceWorkspace />
             </div>
-            <div className="relative min-h-0 overflow-hidden">
-              <ExperienceRightPanel />
-              {!rightPanelCollapsed && (
-                <ResizeHandle position="left" onDrag={handleRightResize} />
-              )}
-            </div>
-          </div>
+          ) : (
+            <>
+              <div
+                className="hidden h-full min-h-0 lg:grid"
+                style={{ gridTemplateColumns: `${leftCol} minmax(0, 1fr) ${rightCol}` }}
+              >
+                <div data-tutorial="properties-panel" className="relative min-h-0 overflow-hidden">
+                  <ProjectTree />
+                  {!leftPanelCollapsed && (
+                    <ResizeHandle position="right" onDrag={handleLeftResize} />
+                  )}
+                </div>
+                <div className="min-h-0 overflow-hidden">
+                  <ExperienceWorkspace />
+                </div>
+                <div className="relative min-h-0 overflow-hidden">
+                  <ExperienceRightPanel />
+                  {!rightPanelCollapsed && (
+                    <ResizeHandle position="left" onDrag={handleRightResize} />
+                  )}
+                </div>
+              </div>
 
-          <div className="h-full min-h-0 overflow-hidden lg:hidden">
-            <ExperienceWorkspace />
-          </div>
-          {activeMobilePanel && (
-            <div className="absolute bottom-0 left-0 right-0 z-40 max-h-[45dvh] overflow-auto overscroll-contain border-t border-neutral-800 bg-[#151719] lg:hidden">
-              {activeMobilePanel === 'scene' && <ProjectTree />}
-              {activeMobilePanel === 'properties' && <ExperienceRightPanel />}
-            </div>
+              <div className="h-full min-h-0 overflow-hidden lg:hidden">
+                <ExperienceWorkspace />
+              </div>
+              {activeMobilePanel && (
+                <div className="absolute bottom-0 left-0 right-0 z-40 max-h-[45dvh] overflow-auto overscroll-contain border-t border-neutral-800 bg-[#151719] lg:hidden">
+                  {activeMobilePanel === 'scene' && <ProjectTree />}
+                  {activeMobilePanel === 'properties' && <ExperienceRightPanel />}
+                </div>
+              )}
+            </>
           )}
         </section>
       )}
 
       <MobileTabBar />
-      <TutorialSpotlight open={tutorialOpen} onClose={() => setTutorialOpen(false)} />
+      <TutorialSpotlight open={tutorialOpen} scope={tutorialScope} onClose={() => setTutorialOpen(false)} />
       <ImageTo3DModal />
     </main>
   );

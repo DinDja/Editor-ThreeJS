@@ -1,9 +1,12 @@
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
+import type { EditorMode } from '@/lib/page-builder/types';
+import { useExperienceStore } from '@/store/experienceStore';
 
 type TutorialSpotlightProps = {
   open: boolean;
+  scope?: 'scene' | 'page-system';
   onClose: () => void;
 };
 
@@ -13,6 +16,7 @@ type TutorialStep = {
   title: string;
   description: string;
   details: string[];
+  mode?: EditorMode;
 };
 
 type Rect = {
@@ -22,7 +26,7 @@ type Rect = {
   height: number;
 };
 
-const steps: TutorialStep[] = [
+const sceneSteps: TutorialStep[] = [
   {
     id: 'tools-group',
     selector: '[data-tutorial="tools-group"]',
@@ -226,12 +230,257 @@ const steps: TutorialStep[] = [
   },
 ];
 
+const pageSystemSteps: TutorialStep[] = [
+  {
+    id: 'web-modes',
+    selector: '[data-tutorial="mode-bar"]',
+    mode: 'page',
+    title: 'Modos do Sistema Web',
+    description: 'A barra superior separa a produção em Cena, Página, Dados, Interações, Preview e Exportar.',
+    details: [
+      'Página monta a interface visual do site.',
+      'Dados define coleções, variáveis e queries usadas pelos componentes.',
+      'Interações conecta HTML, cena 3D, luzes, câmera e estado de dados.',
+    ],
+  },
+  {
+    id: 'page-mode',
+    selector: '[data-tutorial="mode-page"]',
+    mode: 'page',
+    title: 'Modo Página',
+    description: 'Aqui você edita o site como documento visual, usando elementos web e a cena 3D atual.',
+    details: [
+      'A página ativa é a rota que está sendo editada no canvas.',
+      'Toda edição de layout, blocos e estilos fica gravada nessa página.',
+      'Trocar de página muda o documento ativo sem apagar as outras rotas.',
+    ],
+  },
+  {
+    id: 'experience-toolbar',
+    selector: '[data-tutorial="experience-toolbar"]',
+    mode: 'page',
+    title: 'Toolbar do Construtor',
+    description: 'Reúne templates, blocos, inserção de elementos, salvar/carregar e histórico.',
+    details: [
+      'Use Templates para aplicar uma página completa.',
+      'Use Blocos para inserir seções prontas sem substituir a página inteira.',
+      'Salvar gera `.web3d.json` com páginas, cena, dados, variáveis e interações.',
+    ],
+  },
+  {
+    id: 'insert-menu',
+    selector: '[data-tutorial="page-insert-menu"]',
+    mode: 'page',
+    title: 'Inserir Elementos',
+    description: 'O menu Inserir adiciona layout, mídia, 3D, formulários e componentes conectados a dados.',
+    details: [
+      'O elemento entra dentro do item selecionado quando ele aceita filhos.',
+      'Componentes como Data Table, Data Form e Data Stat usam o schema do modo Dados.',
+      'Scene Canvas coloca a cena 3D atual dentro da página.',
+    ],
+  },
+  {
+    id: 'page-navigation',
+    selector: '[data-tutorial="page-navigation"]',
+    mode: 'page',
+    title: 'Páginas e Rotas',
+    description: 'Este painel controla múltiplas páginas do projeto e qual rota está ativa.',
+    details: [
+      'Crie, duplique, remova e selecione páginas sem perder a cena 3D global.',
+      'Cada página tem `path`, nome, título SEO e flag de rota protegida.',
+      'No Preview, links para rotas cadastradas trocam a página ativa.',
+    ],
+  },
+  {
+    id: 'route-settings',
+    selector: '[data-tutorial="page-route-settings"]',
+    mode: 'page',
+    title: 'Metadados da Rota',
+    description: 'Nome, rota e título SEO ficam aqui porque impactam navegação e exportação.',
+    details: [
+      'Use rotas curtas como `/`, `/sobre` e `/produto`.',
+      'O título SEO descreve a página para export e documentação do projeto.',
+      'A flag protegida prepara a página para autenticação em fases futuras.',
+    ],
+  },
+  {
+    id: 'project-tree',
+    selector: '[data-tutorial="page-tree-structure"]',
+    mode: 'page',
+    title: 'Árvore da Página',
+    description: 'Mostra a hierarquia do documento ativo: sections, containers, textos, botões, dados e canvas 3D.',
+    details: [
+      'Arraste elementos para reordenar ou reparentar.',
+      'Use as abas para alternar entre estrutura, z-index, componentes e cena.',
+      'A seleção aqui sincroniza com o canvas e o painel de propriedades.',
+    ],
+  },
+  {
+    id: 'page-canvas',
+    selector: '[data-tutorial="page-canvas"]',
+    mode: 'page',
+    title: 'Canvas da Página',
+    description: 'É a área visual onde você seleciona, edita texto inline, move e redimensiona elementos.',
+    details: [
+      'Clique em um elemento para selecioná-lo.',
+      'Alt+Click seleciona o pai quando estiver dentro de containers.',
+      'Setas movem o elemento selecionado; Shift aumenta o passo.',
+    ],
+  },
+  {
+    id: 'page-topbar',
+    selector: '[data-tutorial="page-topbar"]',
+    mode: 'page',
+    title: 'Barra Contextual',
+    description: 'Mostra o elemento ativo e ações rápidas como duplicar, subir, descer e remover.',
+    details: [
+      'Use Duplicar para repetir padrões de layout.',
+      'Subir/Descer reorganiza o elemento entre irmãos.',
+      'A leitura de tamanho ajuda a ajustar dimensões visualmente.',
+    ],
+  },
+  {
+    id: 'device-preview',
+    selector: '[data-tutorial="page-device-preview"]',
+    mode: 'page',
+    title: 'Larguras de Edição',
+    description: 'Simula canvas fluido, desktop, tablet e mobile durante a edição.',
+    details: [
+      'Use esse controle para validar responsividade enquanto constrói.',
+      'Os breakpoints do painel de propriedades podem ajustar estilos por tamanho.',
+      'Preview faz a checagem final com scroll real.',
+    ],
+  },
+  {
+    id: 'properties-panel',
+    selector: '[data-tutorial="properties-panel"]',
+    mode: 'page',
+    title: 'Propriedades do Elemento',
+    description: 'Edita conteúdo, layout, estilos, responsividade, pseudoestados e bindings.',
+    details: [
+      'É onde ficam ajustes finos que não cabem no canvas.',
+      'Bindings como `{{vars.statusMessage}}` e `{{record.name}}` conectam UI a dados.',
+      'Estados hover/active/focus e breakpoints são parte da liberdade de edição.',
+    ],
+  },
+  {
+    id: 'data-mode',
+    selector: '[data-tutorial="mode-data"]',
+    mode: 'data',
+    title: 'Modo Dados',
+    description: 'Define a camada de dados que alimenta tabelas, forms, listas, gráficos e interações.',
+    details: [
+      'Pense nele como o schema interno do site/aplicação.',
+      'Coleções viram fontes para componentes visuais.',
+      'Variáveis guardam estado runtime simples como contador, loading e mensagens.',
+    ],
+  },
+  {
+    id: 'data-panel',
+    selector: '[data-tutorial="data-model-panel"]',
+    mode: 'data',
+    title: 'Painel de Dados',
+    description: 'Centraliza schema, coleções, queries, variáveis e configurações de API/ORM.',
+    details: [
+      'Tudo é salvo no projeto `.web3d.json`.',
+      'Exports já incluem JSON de dados, variáveis e arquivos de API/schema quando configurados.',
+      'Persistência real em banco ainda depende da próxima integração.',
+    ],
+  },
+  {
+    id: 'data-sidebar',
+    selector: '[data-tutorial="data-sidebar"]',
+    mode: 'data',
+    title: 'Coleções, Variáveis e Queries',
+    description: 'A lateral do modo Dados alterna entre entidades e estado runtime.',
+    details: [
+      'Coleções representam tabelas/recursos.',
+      'Variáveis representam estado global da experiência.',
+      'Queries filtram, ordenam e limitam registros para componentes.',
+    ],
+  },
+  {
+    id: 'collection-editor',
+    selector: '[data-tutorial="data-collection-editor"]',
+    mode: 'data',
+    title: 'Editor de Coleção',
+    description: 'Aqui você define campos, tipos, obrigatoriedade, índices e API da coleção.',
+    details: [
+      'Campos `system` ajudam em ids e timestamps.',
+      'Tipos como enum, relation, email e url orientam forms e export.',
+      'A configuração de API prepara endpoints gerados na exportação.',
+    ],
+  },
+  {
+    id: 'field-editor',
+    selector: '[data-tutorial="data-field-editor"]',
+    mode: 'data',
+    title: 'Campos e Tipos',
+    description: 'Cada campo controla como os componentes de dados exibem e editam informações.',
+    details: [
+      'Data Form gera inputs baseado nos campos da coleção.',
+      'Data Table e Data List usam labels e nomes dos campos.',
+      'Relações e enums deixam o schema pronto para evoluir para backend real.',
+    ],
+  },
+  {
+    id: 'query-builder',
+    selector: '[data-tutorial="data-query-builder"]',
+    mode: 'data',
+    title: 'Query Builder',
+    description: 'Queries salvas filtram, ordenam e limitam registros sem escrever código.',
+    details: [
+      'Componentes de dados podem apontar para uma query específica.',
+      'Interações podem rodar queries e salvar o resultado em variável.',
+      'Isso cria a ponte entre página visual e lógica de aplicação.',
+    ],
+  },
+  {
+    id: 'interactions-mode',
+    selector: '[data-tutorial="mode-interactions"]',
+    mode: 'interactions',
+    title: 'Modo Interações',
+    description: 'Conecta eventos da página a objetos 3D, luzes, câmera, HTML, dados e variáveis.',
+    details: [
+      'Escolha trigger, origem, alvo, ação e parâmetros.',
+      'Ações de dados podem criar registros, alterar variáveis e exibir toast.',
+      'Ações 3D podem mover, rotacionar, mudar material, opacidade e luzes.',
+    ],
+  },
+  {
+    id: 'interactions-workspace',
+    selector: '[data-tutorial="interactions-workspace"]',
+    mode: 'interactions',
+    title: 'Fluxo de Interações',
+    description: 'Esta área mostra a lógica visual que transforma uma página estática em experiência interativa.',
+    details: [
+      'Use nomes claros para rastrear comportamentos complexos.',
+      'Teste cada interação no Preview antes de exportar.',
+      'O debug visual e condições avançadas ainda estão no roadmap.',
+    ],
+  },
+  {
+    id: 'preview-mode',
+    selector: '[data-tutorial="mode-preview"]',
+    mode: 'preview',
+    title: 'Preview',
+    description: 'Executa a experiência com scroll real, eventos, interações, dados runtime e métricas.',
+    details: [
+      'Use para testar navegação entre páginas e rotas.',
+      'Observe FPS, draw calls, texturas, assets e memória.',
+      'É a última checagem antes da exportação.',
+    ],
+  },
+];
+
 const clamp = (value: number, min: number, max: number) => Math.max(min, Math.min(max, value));
 
-export default function TutorialSpotlight({ open, onClose }: TutorialSpotlightProps) {
+export default function TutorialSpotlight({ open, scope = 'scene', onClose }: TutorialSpotlightProps) {
   const [stepIndex, setStepIndex] = useState(0);
   const [targetRect, setTargetRect] = useState<Rect | null>(null);
+  const setActiveMode = useExperienceStore((state) => state.setActiveMode);
 
+  const steps = scope === 'page-system' ? pageSystemSteps : sceneSteps;
   const currentStep = steps[stepIndex];
 
   useEffect(() => {
@@ -239,7 +488,12 @@ export default function TutorialSpotlight({ open, onClose }: TutorialSpotlightPr
 
     const frameId = window.requestAnimationFrame(() => setStepIndex(0));
     return () => window.cancelAnimationFrame(frameId);
-  }, [open]);
+  }, [open, scope]);
+
+  useEffect(() => {
+    if (!open || !currentStep?.mode) return;
+    setActiveMode(currentStep.mode);
+  }, [currentStep?.mode, open, setActiveMode]);
 
   useEffect(() => {
     if (!open) return;
@@ -261,14 +515,15 @@ export default function TutorialSpotlight({ open, onClose }: TutorialSpotlightPr
       element.scrollIntoView({ behavior: 'smooth', block: 'center', inline: 'center' });
     };
 
-    updateRect();
+    const timeoutId = window.setTimeout(updateRect, currentStep.mode ? 120 : 0);
     window.addEventListener('resize', updateRect);
     window.addEventListener('scroll', updateRect, true);
     return () => {
+      window.clearTimeout(timeoutId);
       window.removeEventListener('resize', updateRect);
       window.removeEventListener('scroll', updateRect, true);
     };
-  }, [open, currentStep.selector]);
+  }, [open, currentStep.mode, currentStep.selector]);
 
   const cardStyle = useMemo(() => {
     const viewportWidth = typeof window !== 'undefined' ? window.innerWidth : 1280;

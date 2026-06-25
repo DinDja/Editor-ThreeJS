@@ -4,10 +4,12 @@ import { useEffect, useRef } from 'react';
 import { createProjectExperienceFile } from '@/lib/project-experience/persistence';
 import { autosaveProject } from '@/lib/project-experience/projectHistory';
 import { createSceneDocument } from '@/lib/scene-engine/sceneDocument';
+import { useDataModelStore } from '@/store/dataModelStore';
 import { useExperienceStore } from '@/store/experienceStore';
 import { useMaterialStore } from '@/store/materialStore';
 import { useSceneStore } from '@/store/sceneStore';
 import { useTimelineStore } from '@/store/timelineStore';
+import { useVariableStore } from '@/store/variableStore';
 
 const AUTOSAVE_DEBOUNCE_MS = 4000;
 
@@ -27,9 +29,14 @@ export function useProjectAutosave() {
       const experience = useExperienceStore.getState();
       const project = createProjectExperienceFile({
         page: experience.page,
+        pages: experience.pages,
+        activePageId: experience.activePageId,
         scene,
         interactions: experience.interactions,
         settings: experience.settings,
+        components: experience.components,
+        dataSchema: useDataModelStore.getState().schema,
+        variables: useVariableStore.getState().document,
       });
       const serialized = JSON.stringify(project);
       if (serialized === lastSerializedRef.current) return;
@@ -47,6 +54,8 @@ export function useProjectAutosave() {
       useMaterialStore.subscribe(schedule),
       useTimelineStore.subscribe(schedule),
       useExperienceStore.subscribe(schedule),
+      useDataModelStore.subscribe(schedule),
+      useVariableStore.subscribe(schedule),
     ];
 
     return () => {
