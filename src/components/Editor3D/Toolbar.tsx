@@ -11,6 +11,7 @@ import {
   Check,
   ChevronDown,
   Download,
+  FileImage,
   Grid3X3,
   HelpCircle,
   ImagePlus,
@@ -48,7 +49,7 @@ import { usePhysicsStore } from '@/store/physicsStore';
 import { useSceneStore } from '@/store/sceneStore';
 import { useTimelineStore } from '@/store/timelineStore';
 import { useImageTo3DStore } from '@/store/imageTo3DStore';
-import type { ActiveTool, EffectKind, LightConfig, ObjectSelectionMode, PrimitiveKind, ViewportDisplayMode
+import type { ActiveTool, EffectKind, LightConfig, ObjectSelectionMode, PrimitiveKind, SvgConfig, ViewportDisplayMode
 } from '@/store/types';
 import { DEFAULT_LIGHT_CONFIG } from '@/store/types';
 import { EFFECT_KINDS, EFFECT_LABELS, EFFECT_PRESETS } from '@/lib/effects';
@@ -156,6 +157,7 @@ const round3 = (value: number) => Number(value.toFixed(3));
 export default function Toolbar({ sceneRootRef, onOpenTutorial }: ToolbarProps) {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const refImageInputRef = useRef<HTMLInputElement>(null);
+  const svgInputRef = useRef<HTMLInputElement>(null);
   const toolbarRef = useRef<HTMLElement>(null);
   const toolbarDragRef = useRef({
     pointerId: -1,
@@ -307,6 +309,38 @@ export default function Toolbar({ sceneRootRef, onOpenTutorial }: ToolbarProps) 
     const url = URL.createObjectURL(file);
     const name = file.name.replace(/\.[^.]+$/, '').replace(/[_-]+/g, ' ');
     addReferenceImage(url, name);
+  };
+
+  const handleImportSvgOrImage = (file: File | undefined) => {
+    if (!file) return;
+    const isSvg = file.name.toLowerCase().endsWith('.svg');
+    const isImage = /\.(png|jpe?g|webp|gif|bmp)$/i.test(file.name);
+    if (!isSvg && !isImage) return;
+
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      const dataUrl = e.target?.result as string;
+      if (!dataUrl) return;
+      pushSnapshot();
+      const name = file.name.replace(/\.[^.]+$/, '').replace(/[_-]+/g, ' ');
+      const object = addObject({
+        name,
+        kind: 'svg',
+        source: dataUrl,
+        sourceType: 'upload',
+        svgConfig: {
+        depth: 0.3,
+        bevelEnabled: false,
+        bevelThickness: 0.05,
+        bevelSize: 0.05,
+      },
+        position: [0, 0.5, 0],
+      });
+      createMaterialForObject(object.uuid, object.materialId, `Material ${name}`);
+      setSelectedObject(object.uuid);
+      setActiveTool('translate');
+    };
+    reader.readAsDataURL(file);
   };
 
   const handleAddText = () => {
@@ -914,6 +948,13 @@ export default function Toolbar({ sceneRootRef, onOpenTutorial }: ToolbarProps) 
         className="sr-only"
         onChange={(e) => { handleReferenceFile(e.target.files?.[0]); e.currentTarget.value = ''; }}
       />
+      <input
+        ref={svgInputRef}
+        type="file"
+        accept="image/*,.svg"
+        className="sr-only"
+        onChange={(e) => { handleImportSvgOrImage(e.target.files?.[0]); e.currentTarget.value = ''; }}
+      />
 
       <button type="button" title="Importar modelo 3D" aria-label="Importar" onClick={() => fileInputRef.current?.click()} disabled={importingModel} className={btnAction}>
         <Upload size={12} />
@@ -926,6 +967,10 @@ export default function Toolbar({ sceneRootRef, onOpenTutorial }: ToolbarProps) 
       <button type="button" title="Adicionar imagem de referencia" aria-label="Referencia" onClick={() => refImageInputRef.current?.click()} className={btnAction}>
         <ImagePlus size={12} />
         <span>Ref.</span>
+      </button>
+      <button type="button" title="Importar imagem/SVG e extrudar em 3D" aria-label="Extrudar Imagem" onClick={() => svgInputRef.current?.click()} className={btnAction}>
+        <FileImage size={12} />
+        <span>Img 3D</span>
       </button>
       <button type="button" title="Exportar cena como GLB" aria-label="Exportar" onClick={handleExport} disabled={exporting} className={btnAction}>
         <Download size={12} />

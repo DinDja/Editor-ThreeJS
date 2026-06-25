@@ -2,7 +2,7 @@
 
 /* eslint-disable react-hooks/immutability, react-hooks/purity */
 
-import { Suspense, lazy, useEffect, useMemo, useRef } from 'react';
+import { Suspense, lazy, useEffect, useMemo, useRef, useState } from 'react';
 import { useFrame } from '@react-three/fiber';
 import * as THREE from 'three';
 import type { EffectConfig, EffectKind } from '@/store/types';
@@ -14,9 +14,10 @@ export const EFFECT_PRESETS: Record<EffectKind, EffectConfig> = {
   sparkle: { kind: 'sparkle', color: '#ffe08a', intensity: 0.95, size: 0.08, count: 120 },
   lightGlow: { kind: 'lightGlow', color: '#66c7ff', intensity: 1.1, size: 0.72, count: 1 },
   fluid: { kind: 'fluid', color: '#4a90d9', intensity: 1, size: 5, count: 1 },
+  imageParticles: { kind: 'imageParticles', color: '#ffffff', intensity: 1, size: 0.1, count: 5000, imageUrl: '', pixelStep: 2, depthScale: 0.4 },
 };
 
-export const EFFECT_KINDS: EffectKind[] = ['fireworks', 'fire', 'smoke', 'sparkle', 'lightGlow', 'fluid'];
+export const EFFECT_KINDS: EffectKind[] = ['fireworks', 'fire', 'smoke', 'sparkle', 'lightGlow', 'fluid', 'imageParticles'];
 
 export const EFFECT_LABELS: Record<EffectKind, string> = {
   fireworks: 'Fogos',
@@ -25,6 +26,7 @@ export const EFFECT_LABELS: Record<EffectKind, string> = {
   sparkle: 'Brilho',
   lightGlow: 'Luz',
   fluid: 'Superficie Liquida',
+  imageParticles: 'Img→Particulas',
 };
 
 type ParticleBuffers = {
@@ -474,6 +476,124 @@ function FluidEffect({ config }: { config: EffectConfig }) {
   );
 }
 
+function ImageParticlesEffect({ config }: { config: EffectConfig }) {
+  const count = Math.max(100, Math.floor(config.count));
+  const pointsRef = useRef<THREE.Points>(null);
+  const baseColor = useMemo(() => new THREE.Color(config.color), [config.color]);
+  const [positionsData, setPositionsData] = useState<Float32Array | null>(null);
+  const [loaded, setLoaded] = useState(false);
+  const imageUrl = config.imageUrl || '';
+  const pixelStep = config.pixelStep ?? 2;
+  const depthScale = config.depthScale ?? 0.4;
+
+  useEffect(() => {
+    if (!imageUrl || typeof document === 'undefined') return;
+    setLoaded(false);
+
+    const img = new Image();
+    img.crossOrigin = 'anonymous';
+    img.onload = () => {
+      const canvas = document.createElement('canvas');
+      const maxDim = 600;
+      let w = img.width;
+      let h = img.height;
+      if (w > maxDim || h > maxDim) {
+        const ratio = maxDim / Math.max(w, h);
+        w = Math.floor(w * ratio);
+        h = Math.floor(h * ratio);
+      }
+      canvas.width = w;
+      canvas.height = h;
+      const ctx = canvas.getContext('2d');
+      if (!ctx) return;
+      ctx.drawImage(img, 0, 0, w, h);
+
+      const imgData = ctx.getImageData(0, 0, w, h).data;
+      const validPixels: [number, number][] = [];
+      const step = Math.max(1, Math.floor(pixelStep));
+
+      for (let y = 0; y < h; y += step) {
+        for (let x = 0; x < w; x += step) {
+          const idx = (y * w + x) * 4;
+          if (imgData[idx + 3] > 20 && (imgData[idx] + imgData[idx + 1] + imgData[idx + 2]) / 3 < 245) {
+            validPixels.push([x, y]);
+          }
+        }
+      }
+
+      if (validPixels.length === 0) {
+        for (let y = 0; y < h; y += step) {
+          for (let x = 0; x < w; x += step) {
+            if (imgData[(y * w + x) * 4 + 3] > 10) {
+              validPixels.push([x, y]);
+            }
+          }
+        }
+      }
+
+      const pos = new Float32Array(count * 3);
+      const poolLen = validPixels.length || 1;
+      for (let i = 0; i < count; i++) {
+        const [px, py] = validPixels[Math.floor(Math.random() * poolLen)];
+        pos[i * 3] = (px - w / 2) * 0.012;
+        pos[i * 3 + 1] = -(py - h / 2) * 0.012;
+        pos[i * 3 + 2] = (Math.random() - 0.5) * depthScale;
+      }
+
+      setPositionsData(pos);
+      setLoaded(true);
+    };
+    img.onerror = () => setLoaded(false);
+    img.src = imageUrl;
+  }, [imageUrl, count, pixelStep, depthScale]);
+
+  const buffers = useMemo(() => {
+    if (!positionsData) return null;
+    const next = createParticleBuffers(count);
+    for (let i = 0; i < count; i++) {
+      next.positions[i * 3] = positionsData[i * 3];
+      next.positions[i * 3 + 1] = positionsData[i * 3 + 1];
+      next.positions[i * 3 + 2] = positionsData[i * 3 + 2];
+      next.sizes[i] = config.size * randomRange(60, 120);
+      next.lifetimes[i] = randomRange(1.2, 2.4);
+      next.seeds[i] = Math.random() * Math.PI * 2;
+      writeColor(next.colors, i, baseColor, randomRange(0.7, 1.3));
+    }
+    return next;
+  }, [positionsData, config.size, baseColor, count]);
+
+  useFrame((state) => {
+    if (!buffers) return;
+    for (let i = 0; i < count; i++) {
+      const pulse = Math.max(0, Math.sin(state.clock.elapsedTime * buffers.lifetimes[i] + buffers.seeds[i]));
+      buffers.alphas[i] = 0.5 + pulse * 0.35 * config.intensity;
+      buffers.sizes[i] = config.size * (45 + pulse * 55);
+    }
+    markAttributes(pointsRef.current, ['aSize', 'aAlpha']);
+  });
+
+  if (!imageUrl || !loaded || !buffers) return null;
+
+  return (
+    <points ref={pointsRef}>
+      <bufferGeometry>
+        <bufferAttribute attach="attributes-position" args={[buffers.positions, 3]} />
+        <bufferAttribute attach="attributes-color" args={[buffers.colors, 3]} />
+        <bufferAttribute attach="attributes-aSize" args={[buffers.sizes, 1]} />
+        <bufferAttribute attach="attributes-aAlpha" args={[buffers.alphas, 1]} />
+      </bufferGeometry>
+      <shaderMaterial
+        vertexColors
+        transparent
+        depthWrite={false}
+        blending={THREE.NormalBlending}
+        vertexShader={PARTICLE_VERTEX_SHADER}
+        fragmentShader={PARTICLE_FRAGMENT_SHADER}
+      />
+    </points>
+  );
+}
+
 export function EffectAsset({ effect }: { effect: EffectConfig }) {
   switch (effect.kind) {
     case 'fireworks':
@@ -488,6 +608,8 @@ export function EffectAsset({ effect }: { effect: EffectConfig }) {
       return <LightGlowEffect config={effect} />;
     case 'fluid':
       return <FluidEffect config={effect} />;
+    case 'imageParticles':
+      return <ImageParticlesEffect config={effect} />;
     default:
       return null;
   }

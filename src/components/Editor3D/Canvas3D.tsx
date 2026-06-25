@@ -22,6 +22,7 @@ import { SVGLoader } from 'three/examples/jsm/loaders/SVGLoader.js';
 import { FontLoader } from 'three/examples/jsm/loaders/FontLoader.js';
 import { TextGeometry } from 'three/examples/jsm/geometries/TextGeometry.js';
 import { EffectAsset } from '@/lib/effects';
+import { imageToExtrudedMesh } from '@/lib/imageTo3DMesh';
 import { BehaviorEngine } from '@/lib/behaviors';
 import { ScriptEngine } from '@/lib/scriptEngine';
 import PhysicsRuntime, { PhysicsColliderDebug } from './PhysicsRuntime';
@@ -961,7 +962,8 @@ function ObjectNode({
     return () => registerObjectRef(object.uuid, null);
   }, [object.uuid, registerObjectRef]);
 
-  if (!layerVisible || !material) return null;
+  if (!layerVisible) return null;
+  if (!material && object.kind !== 'svg') return null;
   if (object.kind === 'model' && !object.source) return null;
 
   return (
@@ -1233,6 +1235,7 @@ function ReferenceImagePlane({ refImg }: { refImg: ReferenceImage }) {
 
 function Svg3DAsset({ object }: { object: SceneObject; material?: EditorMaterial }) {
   const [group, setGroup] = useState<THREE.Group | null>(null);
+  const [status, setStatus] = useState<'loading' | 'ready' | 'error'>('loading');
   const objectSource = object.source;
   const depth = object.svgConfig?.depth ?? 0.3;
   const bevelEnabled = object.svgConfig?.bevelEnabled ?? false;
@@ -1240,64 +1243,132 @@ function Svg3DAsset({ object }: { object: SceneObject; material?: EditorMaterial
   const bevelSize = object.svgConfig?.bevelSize ?? 0.05;
 
   useEffect(() => {
-    if (!objectSource) return;
+    if (!objectSource) {
+      setStatus('error');
+      return;
+    }
 
     let cancelled = false;
-    const loader = new SVGLoader();
+    setStatus('loading');
+    setGroup(null);
 
-    const svgTextPromise = objectSource.startsWith('data:')
-      ? Promise.resolve().then(() => {
-          const comma = objectSource.indexOf(',');
-          const raw = objectSource.slice(comma + 1);
-          if (objectSource.includes(';base64')) return decodeURIComponent(escape(atob(raw)));
-          return decodeURIComponent(raw);
-        })
-      : fetch(objectSource).then((res) => res.text());
+    const s = objectSource.trimStart();
+    const isSvgSource =
+      s.startsWith('<svg') || s.startsWith('<?xml') ||
+      objectSource.startsWith('data:image/svg') ||
+      /\.svg(\?|$)/i.test(objectSource);
+    const isRasterSource =
+      (objectSource.startsWith('data:image/') && !objectSource.startsWith('data:image/svg')) ||
+      /\.(png|jpe?g|webp|gif|bmp)(\?|$)/i.test(objectSource);
 
-    svgTextPromise
-      .then((svgText) => {
-        if (cancelled) return null;
-        const data = loader.parse(svgText);
-        if (data.paths.length === 0) {
-          console.warn('SVGLoader: no paths found in SVG');
-          return null;
-        }
+    if (isSvgSource && !isRasterSource) {
+      const loader = new SVGLoader();
 
-        const g = new THREE.Group();
-        let meshCount = 0;
+      const svgTextPromise = objectSource.startsWith('data:')
+        ? Promise.resolve().then(() => {
+            const comma = objectSource.indexOf(',');
+            const raw = objectSource.slice(comma + 1);
+            if (objectSource.includes(';base64')) return decodeURIComponent(escape(atob(raw)));
+            return decodeURIComponent(raw);
+          })
+        : fetch(objectSource).then((res) => res.text());
 
-        for (const path of data.paths) {
-          const shapes = SVGLoader.createShapes(path);
-          for (const shape of shapes) {
-            const geo = new THREE.ExtrudeGeometry(shape, {
-              depth,
-              bevelEnabled,
-              bevelThickness,
-              bevelSize,
-              bevelSegments: 4,
-            });
-            const hex = path.color ? `#${path.color.getHexString()}` : '#cccccc';
-            g.add(new THREE.Mesh(geo, new THREE.MeshStandardMaterial({ color: hex, side: THREE.DoubleSide })));
-            meshCount++;
+      svgTextPromise
+        .then((svgText) => {
+          if (cancelled) return null;
+          const data = loader.parse(svgText);
+          if (data.paths.length === 0) return null;
+
+          const g = new THREE.Group();
+          let meshCount = 0;
+
+          for (const path of data.paths) {
+            const shapes = SVGLoader.createShapes(path);
+            for (const shape of shapes) {
+              const geo = new THREE.ExtrudeGeometry(shape, {
+                depth, bevelEnabled, bevelThickness, bevelSize, bevelSegments: 4,
+              });
+              const hex = path.color ? `#${path.color.getHexString()}` : '#cccccc';
+              g.add(new THREE.Mesh(geo, new THREE.MeshStandardMaterial({ color: hex, side: THREE.DoubleSide })));
+              meshCount++;
+            }
           }
-        }
 
-        if (meshCount === 0) {
-          console.warn('SVGLoader: no shapes created from paths');
-          return null;
-        }
+          if (meshCount === 0) return null;
+          const box = new THREE.Box3().setFromObject(g);
+          g.position.sub(box.getCenter(new THREE.Vector3()));
+          return g;
+        })
+        .then((g) => {
+          if (cancelled) return;
+          if (g) { setGroup(g); setStatus('ready'); }
+          else { setStatus('error'); }
+        })
+        .catch(() => { if (!cancelled) buildFromImage(); });
 
-        const box = new THREE.Box3().setFromObject(g);
-        const center = box.getCenter(new THREE.Vector3());
-        g.position.sub(center);
+      return () => { cancelled = true; };
+    }
 
-        return g;
+    buildFromImage();
+
+    function buildFromImage() {
+      imageToExtrudedMesh(objectSource!, {
+        depth,
+        bevelEnabled,
+        bevelThickness,
+        bevelSize,
+        bevelSegments: 3,
+        threshold: 30,
+        simplifyEpsilon: 1.0,
+        maxDimension: 400,
+        cleanup: 1,
       })
-      .then((g) => { if (!cancelled && g) setGroup(g); })
-      .catch((err) => console.warn('SVG3D error:', err));
+        .then(({ geometry, texture }) => {
+          if (cancelled) return;
+
+          const mat = new THREE.MeshStandardMaterial({
+            map: texture,
+            side: THREE.DoubleSide,
+            roughness: 0.5,
+            metalness: 0.1,
+          });
+
+          const mesh = new THREE.Mesh(geometry, mat);
+
+          const box = new THREE.Box3().setFromObject(mesh);
+          const center = box.getCenter(new THREE.Vector3());
+          const size = box.getSize(new THREE.Vector3());
+          mesh.position.sub(center);
+
+          const maxDim = Math.max(size.x, size.y, size.z);
+          if (maxDim > 0) {
+            const scale = 2 / maxDim;
+            mesh.scale.setScalar(scale);
+          }
+
+          const g = new THREE.Group();
+          g.add(mesh);
+          setGroup(g);
+          setStatus('ready');
+        })
+        .catch((err) => {
+          if (cancelled) return;
+          console.error('Image extrude error:', err);
+          setStatus('error');
+        });
+    }
 
     return () => { cancelled = true; };
   }, [objectSource, depth, bevelEnabled, bevelThickness, bevelSize]);
+
+  if (status === 'error') {
+    return (
+      <mesh>
+        <boxGeometry args={[0.5, 0.5, 0.5]} />
+        <meshStandardMaterial color="#ff3333" wireframe />
+      </mesh>
+    );
+  }
 
   if (!group) return null;
   return <primitive object={group} />;
@@ -1342,7 +1413,24 @@ function Text3DAsset({ object, material }: { object: SceneObject; material: Edit
 
   return (
     <mesh geometry={geometry} castShadow receiveShadow>
-      <meshStandardMaterial color={getMaterialRenderColor(material, textureSet)} metalness={material.metalness} roughness={material.roughness} map={viewportDisplayMode === 'textured' ? textureSet.map : null} side={THREE.DoubleSide} />
+      <meshStandardMaterial
+        key={`${viewportDisplayMode}-${materialTextureKey(material)}`}
+        color={getMaterialRenderColor(material, textureSet)}
+        metalness={material.metalness}
+        roughness={material.roughness}
+        emissive={material.emissive}
+        emissiveIntensity={material.emissiveIntensity}
+        opacity={viewportDisplayMode === 'wireframe' ? 1 : material.opacity}
+        transparent={viewportDisplayMode === 'wireframe' ? false : material.opacity < 1}
+        depthWrite={viewportDisplayMode === 'wireframe' || material.opacity >= 1}
+        map={viewportDisplayMode === 'textured' ? textureSet.map : null}
+        normalMap={viewportDisplayMode === 'textured' ? textureSet.normalMap : null}
+        roughnessMap={viewportDisplayMode === 'textured' ? textureSet.roughnessMap : null}
+        displacementMap={viewportDisplayMode === 'textured' ? textureSet.displacementMap : null}
+        displacementScale={viewportDisplayMode === 'textured' && textureSet.displacementMap ? 0.015 : 0}
+        side={THREE.DoubleSide}
+        wireframe={viewportDisplayMode === 'wireframe'}
+      />
     </mesh>
   );
 }

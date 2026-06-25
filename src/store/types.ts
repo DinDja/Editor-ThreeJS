@@ -31,7 +31,7 @@ export type MobilePanel = 'scene' | 'properties' | 'timeline';
 
 export type PrimitiveKind = 'box' | 'sphere' | 'cylinder' | 'cone' | 'torus' | 'plane';
 
-export type EffectKind = 'fireworks' | 'fire' | 'smoke' | 'sparkle' | 'lightGlow' | 'fluid';
+export type EffectKind = 'fireworks' | 'fire' | 'smoke' | 'sparkle' | 'lightGlow' | 'fluid' | 'imageParticles';
 
 export type EffectConfig = {
   kind: EffectKind;
@@ -39,6 +39,9 @@ export type EffectConfig = {
   intensity: number;
   size: number;
   count: number;
+  imageUrl?: string;
+  pixelStep?: number;
+  depthScale?: number;
 };
 
 export type LightKind = 'spot' | 'point' | 'directional' | 'ambient';

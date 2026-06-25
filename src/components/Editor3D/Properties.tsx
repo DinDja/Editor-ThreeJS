@@ -355,8 +355,132 @@ function EffectPanel({ object }: { object: SceneObject }) {
       <ColorInput label="Cor" value={effect.color} onChange={(v) => updateEffect({ color: v })} />
       <SliderInput label="Intensidade" value={effect.intensity} min={0.1} max={2} step={0.05} onChange={(v) => updateEffect({ intensity: v })} />
       <SliderInput label="Tamanho" value={effect.size} min={0.05} max={2} step={0.05} onChange={(v) => updateEffect({ size: v })} />
-      <SliderInput label="Particulas" value={effect.count} min={10} max={300} step={10} onChange={(v) => updateEffect({ count: v })} />
+      <SliderInput label="Particulas" value={effect.count} min={10} max={effect.kind === 'imageParticles' ? 20000 : 300} step={effect.kind === 'imageParticles' ? 500 : 10} onChange={(v) => updateEffect({ count: v })} />
+      {effect.kind === 'imageParticles' && (
+        <ImageParticleFields effect={effect} updateEffect={updateEffect} />
+      )}
     </Section>
+  );
+}
+
+function ImageParticleFields({
+  effect,
+  updateEffect,
+}: {
+  effect: EffectConfig;
+  updateEffect: (patch: Partial<EffectConfig>) => void;
+}) {
+  const pushSnapshot = useHistoryStore((s) => s.pushSnapshot);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [dragOver, setDragOver] = useState(false);
+
+  const handleImageFile = (file: File) => {
+    if (!file.type.startsWith('image/')) return;
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      const dataUrl = e.target?.result as string;
+      if (dataUrl) {
+        pushSnapshot();
+        updateEffect({ imageUrl: dataUrl });
+      }
+    };
+    reader.readAsDataURL(file);
+  };
+
+  const handleDrop = (e: React.DragEvent) => {
+    e.preventDefault();
+    setDragOver(false);
+    const file = e.dataTransfer.files?.[0];
+    if (file) handleImageFile(file);
+  };
+
+  return (
+    <div className="grid gap-2">
+      <div className="border-t border-neutral-800/60 pt-2" />
+
+      <label className="grid gap-1.5">
+        <span className={labelClass}>Imagem / SVG</span>
+        <div
+          onDragOver={(e) => { e.preventDefault(); setDragOver(true); }}
+          onDragLeave={() => setDragOver(false)}
+          onDrop={handleDrop}
+          onClick={() => fileInputRef.current?.click()}
+          className={`flex cursor-pointer flex-col items-center gap-1.5 rounded-lg border-2 border-dashed px-3 py-4 transition ${
+            dragOver
+              ? 'border-emerald-400 bg-emerald-400/8'
+              : 'border-neutral-700/60 bg-neutral-950/40 hover:border-neutral-600'
+          }`}
+        >
+          {effect.imageUrl ? (
+            <div className="flex w-full items-center gap-2">
+              <div className="h-10 w-10 shrink-0 overflow-hidden rounded border border-neutral-700">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img src={effect.imageUrl} alt="" className="h-full w-full object-cover" />
+              </div>
+              <div className="min-w-0 flex-1">
+                <p className="truncate text-[10px] text-neutral-300">Imagem carregada</p>
+                <p className="text-[9px] text-neutral-500">Clique para trocar</p>
+              </div>
+              <button
+                type="button"
+                onClick={(e) => { e.stopPropagation(); pushSnapshot(); updateEffect({ imageUrl: '' }); }}
+                className="grid h-6 w-6 shrink-0 cursor-pointer place-items-center rounded bg-neutral-800 text-neutral-400 transition hover:bg-red-500/60 hover:text-white"
+              >
+                <Trash2 size={11} />
+              </button>
+            </div>
+          ) : (
+            <>
+              <ImagePlus size={18} className="text-neutral-500" />
+              <span className="text-[10px] text-neutral-500">
+                Arraste uma imagem ou clique
+              </span>
+            </>
+          )}
+        </div>
+        <input
+          ref={fileInputRef}
+          type="file"
+          accept="image/*,.svg"
+          className="hidden"
+          onChange={(e) => {
+            const file = e.target.files?.[0];
+            if (file) handleImageFile(file);
+          }}
+        />
+      </label>
+
+      {effect.imageUrl && (
+        <>
+          <SliderInput
+            label="Passo Pixel"
+            value={effect.pixelStep ?? 2}
+            min={1}
+            max={8}
+            step={1}
+            onChange={(v) => updateEffect({ pixelStep: v })}
+          />
+          <SliderInput
+            label="Profundidade Z"
+            value={effect.depthScale ?? 0.4}
+            min={0.05}
+            max={1.5}
+            step={0.05}
+            onChange={(v) => updateEffect({ depthScale: v })}
+          />
+          <label className="grid gap-1.5">
+            <span className={labelClass}>URL da imagem</span>
+            <input
+              type="text"
+              value={effect.imageUrl?.startsWith('data:') ? '' : (effect.imageUrl ?? '')}
+              placeholder="https://... (ou use upload acima)"
+              onChange={(e) => updateEffect({ imageUrl: e.target.value })}
+              className={inputClass}
+            />
+          </label>
+        </>
+      )}
+    </div>
   );
 }
 
@@ -1118,6 +1242,50 @@ function TextConfigPanel({ object }: { object: SceneObject }) {
   );
 }
 
+function SvgConfigPanel({ object }: { object: SceneObject }) {
+  const updateObject = useSceneStore((s) => s.updateObject);
+  const pushSnapshot = useHistoryStore((s) => s.pushSnapshot);
+  const config = object.svgConfig!;
+
+  const update = (patch: Partial<SvgConfig>) => {
+    updateObject(object.uuid, { svgConfig: { ...config, ...patch } });
+  };
+
+  const isRasterImage = (() => {
+    const src = object.source ?? '';
+    if (src.startsWith('data:image/') && !src.startsWith('data:image/svg')) return true;
+    if (/\.(png|jpe?g|webp|gif|bmp)(\?|$)/i.test(src)) return true;
+    return false;
+  })();
+
+  return (
+    <div className="grid gap-2.5">
+      <SliderInput
+        label="Profundidade"
+        value={config.depth}
+        min={0.05}
+        max={2}
+        step={0.05}
+        onChange={(v) => { pushSnapshot(); update({ depth: v }); }}
+      />
+      <ToggleRow label="Bisel" enabled={config.bevelEnabled} onChange={() => { pushSnapshot(); update({ bevelEnabled: !config.bevelEnabled }); }} />
+      {config.bevelEnabled && (
+        <div className="grid grid-cols-2 gap-2">
+          <NumericInput label="Bisel Esp." value={config.bevelThickness} step={0.01} onChange={(v) => update({ bevelThickness: v })} />
+          <NumericInput label="Bisel Tam." value={config.bevelSize} step={0.01} onChange={(v) => update({ bevelSize: v })} />
+        </div>
+      )}
+      {object.source && (
+        <div className="rounded-md border border-neutral-800 bg-neutral-950/40 p-2">
+          <p className="truncate text-[9px] text-neutral-500">
+            {isRasterImage ? 'Imagem' : 'SVG'}: {object.source.startsWith('data:') ? 'carregado' : object.source}
+          </p>
+        </div>
+      )}
+    </div>
+  );
+}
+
 const materialScopeLabels: Record<MaterialApplicationScope, string> = {
   self: 'Subelemento',
   children: 'Filhos',
@@ -1518,6 +1686,13 @@ export default function Properties() {
         {object.textConfig && (
           <Section title="Texto 3D" icon={<Type size={11} className="text-sky-400" />}>
             <TextConfigPanel object={object} />
+          </Section>
+        )}
+
+        {/* SVG / Image Config */}
+        {object.svgConfig && (
+          <Section title="SVG / Imagem 3D" icon={<FileCode size={11} className="text-amber-400" />}>
+            <SvgConfigPanel object={object} />
           </Section>
         )}
 
