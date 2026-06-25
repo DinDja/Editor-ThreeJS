@@ -4,14 +4,24 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import * as THREE from 'three';
 import { Boxes, Clock, PanelRight } from 'lucide-react';
 import Canvas3D from './Canvas3D';
+import EditorModeBar from './EditorModeBar';
 import EditorShortcuts from './EditorShortcuts';
+import ExperienceProperties from './ExperienceProperties';
+import ExperienceToolbar from './ExperienceToolbar';
+import ExportWorkspace from './ExportWorkspace';
 import ImageTo3DModal from './ImageTo3D/ImageTo3DModal';
+import InteractionsWorkspace from './InteractionsWorkspace';
+import PageBuilderWorkspace from './PageBuilderWorkspace';
+import PreviewWorkspace from './PreviewWorkspace';
 import Properties from './Properties';
+import ProjectTree from './ProjectTree';
 import SceneGraph from './SceneGraph';
 import Timeline from './Timeline';
 import Toolbar from './Toolbar';
 import TutorialSpotlight from './TutorialSpotlight';
+import { useProjectAutosave } from '@/lib/project-experience/useProjectAutosave';
 import { useEditorStore } from '@/store/editorStore';
+import { useExperienceStore } from '@/store/experienceStore';
 import { useSceneStore } from '@/store/sceneStore';
 import type { MobilePanel } from '@/store/types';
 
@@ -71,11 +81,13 @@ const mobilePanelLabels: Record<MobilePanel, string> = {
 };
 
 function MobileTabBar() {
+  const activeMode = useExperienceStore((state) => state.activeMode);
   const activeMobilePanel = useEditorStore((state) => state.activeMobilePanel);
   const setActiveMobilePanel = useEditorStore((state) => state.setActiveMobilePanel);
   const setLeftPanelCollapsed = useEditorStore((state) => state.setLeftPanelCollapsed);
   const setRightPanelCollapsed = useEditorStore((state) => state.setRightPanelCollapsed);
   const setTimelineCollapsed = useEditorStore((state) => state.setTimelineCollapsed);
+  const panels = (activeMode === 'scene' ? ['scene', 'properties', 'timeline'] : ['scene', 'properties']) as MobilePanel[];
 
   const togglePanel = (panel: MobilePanel) => {
     if (activeMobilePanel === panel) {
@@ -93,7 +105,7 @@ function MobileTabBar() {
 
   return (
     <nav className="flex shrink-0 items-center justify-around border-t border-neutral-800 bg-[#17191b] px-2 py-1 lg:hidden">
-      {(Object.keys(mobilePanelIcons) as MobilePanel[]).map((panel) => {
+      {panels.map((panel) => {
         const Icon = mobilePanelIcons[panel];
         return (
           <button
@@ -107,7 +119,7 @@ function MobileTabBar() {
             }`}
           >
             <Icon size={18} />
-            {mobilePanelLabels[panel]}
+            {panel === 'scene' && activeMode !== 'scene' ? 'Projeto' : mobilePanelLabels[panel]}
           </button>
         );
       })}
@@ -150,9 +162,26 @@ function MobileHUD() {
   );
 }
 
+function ExperienceWorkspace() {
+  const activeMode = useExperienceStore((state) => state.activeMode);
+
+  if (activeMode === 'page') return <PageBuilderWorkspace />;
+  if (activeMode === 'interactions') return <InteractionsWorkspace />;
+  if (activeMode === 'preview') return <PreviewWorkspace />;
+  if (activeMode === 'export') return <ExportWorkspace />;
+  return null;
+}
+
+function ExperienceRightPanel() {
+  const selectedObjectIds = useEditorStore((state) => state.selectedObjectIds);
+  return selectedObjectIds.length > 0 ? <Properties /> : <ExperienceProperties />;
+}
+
 export default function Editor3D() {
   const sceneRootRef = useRef<THREE.Group | null>(null);
   const [tutorialOpen, setTutorialOpen] = useState(false);
+  useProjectAutosave();
+  const activeMode = useExperienceStore((state) => state.activeMode);
   const leftPanelCollapsed = useEditorStore((state) => state.leftPanelCollapsed);
   const rightPanelCollapsed = useEditorStore((state) => state.rightPanelCollapsed);
   const leftPanelWidth = useEditorStore((state) => state.leftPanelWidth);
@@ -188,57 +217,97 @@ export default function Editor3D() {
   return (
     <main className="fixed inset-0 flex flex-col overflow-hidden bg-[#0d0f10] text-neutral-100">
       <EditorShortcuts />
-      <Toolbar sceneRootRef={sceneRootRef} onOpenTutorial={() => setTutorialOpen(true)} />
+      <EditorModeBar />
+      {activeMode === 'scene' ? (
+        <Toolbar sceneRootRef={sceneRootRef} onOpenTutorial={() => setTutorialOpen(true)} />
+      ) : (
+        <ExperienceToolbar />
+      )}
 
-      <section className="relative min-h-0 flex-1 overflow-hidden">
-        {/* ── Single Canvas3D fills the section ── */}
-        <div className="absolute inset-0 overflow-hidden">
-          <Canvas3D sceneRootRef={sceneRootRef} />
-          {/* ── Viewport HUD ── */}
-          <div className="hidden lg:block pointer-events-none absolute top-4 z-10" style={{ left: `calc(${leftCol} + 1rem)` }}>
-            <DesktopHUD />
+      {activeMode === 'scene' ? (
+        <section className="relative min-h-0 flex-1 overflow-hidden">
+          {/* ── Single Canvas3D fills the section ── */}
+          <div className="absolute inset-0 overflow-hidden">
+            <Canvas3D sceneRootRef={sceneRootRef} />
+            {/* ── Viewport HUD ── */}
+            <div className="hidden lg:block pointer-events-none absolute top-4 z-10" style={{ left: `calc(${leftCol} + 1rem)` }}>
+              <DesktopHUD />
+            </div>
+            <div className="lg:hidden pointer-events-none absolute left-2 top-2 z-10">
+              <MobileHUD />
+            </div>
           </div>
-          <div className="lg:hidden pointer-events-none absolute left-2 top-2 z-10">
-            <MobileHUD />
-          </div>
-        </div>
 
-        {/* ── Desktop: panels + timeline overlay the canvas ── */}
-        <div className="hidden lg:flex flex-col absolute inset-0 pointer-events-none">
-          <div className="flex min-h-0 flex-1">
-            <div
-              data-tutorial="scene-graph-panel"
-              className="relative shrink-0 overflow-hidden pointer-events-auto"
-              style={{ width: leftCol }}
-            >
-              <SceneGraph />
+          {/* ── Desktop: panels + timeline overlay the canvas ── */}
+          <div className="hidden lg:flex flex-col absolute inset-0 pointer-events-none">
+            <div className="flex min-h-0 flex-1">
+              <div
+                data-tutorial="scene-graph-panel"
+                className="relative shrink-0 overflow-hidden pointer-events-auto"
+                style={{ width: leftCol }}
+              >
+                <SceneGraph />
+                {!leftPanelCollapsed && (
+                  <ResizeHandle position="right" onDrag={handleLeftResize} />
+                )}
+              </div>
+              <div className="flex-1 min-w-0" />
+              <div
+                data-tutorial="properties-panel"
+                className="relative shrink-0 overflow-hidden pointer-events-auto"
+                style={{ width: rightCol }}
+              >
+                <Properties />
+              </div>
+            </div>
+            <div className="pointer-events-auto">
+              <Timeline />
+            </div>
+          </div>
+
+          {/* ── Mobile: panel overlay ── */}
+          {activeMobilePanel && (
+            <div className="absolute bottom-0 left-0 right-0 z-40 max-h-[45dvh] overflow-auto overscroll-contain border-t border-neutral-800 bg-[#151719] lg:hidden">
+              {activeMobilePanel === 'scene' && <SceneGraph />}
+              {activeMobilePanel === 'properties' && <Properties />}
+              {activeMobilePanel === 'timeline' && <Timeline />}
+            </div>
+          )}
+        </section>
+      ) : (
+        <section className="relative min-h-0 flex-1 overflow-hidden">
+          <div
+            className="hidden h-full min-h-0 lg:grid"
+            style={{ gridTemplateColumns: `${leftCol} minmax(0, 1fr) ${rightCol}` }}
+          >
+            <div className="relative min-h-0 overflow-hidden">
+              <ProjectTree />
               {!leftPanelCollapsed && (
                 <ResizeHandle position="right" onDrag={handleLeftResize} />
               )}
             </div>
-            <div className="flex-1 min-w-0" />
-            <div
-              data-tutorial="properties-panel"
-              className="relative shrink-0 overflow-hidden pointer-events-auto"
-              style={{ width: rightCol }}
-            >
-              <Properties />
+            <div className="min-h-0 overflow-hidden">
+              <ExperienceWorkspace />
+            </div>
+            <div className="relative min-h-0 overflow-hidden">
+              <ExperienceRightPanel />
+              {!rightPanelCollapsed && (
+                <ResizeHandle position="left" onDrag={handleRightResize} />
+              )}
             </div>
           </div>
-          <div className="pointer-events-auto">
-            <Timeline />
-          </div>
-        </div>
 
-        {/* ── Mobile: panel overlay ── */}
-        {activeMobilePanel && (
-          <div className="absolute bottom-0 left-0 right-0 z-40 max-h-[45dvh] overflow-auto overscroll-contain border-t border-neutral-800 bg-[#151719] lg:hidden">
-            {activeMobilePanel === 'scene' && <SceneGraph />}
-            {activeMobilePanel === 'properties' && <Properties />}
-            {activeMobilePanel === 'timeline' && <Timeline />}
+          <div className="h-full min-h-0 overflow-hidden lg:hidden">
+            <ExperienceWorkspace />
           </div>
-        )}
-      </section>
+          {activeMobilePanel && (
+            <div className="absolute bottom-0 left-0 right-0 z-40 max-h-[45dvh] overflow-auto overscroll-contain border-t border-neutral-800 bg-[#151719] lg:hidden">
+              {activeMobilePanel === 'scene' && <ProjectTree />}
+              {activeMobilePanel === 'properties' && <ExperienceRightPanel />}
+            </div>
+          )}
+        </section>
+      )}
 
       <MobileTabBar />
       <TutorialSpotlight open={tutorialOpen} onClose={() => setTutorialOpen(false)} />

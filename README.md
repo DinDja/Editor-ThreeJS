@@ -34,6 +34,7 @@ Editor de cena e modelagem 3D com viewport interativo, primitivas, import/export
 ## Sumario
 
 - [Recursos](#recursos)
+- [Virada para Construtor Web 3D](#virada-para-construtor-web-3d)
 - [Analise para Editor Profissional](#analise-para-editor-profissional)
 - [Stack](#stack)
 - [Como Rodar](#como-rodar)
@@ -100,7 +101,11 @@ Editor de cena e modelagem 3D com viewport interativo, primitivas, import/export
 ### Edit Mode
 
 - Selecao e movimento de vertices, arestas e faces (multipla para vertices/faces).
-- Operacoes: extrudar face, subdividir face, apagar face, soldar vertices, bevel de aresta, loop cut, booleanos (union/subtract/intersect), bridge edges, fill face, inset face, flip normals, merge by distance, edge loop select e edge ring select.
+- Modos de selecao: Click, Box (caixa arrastavel) e Lasso (laco livre), com preview visual em tela.
+- Hover preview de vertices, arestas e faces antes de clicar.
+- Operacoes: extrudar face, subdividir face, apagar face, soldar vertices, bevel de aresta, loop cut, booleanos (union/subtract/intersect), bridge edges, fill face, inset face, flip normals, recalculate outward normals, smooth/flat shading, merge by distance, edge loop select e edge ring select.
+- Snap to vertex/edge/face durante transform de sub-elemento.
+- Multi-materiais por face em lote (selecao multi-face + atribuicao).
 - Estrutura interna `PolygonMesh` com vertices/edges/faces explicitos (IDs + adjacencia) para operacoes topologicas.
 - Conversao bidirecional entre `PolygonMesh` e `EditableMesh` (Three.js BufferGeometry).
 
@@ -150,6 +155,262 @@ Editor de cena e modelagem 3D com viewport interativo, primitivas, import/export
 - Retry automatico quando a cena fica simples demais.
 - Compactacao de layout para manter a composicao centralizada.
 - Subdivisao e suavizacao procedural das malhas geradas.
+
+---
+
+## Virada para Construtor Web 3D
+
+O produto deixou de ser somente um editor de cena/modelagem 3D e passou a ter uma primeira arquitetura de **construtor visual de sites 3D interativos**. O Modo Cena continua sendo o nucleo 3D. A nova camada usa essa cena dentro de paginas, heroes, secoes, backgrounds WebGL e componentes web exportaveis.
+
+### O que foi implementado
+
+- Navegacao principal por modos:
+  - `Cena`: mantem o editor 3D existente, sem recriar ou remover funcionalidades.
+  - `Pagina`: monta uma pagina visual usando elementos web e a cena 3D atual, com drag-and-drop e reparenting.
+  - `Interacoes`: conecta elementos HTML da pagina com objetos/luzes/camera da cena.
+  - `Preview`: executa a experiencia como site, com desktop/tablet/mobile e metricas reais (FPS, draw calls, triangulos, resolucao de texturas, heap JS, tamanho de assets).
+  - `Exportar`: gera arquivos reais para projetos web, com ZIP incluindo assets organizados.
+- Novo estado central em `src/store/experienceStore.ts`.
+- Persistencia de projeto em JSON versionado:
+  - schema `ProjectExperience` v1
+  - arquivo `.web3d.json`
+  - snapshot de pagina, cena, materiais, layers, imagens de referencia, timeline e interacoes
+  - catalogo de assets referenciados por cena, materiais, pagina e referencias
+  - autosave em localStorage (debounce 4s) + historico de versoes (ate 24 entradas)
+  - migracoes de schema entre versoes
+- Botoes de `Salvar`, `Carregar` e `Historico` (restaurar autosave/versao) no toolbar dos modos web.
+- Reordenacao manual de elementos no Project Tree com mover para cima/baixo entre irmaos.
+- Drag-and-drop com reparenting na arvore de pagina (indicadores before/after/inside).
+- Novos modelos de dados para:
+  - `ProjectExperience`
+  - `PageDocument`
+  - `PageNode`
+  - `InteractionDocument`
+  - `ProjectSettings`
+- Nova arquitetura em camadas:
+  - `src/lib/page-builder/`
+  - `src/lib/interaction-engine/`
+  - `src/lib/preview-runtime/` via componentes runtime do editor
+  - `src/lib/export-engine/`
+  - `src/lib/template-engine/`
+  - `src/lib/scene-engine/`
+- Modo Pagina com elementos iniciais:
+  - navbar
+  - sections
+  - containers
+  - textos
+  - botoes
+  - cards
+  - imagens
+  - videos
+  - footer
+  - `sceneCanvas` vinculado a cena atual
+- Arvore de projeto hibrida:
+  - `Page`: elementos web.
+  - `Scene`: objetos 3D existentes.
+- Painel de propriedades contextual:
+  - Elemento web: nome, conteudo, layout, estilo visual, responsividade.
+  - Interacao: evento, origem, alvo, acao, parametros, duracao e easing.
+  - Objeto 3D selecionado: reaproveita o painel 3D existente.
+- Modo Interacoes com estrutura baseada em:
+  - trigger
+  - source
+  - action
+  - target
+  - params
+  - duration/easing
+- Acoes de runtime ja conectadas no preview:
+  - mover objeto 3D
+  - rotacionar objeto 3D
+  - escalar objeto 3D
+  - alterar cor/material
+  - alterar opacidade
+  - ligar/desligar luz
+  - mover camera por scroll
+  - mostrar/esconder elemento HTML
+  - trocar texto
+  - abrir modal simples
+  - navegar para link
+- Triggers ja previstos no modelo:
+  - page load
+  - click
+  - hover
+  - mouse move
+  - scroll
+  - section enter
+  - section leave
+  - double click
+  - focus
+  - blur
+- Modo Preview:
+  - desktop/tablet/mobile
+  - scroll real
+  - hover/click/focus basicos
+  - metricas reais em tempo real: FPS, draw calls, triangulos, geometrias, texturas GL, vertices, objetos, luzes, tamanho real de assets (fetch), resolucao de texturas (largura x altura), heap JS usado/total
+  - alertas de budget/performance baseados em medicoes reais (draw calls > 120, textura > 2048px, assets > 20MB, FPS < 30)
+- Export Engine:
+  - Next.js
+  - React
+  - Vite
+  - HTML/CSS/JS puro (runtime standalone com Three.js via CDN, sem build)
+  - JSON
+  - ZIP com assets reais organizados em `public/models`, `public/textures`, `public/images`, `public/videos` (remapeamento automatico de URLs no JSON exportado)
+- Runtime de animacao: keyframes da Timeline sao exportados e reproduzidos no runtime (Next/React/Vite e standalone HTML) com interpolacao hold/linear/ease
+- Estruturas exportadas:
+  - `scene-data.json`
+  - `page-data.json`
+  - `interactions-data.json`
+  - componentes `SceneCanvas` (com `AnimationPlayer`), `PageExperience`, `Hero3D` e `sections`
+  - `main.js` standalone com Three.js + OrbitControls + GLTFLoader via CDN
+- Autosave e historico de versoes do `ProjectExperience` em localStorage (ate 24 entradas, com restauracao via toolbar)
+- Drag-and-drop e reparenting no Page Builder (com indicadores visuais de posicao before/after/inside)
+- Templates iniciais:
+  - Hero 3D texto/modelo
+  - Hero background WebGL
+  - Landing produto 3D
+  - Portfolio 3D
+  - Institucional tech
+  - Educacional interativa
+  - Showcase GLB
+  - Card 3D interativo
+  - Background particulas
+  - Pagina jogo indie
+
+### Correcoes feitas apos os primeiros testes
+
+O primeiro runtime do Modo Pagina estava simples demais e nao respeitava a cena como o Modo Cena. Depois disso, o `ExperienceSceneCanvas` foi corrigido para renderizar melhor a cena real:
+
+- Primitivas respeitam dimensoes/segmentos de `geometry`.
+- `editableMesh` agora renderiza no Modo Pagina/Preview.
+- Materiais PBR usam:
+  - cor
+  - emissive
+  - metalness
+  - roughness
+  - opacidade
+  - textura difusa
+  - normal map
+  - roughness map
+  - displacement map
+  - repeat/offset/rotation de textura
+- Modelos GLB/GLTF importados por hierarquia usam submalhas reais, em vez de caixas fallback.
+- Subnos GLTF preservam material original quando nao ha override.
+- Overrides de material/textura do editor sao aplicados no runtime web.
+- Texto 3D usa `TextGeometry`, depth e bevel.
+- SVG extrudado tambem entra no runtime web.
+- Luzes da cena passaram a ser respeitadas:
+  - point
+  - spot
+  - directional
+  - ambient
+  - cor
+  - intensidade
+  - distance/decay
+  - angle/penumbra
+  - shadow bias/radius
+- Luzes padrao do preview so aparecem se a cena nao tiver nenhuma luz visivel.
+- Interacoes de cor tambem atingem luzes.
+- `toggleLight` agora altera luzes no runtime.
+
+### Validacoes feitas
+
+- `npx eslint` focado nos arquivos novos/alterados.
+- `npx tsc --noEmit`.
+- `npm run build`.
+- Teste visual via Chrome headless/CDP em `/editor`.
+- Pixel check WebGL no canvas de Pagina/Preview.
+- Checagem mobile do Preview para evitar colisao entre texto, CTA e canvas.
+- Validacao incremental apos save/load, metricas e reordenacao:
+  - `npx eslint src\components\Editor3D\ExperienceToolbar.tsx src\components\Editor3D\ExperienceProperties.tsx src\components\Editor3D\ProjectTree.tsx src\lib\project-experience\persistence.ts src\lib\preview-runtime\metrics.ts src\lib\page-builder\tree.ts src\store\experienceStore.ts src\store\timelineStore.ts`
+  - `npx tsc --noEmit`
+
+### O que ainda falta fazer
+
+#### Fidelidade total entre Modo Cena e Modo Pagina
+
+- [ ] Reaproveitar mais codigo do renderer do `Canvas3D` sem carregar ferramentas de edicao.
+- [x] Garantir paridade visual 1:1 para todos os tipos de objeto (effects, behaviors, flat shading, multi-materiais).
+- [x] Renderizar efeitos no runtime web:
+  - fireworks
+  - fire
+  - smoke
+  - sparkle
+  - light glow
+  - fluid
+- [x] Rodar behaviors no Preview/Pagina quando fizer sentido.
+- [ ] Rodar scripts customizados exportaveis com sandbox/API clara.
+- [ ] Suportar physics runtime no Preview como experiencia final, nao como ferramenta de edicao.
+- [ ] Preservar imagens de referencia quando forem usadas como elementos de experiencia.
+- [ ] Testar GLB/GLTF com multi-material complexo, skins, animations e morph targets.
+- [ ] Resolver edge cases de texturas remotas com CORS, object URLs e assets temporarios.
+
+#### Interacoes
+
+- [ ] Implementar `Condition` de verdade.
+- [ ] Implementar `section enter` e `section leave` com `IntersectionObserver`.
+- [ ] Separar actions de HTML, camera, luz, material, textura e script em handlers modulares.
+- [ ] Melhorar `toggleLight` para suportar toggle real, restore por hover e intensidade animada.
+- [ ] Adicionar easing real por action.
+- [ ] Adicionar timeline/animation mixer para iniciar, pausar e resetar animacoes GLTF.
+- [ ] Suportar troca de textura por interacao.
+- [ ] Suportar scripts customizados exportaveis sem depender do editor.
+- [ ] Criar debug visual das interacoes.
+
+#### Page Builder
+
+- [x] Drag-and-drop para montar e reordenar elementos.
+- [x] Reparenting na arvore (com indicadores visuais before/after/inside).
+- [ ] Selecao direta mais precisa no canvas de pagina.
+- [ ] Guias, snapping e handles para layout web.
+- [ ] Editor de breakpoints mais completo.
+- [ ] Estados hover/active/focus para elementos web.
+- [ ] Sistema de componentes reutilizaveis.
+- [ ] Formularios, modais reais e menus.
+- [ ] Camadas/z-index com visualizacao clara.
+- [x] Autosave e historico de versoes do `ProjectExperience`.
+- [ ] Diff visual do documento de pagina.
+
+#### Preview
+
+- [ ] Simular device frames sem depender do tamanho real da janela.
+- [x] Mostrar tamanho real de assets (fetch + content-length).
+- [x] Alertar modelos pesados por contagem de vertices/triangulos.
+- [x] Alertar texturas grandes por resolucao real.
+- [x] Medir draw calls, memoria e FPS com mais precisao (via `gl.info` e `performance.memory`).
+- [ ] Testar preload/loading da cena.
+- [ ] Adicionar overlay de erros de runtime.
+
+#### Exportacao
+
+- [x] Gerar ZIP real do projeto exportado (formato .zip valido, sem dependencias externas).
+- [x] Copiar e organizar assets reais em:
+  - `public/models`
+  - `public/textures`
+  - `public/images`
+- [ ] Resolver assets importados via `blob:` antes da exportacao.
+- [ ] Gerar `package.json`, `tsconfig`, configs e instrucoes por target.
+- [x] Exportar React/Next/Vite com runtime Three.js completo e player de animacao.
+- [x] Exportar HTML/CSS/JS com carregamento Three.js funcional (standalone via CDN).
+- [ ] Gerar componentes Tailwind quando `settings.tailwind = true`.
+- [ ] Preservar scripts customizados em arquivos separados.
+- [x] Exportar interacoes como engine standalone (no main.js do HTML exportado).
+- [x] Exportar animacoes (keyframes) e cameras com dados completos.
+
+#### Templates
+
+- [ ] Transformar templates em presets editaveis com thumbs.
+- [ ] Melhorar copy/layout de cada template.
+- [ ] Criar cenas iniciais especificas por template.
+- [ ] Adicionar interacoes especificas por template.
+- [ ] Validar responsividade de todos os templates.
+
+#### Testes e Qualidade
+
+- [ ] Testes unitarios para `page-builder`, `interaction-engine`, `export-engine` e `template-engine`.
+- [ ] Testes de regressao visual do Preview.
+- [ ] Testes com GLB real, textura real, luz real e malha editada.
+- [ ] Testes de exportacao abrindo o projeto gerado fora do editor.
+- [ ] Separar artefatos `release/` e `.next/` do lint global.
 
 ---
 
@@ -328,14 +589,24 @@ src/
       CollapsibleSection.tsx
       ContextMenu.tsx
       DrawPolygonOverlay.tsx
+      EditorModeBar.tsx
       EditorShortcuts.tsx
+      ExperienceProperties.tsx
+      ExperienceSceneCanvas.tsx
+      ExperienceToolbar.tsx
+      ExportWorkspace.tsx
       index.tsx
+      InteractionsWorkspace.tsx
       KnifeOverlay.tsx
       MaterialEditor.tsx
       MeshEditOverlay.tsx
       ModelingTools.tsx
+      PageBuilderWorkspace.tsx
+      PageExperience.tsx
       PhysicsRuntime.tsx
+      PreviewWorkspace.tsx
       Properties.tsx
+      ProjectTree.tsx
       SceneGraph.tsx
       Timeline.tsx
       Toolbar.tsx
@@ -348,24 +619,40 @@ src/
     animation.ts
     behaviors.tsx
     effects.tsx
+    export-engine/
+      exportExperience.ts
+      types.ts
+      zip.ts
     fileOps.ts
     fluid.tsx
     geometryOps.ts
     gltfImport.ts
+    interaction-engine/
     meshOps.ts
     nvidiaNim.ts
+    page-builder/
     physics.ts
     polygonMesh.ts
+    preview-runtime/
+      metrics.ts
+    project-experience/
+      persistence.ts
+      projectHistory.ts
+      useProjectAutosave.ts
+    scene-engine/
     scriptEngine.tsx
+    template-engine/
 
   store/
     contextMenuStore.ts
     editorStore.ts
+    experienceStore.ts
     historyStore.ts
     initialScene.ts
     materialStore.ts
     physicsStore.ts
     polygonMeshStore.ts
+    previewStatsStore.ts
     sceneStore.ts
     sceneTree.ts
     timelineStore.ts
@@ -377,6 +664,8 @@ src/
 ---
 
 ## Fluxo de Uso
+
+### Fluxo Cena 3D
 
 ```text
  Add / Importar GLB / Gerar IA
@@ -412,6 +701,54 @@ src/
 9. Aplique fisica, behaviors, efeitos ou scripts conforme necessario.
 10. Crie keyframes na Timeline para animar objetos.
 11. Use `Exportar` para baixar a cena atual como `.glb`.
+
+### Fluxo Site 3D Interativo
+
+```text
+  Modo Cena
+      |
+      v
+  Criar/importar cena 3D
+      |
+      v
+  Modo Pagina
+      |
+      v
+  Criar hero/sections/cards/textos/botoes
+      |
+      v
+  Inserir Scene Canvas na pagina
+      |
+      v
+  Modo Interacoes
+      |
+      v
+  Conectar HTML -> objeto/luz/camera 3D
+      |
+      v
+  Modo Preview
+      |
+      v
+  Testar desktop/tablet/mobile
+      |
+      v
+  Modo Exportar
+      |
+      v
+  Gerar estrutura React/Next/Vite/HTML + JSON
+```
+
+1. Monte a cena no `Modo Cena`.
+2. Va para `Modo Pagina`.
+3. Escolha um template ou adicione secoes manualmente.
+4. Insira `3D Scene Canvas` dentro de uma section/hero.
+5. Adicione textos, botoes, cards, imagens, videos, navbar e footer.
+6. Va para `Modo Interacoes`.
+7. Crie triggers como hover, click, mouse move ou scroll.
+8. Escolha um alvo: elemento HTML, objeto 3D, luz, camera ou cena atual.
+9. Teste no `Modo Preview`.
+10. Ajuste responsividade e performance.
+11. Gere os arquivos no `Modo Exportar`.
 
 ---
 
@@ -856,19 +1193,34 @@ Confira se existe algum objeto na cena e tente novamente em um navegador moderno
 - [x] Booleanos entre malhas
 - [x] Modelagem poligonal: Draw Polygon, Knife, Edge Loop/Ring, Bridge, Fill, Inset
 - [x] Sculpt com fallback de pressao para mouse
+- [x] Navegacao por modos: Cena, Pagina, Interacoes, Preview e Exportar
+- [x] Primeira versao do Page Builder
+- [x] Arvore de projeto hibrida Page + Scene
+- [x] Interaction Engine inicial
+- [x] Preview Runtime inicial para experiencias web 3D
+- [x] Export Engine inicial para Next/React/Vite/HTML/JSON
+- [x] Template Engine inicial
+- [x] Runtime web renderizando primitivas, editableMesh, GLTF, texturas, texto 3D, SVG e luzes da cena
+- [x] Save/Load inicial de `ProjectExperience` em `.web3d.json` versionado
+- [x] Reordenacao manual de elementos de pagina no Project Tree
+- [x] Metricas conhecidas de Preview sem estimativa falsa de MB
+- [x] Box / Lasso select de sub-elementos no Edit Mode (com preview visual em tela)
+- [x] Hover preview de vertices, arestas e faces antes de clicar
+- [x] Flip / Recalculate Normals e Smooth / Flat Shading na UI
+- [x] Timeline com keyframes reais exportaveis (player de animacao no runtime React/Next/Vite e standalone HTML)
+- [x] Multi-materiais por face avancado (selecao multi-face + atribuicao em lote + render no Modo Cena e Pagina/Preview)
+- [x] Snap to vertex / edge / face durante transform de sub-elemento
+- [x] Paridade total entre renderer do Modo Cena e renderer web do Modo Pagina/Preview (effects, behaviors, flat shading, multi-materiais)
+- [x] Drag-and-drop, reparenting e indicadores de drop no Page Builder
+- [x] Autosave, historico de versoes e migracoes do `ProjectExperience` (localStorage com ate 24 entradas)
+- [x] ZIP exportavel com assets reais organizados em `public/models`, `public/textures`, `public/images`
+- [x] Runtime exportado standalone com Three.js via CDN e todas as interacoes (HTML/CSS/JS puro, sem build)
+- [x] Preview com tamanho real de arquivos, resolucao de texturas, draw calls, geometrias, triangulos, memoria JS heap e FPS preciso
 
 ### Em Progresso / Planejado
-- [ ] Box / Lasso select de sub-elementos
-- [ ] Hover preview antes de clicar
-- [ ] Flip/Recalculate Normals e Smooth/Flat Shading na UI
-- [ ] Timeline com keyframes reais exportaveis
-- [ ] Multi-materiais por face avancado
-- [ ] Snap to vertex/edge/face durante transform de sub-elemento
-
-### Funcionalidades ausentes/não planejadas
 
 #### Core
-- [ ] **Save/Load de Projeto** - Formato `.e3d` com compressao
+- [ ] **Save/Load avancado de Projeto** - Formato `.e3d`/binario com compressao, diff e empacotamento de assets
 - [ ] **Exportacao multi-formato** - FBX, OBJ, USD, STL, DAE
 - [ ] **Importacao multi-formato** - FBX, OBJ, USD, 3DS, DAE
 - [ ] **Sistema de Preferences** - Configuracoes do usuario, temas, atalhos customizaveis
@@ -962,6 +1314,8 @@ PRs sao bem-vindas. Para bugs, abra uma [Issue](https://github.com/DinDja/Editor
 ## Status
 
 Este projeto esta em desenvolvimento ativo. A base atual cobre cena, materiais, import/export, atalhos, edicao de malha, modelagem poligonal (Draw Polygon, Knife, Edge Loop/Ring), sculpt com suporte a mouse, fisica, animacao, behaviors, efeitos, scripts e geracao de malhas via IA.
+
+A camada de construtor visual de sites 3D interativos (Modo Pagina, Modo Interacoes, Modo Preview, Modo Exportar) agora conta com paridade total com o renderer do Modo Cena, exportacao ZIP com assets reais organizados, runtime standalone em HTML/CSS/JS puro via Three.js CDN, autosave com historico de versoes, drag-and-drop e reparenting no Page Builder, alem de metricas reais de preview (draw calls, triangulos, resolucao de texturas, heap JS e FPS). O Edit Mode ganhou Box/Lasso select, hover preview, Flip/Recalculate Normals, Smooth/Flat Shading, multi-materiais por face em lote e snap de sub-elementos. A timeline agora exporte keyframes reais que rodam no runtime exportado.
 
 
 

@@ -15,6 +15,7 @@ type TimelineStore = {
   selectedKeyframeIds: string[];
   keyframes: TransformKeyframe[];
   setPlayheadFrame: (frame: number) => void;
+  setKeyframes: (keyframes: TransformKeyframe[]) => void;
   setFps: (fps: number) => void;
   setDurationFrames: (durationFrames: number) => void;
   setFrameRange: (startFrame: number, endFrame: number) => void;
@@ -61,6 +62,13 @@ export const useTimelineStore = create<TimelineStore>((set, get) => ({
     set((state) => ({
       playheadFrame: clampFrame(frame, state.durationFrames),
     })),
+
+  setKeyframes: (keyframes) =>
+    set({
+      keyframes: sortKeyframes(keyframes),
+      selectedKeyframeIds: [],
+      isPlaying: false,
+    }),
 
   setFps: (fps) =>
     set({

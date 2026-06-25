@@ -84,8 +84,8 @@ export default function LoginPage() {
         <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top,_rgba(16,185,129,0.06),_transparent_55%)]" />
       </div>
 
-      <div className="grid min-h-screen w-full lg:grid-cols-[1.1fr_1fr]">
-        <section className="relative flex flex-col justify-between overflow-hidden border-r border-neutral-800/60 bg-gradient-to-br from-[#0e1012] via-[#0c0e10] to-[#0a0c0d] px-14 py-16 lg:flex xl:px-20 xl:py-20">
+      <div className="grid h-dvh w-full lg:grid-cols-[1.1fr_1fr]">
+        <section className="relative hidden flex-col justify-between overflow-hidden border-r border-neutral-800/60 bg-gradient-to-br from-[#0e1012] via-[#0c0e10] to-[#0a0c0d] px-14 py-24 lg:flex xl:px-20 xl:py-28">
           <div aria-hidden="true" className="pointer-events-none absolute inset-0">
             <TupiPattern className="absolute -right-32 -top-32 h-[680px] w-[680px] text-emerald-400" />
             <TupiPattern
@@ -107,7 +107,7 @@ export default function LoginPage() {
           </div>
 
           <div className="relative z-10 max-w-xl">
-            <div className="mb-8 inline-flex items-center gap-2 rounded-full border border-neutral-800/80 bg-neutral-900/60 px-3 py-1 text-[11px] font-medium uppercase tracking-[0.22em] text-emerald-300/90">
+            <div className="mb-14 inline-flex items-center gap-2 rounded-full border border-neutral-800/80 bg-neutral-900/60 px-3 py-1 text-[11px] font-medium uppercase tracking-[0.22em] text-emerald-300/90">
               <span className="h-1.5 w-1.5 rounded-full bg-emerald-400 shadow-[0_0_8px_rgba(52,211,153,0.8)]" />
               Território · Conhecimento · Ação
             </div>
@@ -118,14 +118,14 @@ export default function LoginPage() {
               conhecimento.
             </h1>
 
-            <p className="mt-7 max-w-lg text-pretty text-[15px] leading-relaxed text-neutral-400">
+            <p className="mt-12 max-w-lg text-pretty text-[15px] leading-relaxed text-neutral-400">
               Uma experiência digital guiada por tecnologia, território e
               inteligência. Modele cenas, organize dados e transforme
               informações em decisões com uma interface brasileira, clara e
               autoral.
             </p>
 
-            <ul className="mt-12 grid gap-5 text-sm text-neutral-300 sm:grid-cols-2">
+            <ul className="mt-20 grid gap-6 text-sm text-neutral-300 sm:grid-cols-2">
               <li className="flex items-start gap-3">
                 <ShieldCheck size={16} className="mt-0.5 shrink-0 text-emerald-400" />
                 <span>Acesso seguro com criptografia ponta a ponta.</span>
@@ -156,20 +156,18 @@ export default function LoginPage() {
           </div>
         </section>
 
-        <section className="relative flex flex-col justify-center px-6 py-16 sm:px-10 sm:py-20 lg:px-16 lg:py-24 xl:px-24">
-          <div className="mb-14 flex items-center justify-between lg:hidden">
-            <BrandMark />
-            <span className="rounded-full border border-emerald-500/20 bg-emerald-500/5 px-3 py-1 text-[10px] font-medium uppercase tracking-[0.22em] text-emerald-300/80">
-              v1.0
-            </span>
-          </div>
-
-          <div className="mx-auto w-full max-w-md">
-            <div className="mb-2 pb-2">
-              <h2 className="text-2xl font-semibold tracking-tight text-neutral-50 sm:text-3xl">
-                Acessar plataforma
-              </h2>
+        <section className="relative flex flex-col overflow-y-auto px-6 py-16 sm:px-10 sm:py-20 lg:px-16 lg:py-24 xl:px-24">
+          <div className="m-auto flex w-full max-w-md flex-col">
+            <div className="mb-14 flex items-center justify-between lg:hidden">
+              <BrandMark />
+              <span className="rounded-full border border-emerald-500/20 bg-emerald-500/5 px-3 py-1 text-[10px] font-medium uppercase tracking-[0.22em] text-emerald-300/80">
+                v1.0
+              </span>
             </div>
+
+            <h2 className="mb-2 pb-2 text-2xl font-semibold tracking-tight text-neutral-50 sm:text-3xl">
+              Acessar plataforma
+            </h2>
 
             <div className="rounded-2xl border border-neutral-800/80 bg-gradient-to-b from-[#131517] to-[#0e1012] p-8 shadow-[0_30px_60px_-30px_rgba(0,0,0,0.7)] backdrop-blur-sm sm:p-12">
               <form onSubmit={handleSubmit} noValidate className="grid gap-7">

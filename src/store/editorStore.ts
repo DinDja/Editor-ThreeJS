@@ -1,13 +1,20 @@
 import { create } from 'zustand';
 import type { ActiveTool, MeshEditMode, MeshSelectionMode, MobilePanel, ObjectSelectionMode, PointerType, SculptFalloff, SculptMode, Vec3, ViewportDisplayMode } from './types';
 
+export type MeshSelectMode = 'click' | 'box' | 'lasso';
+
+export type MeshSnapTarget = 'off' | 'vertex' | 'edge' | 'face';
+
 type EditorState = {
   selectedObjectIds: string[];
   activeTool: ActiveTool;
   objectSelectionMode: ObjectSelectionMode;
   viewportDisplayMode: ViewportDisplayMode;
   meshSelectionMode: MeshSelectionMode;
+  meshSelectMode: MeshSelectMode;
   meshEditMode: MeshEditMode;
+  meshSnapEnabled: boolean;
+  meshSnapTarget: MeshSnapTarget;
   selectedVertexIndices: number[];
   selectedEdgeVertexIndices: [number, number] | null;
   selectedEdgeIndices: number[];
@@ -54,7 +61,10 @@ type EditorState = {
   setObjectSelectionMode: (mode: ObjectSelectionMode) => void;
   setViewportDisplayMode: (mode: ViewportDisplayMode) => void;
   setMeshSelectionMode: (mode: MeshSelectionMode) => void;
+  setMeshSelectMode: (mode: MeshSelectMode) => void;
   setMeshEditMode: (mode: MeshEditMode) => void;
+  setMeshSnapEnabled: (enabled: boolean) => void;
+  setMeshSnapTarget: (target: MeshSnapTarget) => void;
   setSelectedVertices: (indices: number[]) => void;
   toggleVertexSelection: (index: number, additive?: boolean) => void;
   setSelectedEdge: (edge: [number, number] | null) => void;
@@ -104,7 +114,10 @@ export const useEditorStore = create<EditorState>((set) => ({
   objectSelectionMode: 'subelement',
   viewportDisplayMode: 'textured',
   meshSelectionMode: 'vertex',
+  meshSelectMode: 'click',
   meshEditMode: 'object',
+  meshSnapEnabled: false,
+  meshSnapTarget: 'vertex',
   selectedVertexIndices: [],
   selectedEdgeVertexIndices: null,
   selectedEdgeIndices: [],
@@ -223,7 +236,10 @@ export const useEditorStore = create<EditorState>((set) => ({
       selectedFaceIndex: null,
       selectedFaceIndices: [],
     }),
+  setMeshSelectMode: (meshSelectMode) => set({ meshSelectMode }),
   setMeshEditMode: (meshEditMode) => set({ meshEditMode }),
+  setMeshSnapEnabled: (meshSnapEnabled) => set({ meshSnapEnabled }),
+  setMeshSnapTarget: (meshSnapTarget) => set({ meshSnapTarget }),
   setSelectedVertices: (selectedVertexIndices) =>
     set({ selectedVertexIndices, selectedEdgeVertexIndices: null, selectedEdgeIndices: [], selectedFaceIndex: null, selectedFaceIndices: [] }),
   toggleVertexSelection: (index, additive = false) =>

@@ -176,6 +176,7 @@ const applyViewportMaterialProps = (
   editorMaterial: EditorMaterial,
   textureSet: MaterialTextureSet,
   displayMode: ViewportDisplayMode,
+  flatShading = false,
 ) => {
   const textured = displayMode === 'textured';
   applyMaterialProps(material, editorMaterial, textured ? textureSet : EMPTY_TEXTURE_SET);
@@ -184,6 +185,7 @@ const applyViewportMaterialProps = (
   material.opacity = displayMode === 'wireframe' ? 1 : editorMaterial.opacity;
   material.transparent = displayMode === 'wireframe' ? false : editorMaterial.opacity < 1;
   material.depthWrite = material.opacity >= 1;
+  material.flatShading = flatShading;
 
   if (!textured) {
     material.map = null;
@@ -432,10 +434,16 @@ function EditableMeshAsset({ object, material }: { object: SceneObject; material
 
     return objectMaterials.map((editorMaterial, index) => {
       const nextMaterial = new THREE.MeshStandardMaterial();
-      applyViewportMaterialProps(nextMaterial, editorMaterial, textureSets[editorMaterial.uuid] ?? EMPTY_TEXTURE_SET, viewportDisplayMode);
+      applyViewportMaterialProps(
+        nextMaterial,
+        editorMaterial,
+        textureSets[editorMaterial.uuid] ?? EMPTY_TEXTURE_SET,
+        viewportDisplayMode,
+        object.metadata.flatShading === true,
+      );
       return nextMaterial;
     });
-  }, [objectMaterials, textureSets, viewportDisplayMode]);
+  }, [object.metadata.flatShading, objectMaterials, textureSets, viewportDisplayMode]);
 
   useEffect(() => () => geometry?.dispose(), [geometry]);
   useEffect(
@@ -650,7 +658,7 @@ function EditableMeshAsset({ object, material }: { object: SceneObject; material
     >
       {!meshMaterials && (
         <meshStandardMaterial
-          key={`${viewportDisplayMode}-${materialTextureKey(material)}`}
+          key={`${viewportDisplayMode}-${materialTextureKey(material)}-${object.metadata.flatShading === true}`}
           color={getMaterialRenderColor(material, textureSet)}
           metalness={material.metalness}
           roughness={material.roughness}
@@ -666,6 +674,7 @@ function EditableMeshAsset({ object, material }: { object: SceneObject; material
           displacementScale={viewportDisplayMode === 'textured' && textureSet.displacementMap ? 0.015 : 0}
           side={THREE.DoubleSide}
           wireframe={viewportDisplayMode === 'wireframe'}
+          flatShading={object.metadata.flatShading === true}
         />
       )}
     </mesh>
@@ -703,7 +712,7 @@ function PrimitiveAsset({ object, material }: { object: SceneObject; material: E
         <boxGeometry key={geometryKey} args={[geometry.width, geometry.height, geometry.depth, geometry.widthSegments, geometry.heightSegments, geometry.depthSegments]} />
       )}
       <meshStandardMaterial
-        key={`${viewportDisplayMode}-${materialTextureKey(material)}`}
+        key={`${viewportDisplayMode}-${materialTextureKey(material)}-${object.metadata.flatShading === true}`}
         color={getMaterialRenderColor(material, textureSet)}
         metalness={material.metalness}
         roughness={material.roughness}
@@ -719,6 +728,7 @@ function PrimitiveAsset({ object, material }: { object: SceneObject; material: E
         displacementScale={viewportDisplayMode === 'textured' && textureSet.displacementMap ? 0.015 : 0}
         side={THREE.DoubleSide}
         wireframe={viewportDisplayMode === 'wireframe'}
+        flatShading={object.metadata.flatShading === true}
         />
     </mesh>
   );

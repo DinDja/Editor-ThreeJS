@@ -1,7 +1,7 @@
 'use client';
 
 import { useMemo, useState } from 'react';
-import { Brush, Check, Copy, Crosshair, FlipHorizontal2, Grid3X3, Layers, RotateCcw, Trash2 } from 'lucide-react';
+import { Brush, Check, Copy, Crosshair, FlipHorizontal2, Grid3X3, Layers, RotateCcw, Sparkles, Trash2 } from 'lucide-react';
 import { applyScaleToPrimitiveGeometry, mergePrimitiveGeometry } from '@/lib/geometryOps';
 import {
   bevelEdge,
@@ -11,10 +11,13 @@ import {
   createPrimitiveEditableMesh,
   deleteFace,
   extrudeFace,
+  flipFacesNormals,
   invertMask,
   loopCutMesh,
+  recalculateOutwardNormals,
   remeshDyntopoLite,
   setFaceMaterial,
+  setFacesMaterial,
   subdivideMesh,
   subdivideFace,
   weldVertices,
@@ -187,9 +190,16 @@ export default function ModelingTools({ object, material }: ModelingToolsProps) 
   const removeMaterialsForObjects = useMaterialStore((state) => state.removeMaterialsForObjects);
   const activeTool = useEditorStore((state) => state.activeTool);
   const meshSelectionMode = useEditorStore((state) => state.meshSelectionMode);
+  const meshSelectMode = useEditorStore((state) => state.meshSelectMode);
+  const setMeshSelectMode = useEditorStore((state) => state.setMeshSelectMode);
+  const meshSnapEnabled = useEditorStore((state) => state.meshSnapEnabled);
+  const meshSnapTarget = useEditorStore((state) => state.meshSnapTarget);
+  const setMeshSnapEnabled = useEditorStore((state) => state.setMeshSnapEnabled);
+  const setMeshSnapTarget = useEditorStore((state) => state.setMeshSnapTarget);
   const selectedVertexIndices = useEditorStore((state) => state.selectedVertexIndices);
   const selectedEdgeVertexIndices = useEditorStore((state) => state.selectedEdgeVertexIndices);
   const selectedFaceIndex = useEditorStore((state) => state.selectedFaceIndex);
+  const selectedFaceIndices = useEditorStore((state) => state.selectedFaceIndices);
   const sculptMode = useEditorStore((state) => state.sculptMode);
   const sculptFalloff = useEditorStore((state) => state.sculptFalloff);
   const sculptSymmetryX = useEditorStore((state) => state.sculptSymmetryX);
@@ -407,11 +417,38 @@ export default function ModelingTools({ object, material }: ModelingToolsProps) 
   };
 
   const handleAssignFaceMaterial = (materialId: string) => {
-    if (!object.editableMesh || selectedFaceIndex === null) return;
+    if (!object.editableMesh) return;
+    const targetFaces = selectedFaceIndices.length > 0 ? selectedFaceIndices : selectedFaceIndex !== null ? [selectedFaceIndex] : [];
+    if (targetFaces.length === 0) return;
 
     pushSnapshot();
     updateObject(object.uuid, {
-      editableMesh: setFaceMaterial(object.editableMesh, selectedFaceIndex, materialId === object.materialId ? null : materialId),
+      editableMesh: setFacesMaterial(object.editableMesh, targetFaces, materialId === object.materialId ? null : materialId),
+    });
+  };
+
+  const handleFlipNormals = () => {
+    if (!object.editableMesh) return;
+    const targetFaces = selectedFaceIndices.length > 0 ? selectedFaceIndices : selectedFaceIndex !== null ? [selectedFaceIndex] : [];
+    pushSnapshot();
+    updateObject(object.uuid, {
+      editableMesh:
+        targetFaces.length > 0
+          ? flipFacesNormals(object.editableMesh, targetFaces)
+          : flipFacesNormals(object.editableMesh, Array.from({ length: Math.floor(object.editableMesh.indices.length / 3) }, (_, i) => i)),
+    });
+  };
+
+  const handleRecalculateNormals = () => {
+    if (!object.editableMesh) return;
+    pushSnapshot();
+    updateObject(object.uuid, { editableMesh: recalculateOutwardNormals(object.editableMesh) });
+  };
+
+  const toggleFlatShading = () => {
+    pushSnapshot();
+    updateObject(object.uuid, {
+      metadata: { ...object.metadata, flatShading: object.metadata.flatShading !== true },
     });
   };
 
@@ -510,6 +547,47 @@ export default function ModelingTools({ object, material }: ModelingToolsProps) 
 
   return (
     <div className="grid gap-4">
+      <div className="grid gap-2 rounded-md border border-neutral-800 bg-neutral-950/45 p-3">
+        <span className={labelClass}>Selecao de sub-elementos</span>
+        <div className="grid grid-cols-3 gap-2">
+          {(['click', 'box', 'lasso'] as const).map((mode) => (
+            <button
+              key={mode}
+              type="button"
+              onClick={() => setMeshSelectMode(mode)}
+              className={`${buttonClass} ${meshSelectMode === mode ? activeButtonClass : ''}`}
+              title={mode === 'click' ? 'Selecionar por clique' : mode === 'box' ? 'Selecao por caixa (arraste)' : 'Selecao por lazo (arraste)'}
+            >
+              {mode === 'click' ? 'Click' : mode === 'box' ? 'Box' : 'Lasso'}
+            </button>
+          ))}
+        </div>
+        <label className="flex h-11 cursor-pointer items-center justify-between gap-3 rounded-md border border-neutral-700/80 bg-[#0d0f10] px-3 text-xs font-medium text-neutral-300 transition hover:border-emerald-400/70 hover:text-emerald-100">
+          <span>Snap ao transformar sub-elemento</span>
+          <input
+            type="checkbox"
+            checked={meshSnapEnabled}
+            onChange={(event) => setMeshSnapEnabled(event.target.checked)}
+            className="h-4 w-4 cursor-pointer accent-emerald-400"
+          />
+        </label>
+        {meshSnapEnabled && (
+          <div className="grid grid-cols-4 gap-2">
+            {(['off', 'vertex', 'edge', 'face'] as const).map((target) => (
+              <button
+                key={target}
+                type="button"
+                onClick={() => setMeshSnapTarget(target)}
+                className={`${buttonClass} ${meshSnapTarget === target ? activeButtonClass : ''}`}
+                title={`Snap para ${target}`}
+              >
+                {target === 'off' ? 'Off' : target === 'vertex' ? 'Vert' : target === 'edge' ? 'Edge' : 'Face'}
+              </button>
+            ))}
+          </div>
+        )}
+      </div>
+
       <div className="grid grid-cols-2 gap-2">
         <button
           type="button"
@@ -794,7 +872,9 @@ export default function ModelingTools({ object, material }: ModelingToolsProps) 
           <div className="grid gap-2 rounded-md border border-neutral-800 bg-neutral-950/50 p-2.5">
             <div className="grid grid-cols-2 gap-2">
               <label className="grid gap-1">
-                <span className={labelClass}>Material da face</span>
+                <span className={labelClass}>
+                  Material da face {selectedFaceIndices.length > 1 ? `(${selectedFaceIndices.length})` : ''}
+                </span>
                 <select
                   value={
                     selectedFaceIndex === null
@@ -802,7 +882,7 @@ export default function ModelingTools({ object, material }: ModelingToolsProps) 
                       : object.editableMesh.faceMaterialIds?.[selectedFaceIndex] ?? object.materialId
                   }
                   onChange={(event) => handleAssignFaceMaterial(event.target.value)}
-                  disabled={selectedFaceIndex === null}
+                  disabled={selectedFaceIndex === null && selectedFaceIndices.length === 0}
                   className={inputClass}
                 >
                   {objectMaterials.map((item) => (
@@ -828,6 +908,30 @@ export default function ModelingTools({ object, material }: ModelingToolsProps) 
               </button>
               <button type="button" onClick={handleClearFaceMaterials} className={buttonClass}>
                 Limpar Mats
+              </button>
+            </div>
+          </div>
+
+          <div className="grid gap-2 rounded-md border border-neutral-800 bg-neutral-950/50 p-2.5">
+            <span className={labelClass}>Normais / Shading</span>
+            <div className="grid grid-cols-3 gap-2">
+              <button type="button" onClick={handleFlipNormals} disabled={!object.editableMesh} className={buttonClass} title="Inverter normais (faces selecionadas ou todas)">
+                <FlipHorizontal2 size={13} />
+                Flip
+              </button>
+              <button type="button" onClick={handleRecalculateNormals} disabled={!object.editableMesh} className={buttonClass} title="Recalcular normais para fora">
+                <Sparkles size={13} />
+                Recalc
+              </button>
+              <button
+                type="button"
+                onClick={toggleFlatShading}
+                disabled={!object.editableMesh && !object.metadata.flatShading}
+                className={`${buttonClass} ${object.metadata.flatShading === true ? activeButtonClass : ''}`}
+                title="Alternar flat / smooth shading"
+              >
+                <Grid3X3 size={13} />
+                {object.metadata.flatShading === true ? 'Flat' : 'Smooth'}
               </button>
             </div>
           </div>

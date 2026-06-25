@@ -93,6 +93,7 @@ export type SceneObjectMetadata = {
   sourceMaterialNames?: string[];
   materialOverrides?: Record<string, boolean>;
   physics?: ScenePhysicsConfig;
+  flatShading?: boolean;
   [key: string]: unknown;
 };
 

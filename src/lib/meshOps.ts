@@ -792,6 +792,20 @@ export const setFaceMaterial = (mesh: EditableMesh, faceIndex: number, materialI
   };
 };
 
+export const setFacesMaterial = (mesh: EditableMesh, faceIndices: number[], materialId: string | null): EditableMesh => {
+  const faceCount = Math.floor(mesh.indices.length / 3);
+  const target = Array.from(new Set(faceIndices.filter((index) => index >= 0 && index < faceCount)));
+  if (target.length === 0) return cloneMeshData(mesh);
+
+  const faceMaterialIds = cloneFaceMaterials(mesh);
+  for (const faceIndex of target) faceMaterialIds[faceIndex] = materialId;
+
+  return {
+    ...cloneMeshData(mesh),
+    faceMaterialIds,
+  };
+};
+
 export const clearFaceMaterials = (mesh: EditableMesh): EditableMesh => ({
   ...cloneMeshData(mesh),
   faceMaterialIds: undefined,
@@ -1181,4 +1195,103 @@ export const createSelectedEdgeGeometry = (mesh: EditableMesh, edge: [number, nu
   const geometry = new THREE.BufferGeometry();
   geometry.setAttribute('position', new THREE.Float32BufferAttribute([...a, ...b], 3));
   return geometry;
+};
+
+export const createSelectedFacesGeometry = (mesh: EditableMesh, faceIndices: number[]) => {
+  const validFaces = Array.from(
+    new Set(faceIndices.filter((index) => index >= 0 && index < Math.floor(mesh.indices.length / 3))),
+  );
+  if (validFaces.length === 0) return null;
+
+  const positions: number[] = [];
+  const indices: number[] = [];
+  const vertexLookup = new Map<string, number>();
+  const toKey = (vertex: Vec3) => `${vertex[0]}|${vertex[1]}|${vertex[2]}`;
+
+  for (const faceIndex of validFaces) {
+    const start = faceIndex * 3;
+    const face = mesh.indices.slice(start, start + 3);
+    for (const vertexIndex of face) {
+      const vertex = mesh.vertices[vertexIndex] ?? [0, 0, 0];
+      const key = toKey(vertex);
+      let nextIndex = vertexLookup.get(key);
+      if (nextIndex === undefined) {
+        nextIndex = positions.length / 3;
+        vertexLookup.set(key, nextIndex);
+        positions.push(vertex[0], vertex[1], vertex[2]);
+      }
+      indices.push(nextIndex);
+    }
+  }
+
+  const geometry = new THREE.BufferGeometry();
+  geometry.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
+  geometry.setIndex(indices);
+  geometry.computeVertexNormals();
+  return geometry;
+};
+
+export const flipFacesNormals = (mesh: EditableMesh, faceIndices: number[]): EditableMesh => {
+  const faceCount = Math.floor(mesh.indices.length / 3);
+  const flipSet = new Set(faceIndices.filter((index) => index >= 0 && index < faceCount));
+  if (flipSet.size === 0) return cloneMeshData(mesh);
+
+  const nextIndices = [...mesh.indices];
+  for (const faceIndex of flipSet) {
+    const start = faceIndex * 3;
+    const a = nextIndices[start];
+    const b = nextIndices[start + 1];
+    const c = nextIndices[start + 2];
+    nextIndices[start] = a;
+    nextIndices[start + 1] = c;
+    nextIndices[start + 2] = b;
+  }
+
+  return {
+    ...cloneMeshData(mesh),
+    indices: nextIndices,
+  };
+};
+
+export const recalculateOutwardNormals = (mesh: EditableMesh): EditableMesh => {
+  const faceCount = Math.floor(mesh.indices.length / 3);
+  if (faceCount === 0) return cloneMeshData(mesh);
+
+  const centroid = new THREE.Vector3();
+  let counted = 0;
+  for (let faceIndex = 0; faceIndex < faceCount; faceIndex += 1) {
+    const start = faceIndex * 3;
+    for (let offset = 0; offset < 3; offset += 1) {
+      const vertex = mesh.vertices[mesh.indices[start + offset]];
+      if (vertex) {
+        centroid.add(vectorFromVertex(vertex));
+        counted += 1;
+      }
+    }
+  }
+  if (counted > 0) centroid.multiplyScalar(1 / counted);
+
+  const facesToFlip: number[] = [];
+  const faceCenter = new THREE.Vector3();
+  for (let faceIndex = 0; faceIndex < faceCount; faceIndex += 1) {
+    const start = faceIndex * 3;
+    const normal = getFaceNormal(mesh, faceIndex);
+    faceCenter.set(0, 0, 0);
+    let vertexCount = 0;
+    for (let offset = 0; offset < 3; offset += 1) {
+      const vertex = mesh.vertices[mesh.indices[start + offset]];
+      if (vertex) {
+        faceCenter.add(vectorFromVertex(vertex));
+        vertexCount += 1;
+      }
+    }
+    if (vertexCount === 0) continue;
+    faceCenter.multiplyScalar(1 / vertexCount);
+    const outward = faceCenter.clone().sub(centroid);
+    if (outward.lengthSq() > 0 && normal.dot(outward) < 0) {
+      facesToFlip.push(faceIndex);
+    }
+  }
+
+  return flipFacesNormals(mesh, facesToFlip);
 };
