@@ -7,11 +7,14 @@ import {
   type KeyboardEvent as ReactKeyboardEvent,
   type MouseEvent,
   type ReactNode,
+  useMemo,
 } from 'react';
 import ExperienceSceneCanvas from './ExperienceSceneCanvas';
 import { EffectsLayer } from '@/components/effects';
 import type { InteractionDocument } from '@/lib/interaction-engine/types';
 import type { PageDocument, PageNode, PreviewDevice } from '@/lib/page-builder/types';
+import { EFFECT_REGISTRY } from '@/lib/effects-system/registry';
+import { getVisualPreset } from '@/lib/template-engine/presets';
 
 type PageExperienceProps = {
   page: PageDocument;
@@ -84,6 +87,11 @@ function PlaceholderMedia({ type }: { type: 'image' | 'video' }) {
   );
 }
 
+function hasSceneCanvasChild(node: PageNode): boolean {
+  if (!node.children) return false;
+  return node.children.some((child) => child.type === 'sceneCanvas');
+}
+
 function PageNodeView({
   node,
   interactions,
@@ -92,6 +100,8 @@ function PageNodeView({
   mode,
   onSelectNode,
   onUpdateNodeProps,
+  hasWebglBackground,
+  presetBgRgb,
 }: {
   node: PageNode;
   interactions: InteractionDocument[];
@@ -100,9 +110,29 @@ function PageNodeView({
   mode: 'edit' | 'preview';
   onSelectNode?: (id: string) => void;
   onUpdateNodeProps?: (id: string, patch: Record<string, unknown>) => void;
+  hasWebglBackground?: boolean;
+  presetBgRgb?: string;
 }) {
   const style = toCssProperties(node, device);
   const nodeInteractions = interactions.filter((interaction) => interaction.sourceId === node.id);
+
+  // When page-level WebGL background effects exist, make sections
+  // semi-transparent so particles/3D scenes show through.
+  // Sections with their own sceneCanvas child are skipped.
+  if (hasWebglBackground && presetBgRgb && !hasSceneCanvasChild(node)) {
+    const sectionTypes = new Set<string>(['section', 'navbar', 'footer']);
+    if (sectionTypes.has(node.type)) {
+      const opacity = node.type === 'navbar' ? 0.7 : 0.55;
+      style.background = `rgba(${presetBgRgb}, ${opacity})`;
+      if (node.type !== 'navbar') {
+        style.backdropFilter = 'blur(4px)';
+      }
+    }
+    if (node.type === 'card') {
+      style.background = `rgba(${presetBgRgb}, 0.6)`;
+      style.backdropFilter = 'blur(6px)';
+    }
+  }
   const selected = selectedNodeId === node.id && mode === 'edit';
   const editable = mode === 'edit' && Boolean(onUpdateNodeProps);
 
@@ -274,6 +304,8 @@ function PageNodeView({
         mode={mode}
         onSelectNode={onSelectNode}
         onUpdateNodeProps={onUpdateNodeProps}
+        hasWebglBackground={hasWebglBackground}
+        presetBgRgb={presetBgRgb}
       />
     )),
   );
@@ -292,8 +324,31 @@ export default function PageExperience({
 }: PageExperienceProps) {
   const effects = page.effects?.items ?? [];
   const effectIntensity = page.effects?.intensity ?? 1;
+
+  // Detect WebGL background effects that should show through sections
+  const hasWebglBackground = useMemo(() =>
+    effects.some((e) => e.enabled && EFFECT_REGISTRY[e.type]?.renderer === 'webgl' && EFFECT_REGISTRY[e.type]?.category === 'background'),
+    [effects],
+  );
+
+  // Extract preset background RGB for consistent section tinting per template
+  const presetBgRgb = useMemo(() => {
+    if (!hasWebglBackground) return;
+    const presetId = page.effects?.presetId;
+    const preset = presetId ? getVisualPreset(presetId) : null;
+    const bg = preset?.palette.background ?? '#0d0f10';
+    const hex = bg.replace('#', '');
+    const r = parseInt(hex.substring(0, 2), 16);
+    const g = parseInt(hex.substring(2, 4), 16);
+    const b = parseInt(hex.substring(4, 6), 16);
+    return `${r}, ${g}, ${b}`;
+  }, [hasWebglBackground, page.effects?.presetId]);
+
   return (
-    <main className="relative min-h-full w-full bg-[#101214] text-neutral-100">
+    <main
+      className="relative min-h-full w-full text-neutral-100"
+      style={{ background: hasWebglBackground ? 'transparent' : '#101214' }}
+    >
       {effects.length > 0 && <EffectsLayer effects={effects} globalIntensity={effectIntensity} mode={mode} />}
       <div className="relative" style={{ zIndex: 10 }}>
         {page.children.map((node) => (
@@ -306,6 +361,8 @@ export default function PageExperience({
             mode={mode}
             onSelectNode={onSelectNode}
             onUpdateNodeProps={onUpdateNodeProps}
+            hasWebglBackground={hasWebglBackground}
+            presetBgRgb={presetBgRgb}
           />
         ))}
       </div>

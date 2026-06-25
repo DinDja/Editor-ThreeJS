@@ -43,7 +43,11 @@ export type ExperienceTemplateId =
   | 'tech-startup-landing'
   | 'glb-showcase'
   | 'particle-showcase'
-  | 'indie-game-page';
+  | 'indie-game-page'
+  | 'power-ai-landing'
+  | 'taskly-landing'
+  | 'vanguard-brand'
+  | 'lithos-geology';
 
 export type ExperienceTemplate = {
   id: ExperienceTemplateId;
@@ -666,6 +670,186 @@ const particleShowcase = (): ExperienceTemplate => ({
   },
 });
 
+const powerAiLanding = (): ExperienceTemplate => ({
+  id: 'power-ai-landing',
+  name: 'Power AI',
+  description: 'Hero gradiente, glass navbar, marcas em loop com vídeo de fundo.',
+  category: 'startup',
+  exportTarget: 'next',
+  presetId: 'power-ai',
+  performance: 'medium',
+  accent: '#f472b6',
+  createPage: () =>
+    themedPage('power-ai', 'Power AI', (p) => [
+      buildNavbar(p, 'POWER AI', 'Recursos,API,Preços,Contato'.split(',')),
+      buildHero(p, {
+        variant: 'background',
+        title: 'Power AI',
+        subtitle: 'Inteligência artificial que amplifica seu time — integração simples, resultados reais.',
+        cta: 'Começar agora',
+        ctaHref: '#start',
+      }),
+      buildStatsRow(p, [
+        { value: '10x', label: 'Mais produtivo' },
+        { value: '99%', label: 'Precisão' },
+        { value: '45+', label: 'Integrações' },
+      ]),
+      buildFeaturesGrid(p, [
+        { title: 'Modelos avançados', body: 'LLMs proprietários treinados para seu domínio.' },
+        { title: 'Integração plug-and-play', body: 'API REST e SDKs para Python, Node e Go.' },
+        { title: 'Segurança enterprise', body: 'Criptografia ponta a ponta e conformidade SOC2.' },
+      ]),
+      buildCTA(p, {
+        title: 'Acelere sua empresa com IA',
+        body: 'Teste grátis por 14 dias, sem compromisso.',
+        cta: 'Solicitar demo',
+        ctaHref: '#demo',
+      }),
+      buildFooter(p, '© 2026 Power AI'),
+    ]),
+  createEffects: () => [
+    effect('shaderBackground', 0, { color: '#05060a', colorB: '#f472b6', colorC: '#a855f7', speed: 0.25, opacity: 0.7 }),
+    effect('particleField', 1, { count: 1800, color: '#f472b6', colorB: '#a855f7', shape: 'cloud', depth: 6, connectLines: true }),
+    effect('customCursor', 46, { cursorStyle: 'neoGlow', cursorColor: '#f472b6', showTrail: true, trailLength: 8, showLight: true, lightColor: '#f472b6', lightIntensity: 6 }),
+    effect('noiseOverlay', 42, { opacity: 0.05 }),
+  ],
+  createInteractions: (page) => {
+    const scene = firstSceneCanvas(page);
+    return scene ? [createDefaultInteraction(scene.id, 'current-scene', 'mouseMove', 'rotateObject3D')] : [];
+  },
+});
+
+const tasklyLanding = (): ExperienceTemplate => ({
+  id: 'taskly-landing',
+  name: 'Taskly',
+  description: 'Landing limpa de produtividade com glass UI, gradiente e preview de app.',
+  category: 'saas',
+  exportTarget: 'next',
+  presetId: 'taskly',
+  performance: 'low',
+  accent: '#3b82f6',
+  createPage: () =>
+    themedPage('taskly', 'Taskly', (p) => [
+      buildNavbar(p, 'Taskly', 'Recursos,Preços,Login'.split(',')),
+      buildHero(p, {
+        variant: 'centered',
+        title: 'Organize seu time com Taskly',
+        subtitle: 'Gestão de tarefas visual, colaborativa e em tempo real — integrada ao seu workflow.',
+        cta: 'Começar grátis',
+        ctaHref: '#start',
+      }),
+      buildStatsRow(p, [
+        { value: '500k+', label: 'Usuários ativos' },
+        { value: '98%', label: 'Satisfação' },
+        { value: '4.9', label: 'App Store' },
+      ]),
+      buildFeaturesGrid(p, [
+        { title: 'Kanban inteligente', body: 'Arraste cards, crie automações e acompanhe métricas.' },
+        { title: 'Colaboração real', body: 'Comentários, menções e notificações em tempo real.' },
+        { title: 'Integrações', body: 'Slack, GitHub, Figma e 40+ ferramentas.' },
+      ]),
+      buildCTA(p, {
+        title: 'Produtividade que seu time merece',
+        body: 'Plano gratuito para até 10 membros.',
+        cta: 'Testar agora',
+        ctaHref: '#signup',
+      }),
+      buildFooter(p, '© 2026 Taskly'),
+    ]),
+  createEffects: () => [
+    effect('gradientMesh', 0, { color: '#3b82f6', colorB: '#6366f1', colorC: '#a78bfa', blur: 60, opacity: 0.25, speed: 0.3 }),
+    effect('scrollReveal', 30, { once: true }),
+    effect('customCursor', 46, { cursorStyle: 'tech', cursorColor: '#3b82f6', showTrail: true, trailLength: 5, showLight: false }),
+  ],
+  createInteractions: () => [],
+});
+
+const vanguardBrand = (): ExperienceTemplate => ({
+  id: 'vanguard-brand',
+  name: 'Vanguard',
+  description: 'Landing de marca escura com tipografia bold, vídeo hero e stats.',
+  category: 'institutional',
+  exportTarget: 'next',
+  presetId: 'vanguard',
+  performance: 'low',
+  accent: '#ffffff',
+  createPage: () =>
+    themedPage('vanguard', 'Vanguard', (p) => [
+      buildNavbar(p, 'VANGUARD', 'Work,Studio,Contact'.split(',')),
+      buildHero(p, {
+        variant: 'centered',
+        title: 'Design.\nDisrupt.\nConquer.',
+        subtitle: 'Studio de branding e identidade visual para marcas que não seguem o padrão.',
+        cta: 'Ver portfólio',
+        ctaHref: '#work',
+      }),
+      buildStatsRow(p, [
+        { value: '120+', label: 'Projetos entregues' },
+        { value: '18', label: 'Prêmios' },
+        { value: '96%', label: 'Retenção' },
+      ]),
+      buildFeaturesGrid(p, [
+        { title: 'Brand Strategy', body: 'Posicionamento e naming para empresas em crescimento.' },
+        { title: 'Visual Identity', body: 'Sistemas de identidade completos com diretrizes e assets.' },
+        { title: 'Digital Presence', body: 'Sites, motion e experiências interativas premium.' },
+      ]),
+      buildCTA(p, {
+        title: 'Vamos construir algo marcante',
+        body: 'Agende uma conversa sem compromisso com nosso estúdio.',
+        cta: 'Falar conosco',
+        ctaHref: '#contact',
+      }),
+      buildFooter(p, '© 2026 VANGUARD'),
+    ]),
+  createEffects: () => [
+    effect('shaderBackground', 0, { color: '#000000', colorB: '#1a1a2e', colorC: '#0d0d0d', speed: 0.15, opacity: 0.5 }),
+    effect('scrollReveal', 30, { distance: 64, duration: 800, once: true }),
+    effect('customCursor', 46, { cursorStyle: 'editorial', cursorColor: '#ffffff', showTrail: true, trailLength: 6, showLight: false }),
+  ],
+  createInteractions: () => [],
+});
+
+const lithosGeology = (): ExperienceTemplate => ({
+  id: 'lithos-geology',
+  name: 'Lithos',
+  description: 'Temática geológica com imagem de fundo, spotlight revelador e serifa itálica.',
+  category: 'editorial',
+  exportTarget: 'next',
+  presetId: 'lithos',
+  performance: 'low',
+  accent: '#d97706',
+  createPage: () =>
+    themedPage('lithos', 'Lithos', (p) => [
+      buildNavbar(p, 'LITHOS', 'Layers,About,Contact'.split(',')),
+      buildHero(p, {
+        variant: 'background',
+        title: 'Layers hold\ntales of time',
+        subtitle: 'Exploração visual das camadas da terra — onde cada estrato conta uma história de milhões de anos.',
+        cta: 'Explorar camadas',
+        ctaHref: '#layers',
+      }),
+      buildFeaturesGrid(p, [
+        { title: 'Estratos', body: 'Cada camada revela um período geológico distinto com minerais únicos.' },
+        { title: 'Fósseis', body: 'Registros de vida ancestral preservados na matriz sedimentar.' },
+        { title: 'Minerais', body: 'Cristalizações e formações que contam a história química da terra.' },
+      ]),
+      buildCTA(p, {
+        title: 'Descubra o que a terra guarda',
+        body: 'Exposição imersiva com curadoria científica.',
+        cta: 'Visitar exposição',
+        ctaHref: '#expo',
+      }),
+      buildFooter(p, '© 2026 LITHOS'),
+    ]),
+  createEffects: () => [
+    effect('parallaxLayer', 30, { strength: 0.25 }),
+    effect('scrollReveal', 30, { distance: 56, duration: 800, once: true }),
+    effect('customCursor', 46, { cursorStyle: 'luxury', cursorColor: '#d97706', showTrail: true, trailLength: 6, showLight: true, lightColor: '#d97706', lightIntensity: 4 }),
+    effect('noiseOverlay', 42, { opacity: 0.06 }),
+  ],
+  createInteractions: () => [],
+});
+
 const indieGamePage = (): ExperienceTemplate => ({
   id: 'indie-game-page',
   name: 'Landing de Game Indie',
@@ -725,6 +909,10 @@ export const EXPERIENCE_TEMPLATES: ExperienceTemplate[] = [
   glbShowcase(),
   particleShowcase(),
   indieGamePage(),
+  powerAiLanding(),
+  tasklyLanding(),
+  vanguardBrand(),
+  lithosGeology(),
 ];
 
 export const getTemplate = (id: ExperienceTemplateId): ExperienceTemplate =>

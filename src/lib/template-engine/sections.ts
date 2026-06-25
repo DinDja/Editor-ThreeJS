@@ -131,25 +131,10 @@ export const buildHero = (
   }
 
   if (opts.variant === 'background' || opts.variant === 'immersive') {
-    const sceneCanvas = createPageNode('sceneCanvas', {
-      name: 'Background Scene',
-      props: { placement: 'background', interactive: opts.variant === 'immersive', transparent: true, linkedSceneId: 'current-scene' },
-      styles: createResponsiveStyles({
-        position: 'absolute',
-        width: '100%',
-        height: '100%',
-        minHeight: '100%',
-        top: 0,
-        left: 0,
-        zIndex: 0,
-        borderRadius: 0,
-        overflow: 'hidden',
-      }),
-    });
     return createPageNode('section', {
       name: 'Hero Section',
       styles: createResponsiveStyles({ ...heroBase, minHeight: opts.variant === 'immersive' ? 880 : 680 }, { minHeight: 640, padding: '48px 20px' }),
-      children: [sceneCanvas, copyGroup],
+      children: [copyGroup],
     });
   }
 
