@@ -36,6 +36,16 @@ export const findPageNode = (nodes: PageNode[], id: string | null): PageNode | n
   return null;
 };
 
+export const findParentPageNode = (nodes: PageNode[], id: string | null): PageNode | null => {
+  if (!id) return null;
+  for (const node of nodes) {
+    if (node.children?.some((child) => child.id === id)) return node;
+    const found = findParentPageNode(node.children ?? [], id);
+    if (found) return found;
+  }
+  return null;
+};
+
 export type PageNodeLocation = {
   node: PageNode;
   parentId: string | null;

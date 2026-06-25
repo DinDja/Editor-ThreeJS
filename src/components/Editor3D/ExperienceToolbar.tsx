@@ -132,7 +132,7 @@ export default function ExperienceToolbar() {
   const historyEntries = historyOpen ? listProjectHistory().slice(0, 8) : [];
 
   return (
-    <header className="flex h-12 shrink-0 items-center gap-2 overflow-x-auto border-b border-neutral-800/80 bg-[#1a1b1e] px-2 text-neutral-100">
+    <header className="flex h-12 shrink-0 items-center border-b border-neutral-800/80 bg-[#1a1b1e] px-2 text-neutral-100">
       <input
         ref={fileInputRef}
         type="file"
@@ -140,80 +140,81 @@ export default function ExperienceToolbar() {
         className="hidden"
         onChange={loadProject}
       />
-      {activeMode === 'page' && (
-        <>
+      <div className="flex min-w-0 flex-1 items-center gap-2 overflow-x-auto">
+        {activeMode === 'page' && (
+          <>
+            <button
+              type="button"
+              onClick={() => setGalleryOpen(true)}
+              className="flex h-8 shrink-0 items-center gap-1.5 rounded-md border border-emerald-600/40 bg-emerald-950/30 px-3 text-[11px] font-semibold text-emerald-300 transition hover:border-emerald-500/60 hover:bg-emerald-900/40"
+              title="Galeria de templates"
+            >
+              <LayoutTemplate size={13} />
+              Templates
+            </button>
+            <div className="h-5 w-px shrink-0 bg-neutral-800" />
+            {pageNodeTypes.map((item) => (
+              <button
+                key={item.type}
+                type="button"
+                onClick={() => addPageNode(item.type)}
+                className="flex h-8 shrink-0 items-center gap-1 rounded-md border border-neutral-700/50 bg-neutral-900/50 px-2.5 text-[11px] font-medium text-neutral-400 transition hover:border-emerald-400/40 hover:text-emerald-200"
+              >
+                <Plus size={12} />
+                {item.label}
+              </button>
+            ))}
+          </>
+        )}
+
+        {activeMode === 'interactions' && (
           <button
             type="button"
-            onClick={() => setGalleryOpen(true)}
+            onClick={() => addInteraction()}
             className="flex h-8 shrink-0 items-center gap-1.5 rounded-md border border-emerald-600/40 bg-emerald-950/30 px-3 text-[11px] font-semibold text-emerald-300 transition hover:border-emerald-500/60 hover:bg-emerald-900/40"
-            title="Galeria de templates"
           >
-            <LayoutTemplate size={13} />
-            Templates
+            <MousePointer2 size={12} />
+            Nova interacao
           </button>
-          <div className="h-5 w-px shrink-0 bg-neutral-800" />
-          {pageNodeTypes.map((item) => (
-            <button
-              key={item.type}
-              type="button"
-              onClick={() => addPageNode(item.type)}
-              className="flex h-8 shrink-0 items-center gap-1 rounded-md border border-neutral-700/50 bg-neutral-900/50 px-2.5 text-[11px] font-medium text-neutral-400 transition hover:border-emerald-400/40 hover:text-emerald-200"
-            >
-              <Plus size={12} />
-              {item.label}
-            </button>
-          ))}
-        </>
-      )}
+        )}
 
-      {activeMode === 'interactions' && (
-        <button
-          type="button"
-          onClick={() => addInteraction()}
-          className="flex h-8 shrink-0 items-center gap-1.5 rounded-md border border-emerald-600/40 bg-emerald-950/30 px-3 text-[11px] font-semibold text-emerald-300 transition hover:border-emerald-500/60 hover:bg-emerald-900/40"
-        >
-          <MousePointer2 size={12} />
-          Nova interacao
-        </button>
-      )}
-
-      {activeMode === 'preview' && (
-        <div className="flex shrink-0 items-center gap-1 rounded-md bg-neutral-900/60 p-0.5">
-          {(['desktop', 'tablet', 'mobile'] as PreviewDevice[]).map((device) => (
-            <button
-              key={device}
-              type="button"
-              onClick={() => setPreviewDevice(device)}
-              className={`flex h-8 items-center gap-1 rounded-md px-3 text-[11px] font-medium transition ${
-                previewDevice === device ? 'bg-emerald-400/10 text-emerald-200' : 'text-neutral-500 hover:bg-neutral-800 hover:text-neutral-200'
-              }`}
-            >
-              {deviceIcons[device]}
-              {device}
-            </button>
-          ))}
-        </div>
-      )}
-
-      {activeMode === 'export' && (
-        <>
-          <div className="relative shrink-0">
-            <select
-              aria-label="Formato de exportacao"
-              value={exportTarget}
-              onChange={(event) => setExportTarget(event.target.value as ExportTarget)}
-              className="h-8 appearance-none rounded-md border border-neutral-700/50 bg-neutral-900 px-8 text-[11px] font-medium text-neutral-400 outline-none transition hover:border-neutral-600 focus:border-emerald-500"
-            >
-              {(Object.keys(exportTargetLabel) as ExportTarget[]).map((target) => (
-                <option key={target} value={target}>{exportTargetLabel[target]}</option>
-              ))}
-            </select>
-            <Download size={12} className="pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2 text-neutral-500" />
+        {activeMode === 'preview' && (
+          <div className="flex shrink-0 items-center gap-1 rounded-md bg-neutral-900/60 p-0.5">
+            {(['desktop', 'tablet', 'mobile'] as PreviewDevice[]).map((device) => (
+              <button
+                key={device}
+                type="button"
+                onClick={() => setPreviewDevice(device)}
+                className={`flex h-8 items-center gap-1 rounded-md px-3 text-[11px] font-medium transition ${
+                  previewDevice === device ? 'bg-emerald-400/10 text-emerald-200' : 'text-neutral-500 hover:bg-neutral-800 hover:text-neutral-200'
+                }`}
+              >
+                {deviceIcons[device]}
+                {device}
+              </button>
+            ))}
           </div>
-        </>
-      )}
+        )}
 
-      <div className="ml-auto flex shrink-0 items-center gap-1.5">
+        {activeMode === 'export' && (
+          <>
+            <div className="relative shrink-0">
+              <select
+                aria-label="Formato de exportacao"
+                value={exportTarget}
+                onChange={(event) => setExportTarget(event.target.value as ExportTarget)}
+                className="h-8 appearance-none rounded-md border border-neutral-700/50 bg-neutral-900 px-8 text-[11px] font-medium text-neutral-400 outline-none transition hover:border-neutral-600 focus:border-emerald-500"
+              >
+                {(Object.keys(exportTargetLabel) as ExportTarget[]).map((target) => (
+                  <option key={target} value={target}>{exportTargetLabel[target]}</option>
+                ))}
+              </select>
+              <Download size={12} className="pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2 text-neutral-500" />
+            </div>
+          </>
+        )}
+      </div>
+      <div className="flex shrink-0 items-center gap-1.5">
         <div className="relative shrink-0">
           <button
             type="button"

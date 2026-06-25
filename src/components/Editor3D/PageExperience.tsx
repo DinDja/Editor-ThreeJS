@@ -23,6 +23,7 @@ type PageExperienceProps = {
   device?: PreviewDevice;
   mode?: 'edit' | 'preview';
   onSelectNode?: (id: string) => void;
+  onSelectParentNode?: () => void;
   onUpdateNodeProps?: (id: string, patch: Record<string, unknown>) => void;
   onDuplicateNode?: (id: string) => void;
   onRemoveNode?: (id: string) => void;
@@ -99,9 +100,11 @@ function PageNodeView({
   device,
   mode,
   onSelectNode,
+  onSelectParentNode,
   onUpdateNodeProps,
   hasWebglBackground,
   presetBgRgb,
+  parentId,
 }: {
   node: PageNode;
   interactions: InteractionDocument[];
@@ -109,9 +112,11 @@ function PageNodeView({
   device: PreviewDevice;
   mode: 'edit' | 'preview';
   onSelectNode?: (id: string) => void;
+  onSelectParentNode?: () => void;
   onUpdateNodeProps?: (id: string, patch: Record<string, unknown>) => void;
   hasWebglBackground?: boolean;
   presetBgRgb?: string;
+  parentId?: string | null;
 }) {
   const style = toCssProperties(node, device);
   const nodeInteractions = interactions.filter((interaction) => interaction.sourceId === node.id);
@@ -140,6 +145,10 @@ function PageNodeView({
     if (mode !== 'edit') return;
     event.preventDefault();
     event.stopPropagation();
+    if (event.altKey && parentId && onSelectParentNode) {
+      onSelectParentNode();
+      return;
+    }
     onSelectNode?.(node.id);
   };
 
@@ -174,12 +183,13 @@ function PageNodeView({
   const className = selected
     ? 'outline outline-2 outline-emerald-300 outline-offset-2'
     : mode === 'edit'
-      ? 'outline outline-1 outline-transparent hover:outline-emerald-400/40'
+      ? 'outline outline-1 outline-transparent hover:outline-emerald-400/45 hover:bg-emerald-400/[0.02]'
       : undefined;
 
   const sharedProps = {
     'data-experience-node': node.id,
     'data-node-type': node.type,
+    'data-parent-id': parentId ?? '',
     style,
     className,
     tabIndex: nodeInteractions.some((interaction) => interaction.trigger === 'focus' || interaction.trigger === 'blur') ? 0 : undefined,
@@ -221,12 +231,14 @@ function PageNodeView({
 
   if (node.type === 'text') {
     const tag = typeof node.props.as === 'string' ? node.props.as : 'p';
-    return createElement(tag, { ...sharedProps, ...editableTextProps('text', true) }, String(node.props.text ?? ''));
+    const textStyle = mode === 'edit' ? { display: 'block', minHeight: '1.2em', minWidth: '40px' as const } : {};
+    return createElement(tag, { ...sharedProps, style: { ...style, ...textStyle }, ...editableTextProps('text', true) }, String(node.props.text ?? ''));
   }
 
   if (node.type === 'button') {
+    const btnStyle = mode === 'edit' ? { display: 'inline-block', minWidth: '60px' as const, minHeight: '32px' as const } : {};
     return (
-      <a {...sharedProps} {...editableTextProps('label')} href={mode === 'preview' ? String(node.props.href ?? '#') : '#'} role="button">
+      <a {...sharedProps} style={{ ...style, ...btnStyle }} {...editableTextProps('label')} href={mode === 'preview' ? String(node.props.href ?? '#') : '#'} role="button">
         {String(node.props.label ?? 'Button')}
       </a>
     );
@@ -303,9 +315,11 @@ function PageNodeView({
         device={device}
         mode={mode}
         onSelectNode={onSelectNode}
+        onSelectParentNode={onSelectParentNode}
         onUpdateNodeProps={onUpdateNodeProps}
         hasWebglBackground={hasWebglBackground}
         presetBgRgb={presetBgRgb}
+        parentId={node.id}
       />
     )),
   );
@@ -320,6 +334,7 @@ export default function PageExperience({
   device = 'desktop',
   mode = 'preview',
   onSelectNode,
+  onSelectParentNode,
   onUpdateNodeProps,
 }: PageExperienceProps) {
   const effects = page.effects?.items ?? [];
@@ -360,6 +375,7 @@ export default function PageExperience({
             device={device}
             mode={mode}
             onSelectNode={onSelectNode}
+            onSelectParentNode={onSelectParentNode}
             onUpdateNodeProps={onUpdateNodeProps}
             hasWebglBackground={hasWebglBackground}
             presetBgRgb={presetBgRgb}

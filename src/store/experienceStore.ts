@@ -7,6 +7,7 @@ import {
   duplicatePageNodeTree,
   findPageNode,
   findPageNodeLocation,
+  findParentPageNode,
   flattenPageNodes,
   insertPageNodeTree,
   movePageNodeTree,
@@ -36,6 +37,7 @@ type ExperienceState = {
   exportTarget: ExportTarget;
   setActiveMode: (mode: EditorMode) => void;
   setSelectedPageNode: (id: string | null) => void;
+  selectParentPageNode: () => void;
   setSelectedInteraction: (id: string | null) => void;
   setPreviewDevice: (device: PreviewDevice) => void;
   setExportTarget: (target: ExportTarget) => void;
@@ -80,6 +82,11 @@ export const useExperienceStore = create<ExperienceState>((set, get) => ({
 
   setActiveMode: (activeMode) => set({ activeMode }),
   setSelectedPageNode: (selectedPageNodeId) => set({ selectedPageNodeId }),
+  selectParentPageNode: () =>
+    set((state) => {
+      const parent = findParentPageNode(state.page.children, state.selectedPageNodeId);
+      return parent ? { selectedPageNodeId: parent.id } : state;
+    }),
   setSelectedInteraction: (selectedInteractionId) => set({ selectedInteractionId }),
   setPreviewDevice: (previewDevice) => set({ previewDevice }),
   setExportTarget: (exportTarget) =>

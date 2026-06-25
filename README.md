@@ -379,7 +379,7 @@ O primeiro runtime do Modo Pagina estava simples demais e nao respeitava a cena 
 
 - [x] Drag-and-drop para montar e reordenar elementos.
 - [x] Reparenting na arvore (com indicadores visuais before/after/inside).
-- [ ] Selecao direta mais precisa no canvas de pagina.
+- [x] Selecao direta mais precisa no canvas de pagina.
 - [x] Guias, snapping e handles para layout web.
 - [ ] Editor de breakpoints mais completo.
 - [ ] Estados hover/active/focus para elementos web.
@@ -1239,7 +1239,8 @@ Confira se existe algum objeto na cena e tente novamente em um navegador moderno
 - [x] Autosave, historico de versoes e migracoes do `ProjectExperience` (localStorage com ate 24 entradas)
 - [x] ZIP exportavel com assets reais organizados em `public/models`, `public/textures`, `public/images`
 - [x] Runtime exportado standalone com Three.js via CDN e todas as interacoes (HTML/CSS/JS puro, sem build)
-- [x] Preview com tamanho real de arquivos, resolucao de texturas, draw calls, geometrias, triangulos, memoria JS heap e FPS preciso
+- [x] Preview com tamanho real de arquivos, resolucao de texturas, draw calls, geometries, triangulos, memoria JS heap e FPS preciso
+- [x] Selecao direta mais precisa no canvas de pagina (hover preview com tooltip, Alt+Click para selecionar pai, breadcrumb de ancestrais, hit areas ampliadas para texto/botao)
 
 ### Em Progresso / Planejado
 

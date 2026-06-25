@@ -3,8 +3,8 @@
 import { type PointerEvent as ReactPointerEvent, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { Copy, Grip, MousePointer2, Plus, Trash2 } from 'lucide-react';
 import PageExperience from './PageExperience';
-import { findPageNode } from '@/lib/page-builder/tree';
-import type { PageNodeType, PageStyle } from '@/lib/page-builder/types';
+import { findPageNode, findParentPageNode, flattenPageNodes } from '@/lib/page-builder/tree';
+import type { PageNode, PageNodeType, PageStyle } from '@/lib/page-builder/types';
 import { useExperienceStore } from '@/store/experienceStore';
 
 const canvasAddTypes: Array<{ type: PageNodeType; label: string }> = [
@@ -47,6 +47,14 @@ type DragState = {
   startHeight: number;
 };
 
+type HoverInfo = {
+  id: string;
+  name: string;
+  type: string;
+  x: number;
+  y: number;
+};
+
 const SNAP_SIZE = 8;
 const snapValue = (value: number) => Math.round(value / SNAP_SIZE) * SNAP_SIZE;
 
@@ -56,14 +64,31 @@ const getPageNodeElement = (id: string | null) => {
     .find((element) => element.dataset.experienceNode === id) ?? null;
 };
 
+const buildAncestorChain = (pageChildren: PageNode[], id: string | null): Array<{ id: string; name: string; type: string }> => {
+  if (!id) return [];
+  const allNodes = flattenPageNodes({ id: 'page', type: 'page' as const, name: 'Page', children: pageChildren, responsive: { desktop: 1440, tablet: 820, mobile: 390 } });
+  const chain: Array<{ id: string; name: string; type: string }> = [];
+  let currentId: string | null = id;
+  while (currentId) {
+    const entry = allNodes.find((n) => n.node.id === currentId);
+    if (!entry) break;
+    chain.unshift({ id: entry.node.id, name: entry.node.name, type: entry.node.type });
+    currentId = entry.parentId;
+  }
+  return chain;
+};
+
 export default function PageBuilderWorkspace() {
   const workspaceRef = useRef<HTMLDivElement>(null);
   const dragStateRef = useRef<DragState | null>(null);
   const [selectionRect, setSelectionRect] = useState<SelectionRect | null>(null);
+  const [hoverInfo, setHoverInfo] = useState<HoverInfo | null>(null);
+  const hoverTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const page = useExperienceStore((state) => state.page);
   const interactions = useExperienceStore((state) => state.interactions);
   const selectedPageNodeId = useExperienceStore((state) => state.selectedPageNodeId);
   const setSelectedPageNode = useExperienceStore((state) => state.setSelectedPageNode);
+  const selectParentPageNode = useExperienceStore((state) => state.selectParentPageNode);
   const addPageNode = useExperienceStore((state) => state.addPageNode);
   const updatePageNodeProps = useExperienceStore((state) => state.updatePageNodeProps);
   const updatePageNodeStyle = useExperienceStore((state) => state.updatePageNodeStyle);
@@ -71,6 +96,7 @@ export default function PageBuilderWorkspace() {
   const removePageNode = useExperienceStore((state) => state.removePageNode);
   const movePageNode = useExperienceStore((state) => state.movePageNode);
   const selectedNode = useMemo(() => findPageNode(page.children, selectedPageNodeId), [page, selectedPageNodeId]);
+  const breadcrumb = useMemo(() => buildAncestorChain(page.children, selectedPageNodeId), [page, selectedPageNodeId]);
 
   const refreshSelectionRect = useCallback(() => {
     const element = getPageNodeElement(selectedPageNodeId);
@@ -158,6 +184,42 @@ export default function PageBuilderWorkspace() {
       height: nextHeight,
     });
   }, [selectedNode, updatePageNodeStyle]);
+
+  const handleCanvasPointerMove = useCallback((event: React.PointerEvent<HTMLDivElement>) => {
+    const target = event.target as HTMLElement;
+    const nodeEl = target.closest('[data-experience-node]') as HTMLElement | null;
+    if (!nodeEl) {
+      setHoverInfo(null);
+      return;
+    }
+    const id = nodeEl.dataset.experienceNode;
+    const type = nodeEl.dataset.nodeType;
+    if (!id || !type) {
+      setHoverInfo(null);
+      return;
+    }
+    const node = findPageNode(page.children, id);
+    if (!node) {
+      setHoverInfo(null);
+      return;
+    }
+
+    if (hoverTimeoutRef.current) clearTimeout(hoverTimeoutRef.current);
+    hoverTimeoutRef.current = setTimeout(() => {
+      setHoverInfo({
+        id,
+        name: node.name,
+        type,
+        x: event.clientX + 14,
+        y: event.clientY - 10,
+      });
+    }, 80);
+  }, [page]);
+
+  const handleCanvasPointerLeave = useCallback(() => {
+    if (hoverTimeoutRef.current) clearTimeout(hoverTimeoutRef.current);
+    setHoverInfo(null);
+  }, []);
 
   useLayoutEffect(() => {
     const frame = window.requestAnimationFrame(refreshSelectionRect);
@@ -285,6 +347,8 @@ export default function PageBuilderWorkspace() {
       <div
         className="mx-auto min-h-full w-full max-w-[1440px] overflow-hidden rounded-md border border-neutral-800 bg-[#101214] shadow-2xl"
         onClick={() => setSelectedPageNode(null)}
+        onPointerMove={handleCanvasPointerMove}
+        onPointerLeave={handleCanvasPointerLeave}
       >
         <PageExperience
           page={page}
@@ -293,12 +357,24 @@ export default function PageBuilderWorkspace() {
           mode="edit"
           device="desktop"
           onSelectNode={setSelectedPageNode}
+          onSelectParentNode={selectParentPageNode}
           onUpdateNodeProps={updatePageNodeProps}
           onDuplicateNode={duplicatePageNode}
           onRemoveNode={removePageNode}
         />
       </div>
-      {selectedNode && selectionRect && (
+
+      {hoverInfo && (
+        <div
+          className="pointer-events-none fixed z-50 flex items-center gap-1.5 rounded-md border border-neutral-700/60 bg-neutral-950/90 px-2 py-1 text-[10px] font-medium text-neutral-200 shadow-xl backdrop-blur-sm"
+          style={{ left: hoverInfo.x, top: hoverInfo.y }}
+        >
+          <span className="rounded bg-emerald-400/15 px-1 py-0.5 text-[9px] uppercase tracking-wider text-emerald-300">{hoverInfo.type}</span>
+          <span>{hoverInfo.name}</span>
+        </div>
+      )}
+
+      {selectedNode && selectionRect && breadcrumb.length > 0 && (
         <div
           className="pointer-events-none fixed z-40 border border-emerald-300/90 shadow-[0_0_0_1px_rgba(16,185,129,0.22),0_0_34px_rgba(16,185,129,0.16)]"
           style={{
@@ -310,9 +386,23 @@ export default function PageBuilderWorkspace() {
         >
           <div className="absolute left-1/2 top-0 h-full w-px -translate-x-1/2 bg-emerald-300/20" />
           <div className="absolute left-0 top-1/2 h-px w-full -translate-y-1/2 bg-emerald-300/20" />
-          <div className="absolute -top-6 left-0 rounded border border-neutral-700 bg-neutral-950 px-1.5 py-0.5 text-[10px] font-medium text-neutral-300">
-            {Math.round(selectionRect.width)} x {Math.round(selectionRect.height)}
+          <div className="absolute -top-7 left-0 flex items-center gap-1 rounded border border-neutral-700 bg-neutral-950 px-1.5 py-0.5 text-[10px] font-medium text-neutral-300">
+            <span className="rounded bg-emerald-400/15 px-1 py-0.5 text-[9px] uppercase text-emerald-300">{selectedNode.type}</span>
+            <span>{Math.round(selectionRect.width)} x {Math.round(selectionRect.height)}</span>
           </div>
+          <div className="absolute -bottom-5 left-0 flex items-center gap-1 text-[9px] text-neutral-500">
+            {breadcrumb.map((item, index) => (
+              <span key={item.id} className="flex items-center gap-1">
+                {index > 0 && <span className="text-neutral-700">/</span>}
+                <span className="rounded bg-neutral-800/80 px-1 py-0.5">{item.name}</span>
+              </span>
+            ))}
+          </div>
+          {selectedPageNodeId && findParentPageNode(page.children, selectedPageNodeId) && (
+            <div className="absolute -top-7 right-0 text-[9px] text-neutral-600">
+              Alt+Click: pai
+            </div>
+          )}
           <button
             type="button"
             onPointerDown={(event) => startHandleDrag('move', event)}
