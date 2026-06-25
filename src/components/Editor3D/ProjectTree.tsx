@@ -17,7 +17,7 @@ import {
   Trash2,
   Type,
 } from 'lucide-react';
-import { flattenPageNodes } from '@/lib/page-builder/tree';
+import { findPageNodeLocation, flattenPageNodes } from '@/lib/page-builder/tree';
 import type { PageNode, PageNodeType } from '@/lib/page-builder/types';
 import { buildSceneTree, type SceneTreeNode } from '@/store/sceneTree';
 import { useEditorStore } from '@/store/editorStore';
@@ -123,16 +123,11 @@ function PageRow({ item }: { item: { node: PageNode; depth: number; parentId: st
     setDropPosition(null);
     if (!draggedId || draggedId === item.node.id) return;
     const position = computeDropPosition(event);
-    const siblings = item.parentId
-      ? useExperienceStore.getState().page.children
-      : useExperienceStore.getState().page.children;
-    void siblings;
     if (position === 'inside' && canAcceptChild(item.node)) {
       reparentPageNode(draggedId, item.node.id);
     } else {
-      reparentPageNode(draggedId, item.parentId);
-      const targetIndex = useExperienceStore.getState().page.children.findIndex((node) => node.id === item.node.id);
-      reparentPageNode(draggedId, item.parentId, position === 'before' ? targetIndex : targetIndex + 1);
+      const target = findPageNodeLocation(useExperienceStore.getState().page.children, item.node.id);
+      reparentPageNode(draggedId, target?.parentId ?? null, (target?.index ?? 0) + (position === 'after' ? 1 : 0));
     }
     dragPayload.draggedId = null;
   };

@@ -36,6 +36,35 @@ export const findPageNode = (nodes: PageNode[], id: string | null): PageNode | n
   return null;
 };
 
+export type PageNodeLocation = {
+  node: PageNode;
+  parentId: string | null;
+  index: number;
+  siblingCount: number;
+};
+
+export const findPageNodeLocation = (
+  nodes: PageNode[],
+  id: string | null,
+  parentId: string | null = null,
+): PageNodeLocation | null => {
+  if (!id) return null;
+  for (let index = 0; index < nodes.length; index += 1) {
+    const node = nodes[index];
+    if (node.id === id) {
+      return {
+        node,
+        parentId,
+        index,
+        siblingCount: nodes.length,
+      };
+    }
+    const child = findPageNodeLocation(node.children ?? [], id, node.id);
+    if (child) return child;
+  }
+  return null;
+};
+
 export const updatePageNodeTree = (
   nodes: PageNode[],
   id: string,
@@ -123,6 +152,29 @@ const removeNodeFromTree = (nodes: PageNode[], id: string): { nodes: PageNode[];
   return { nodes: walk(nodes), removed };
 };
 
+const insertNodeIntoTree = (
+  nodes: PageNode[],
+  parentId: string | null,
+  nodeToInsert: PageNode,
+  index?: number,
+): PageNode[] => {
+  if (!parentId) {
+    const nextNodes = [...nodes];
+    const insertIndex = typeof index === 'number' ? Math.max(0, Math.min(index, nextNodes.length)) : nextNodes.length;
+    nextNodes.splice(insertIndex, 0, nodeToInsert);
+    return nextNodes;
+  }
+
+  return updatePageNodeTree(nodes, parentId, (node) => {
+    const children = [...(node.children ?? [])];
+    const insertIndex = typeof index === 'number' ? Math.max(0, Math.min(index, children.length)) : children.length;
+    children.splice(insertIndex, 0, nodeToInsert);
+    return { ...node, children };
+  });
+};
+
+export const insertPageNodeTree = insertNodeIntoTree;
+
 const LEAF_TYPES: PageNodeType[] = ['text', 'button', 'image', 'video', 'sceneCanvas'];
 
 export const canNestPageNode = (parent: PageNode | null, childType: PageNodeType): boolean => {
@@ -139,31 +191,29 @@ export const reparentPageNodeTree = (
   index?: number,
 ): PageNode[] => {
   if (id === newParentId) return nodes;
-  const { nodes: afterRemoval, removed } = removeNodeFromTree(nodes, id);
-  if (!removed) return nodes;
-
+  const originalLocation = findPageNodeLocation(nodes, id);
+  const original = originalLocation?.node ?? null;
   const isDescendant = (parent: PageNode, targetId: string): boolean => {
     if (parent.id === targetId) return true;
     return Boolean(parent.children?.some((child) => isDescendant(child, targetId)));
   };
+
+  if (original && newParentId && isDescendant(original, newParentId)) return nodes;
+
+  const { nodes: afterRemoval, removed } = removeNodeFromTree(nodes, id);
+  if (!removed) return nodes;
+
   if (newParentId && removed.id === newParentId) return nodes;
   if (newParentId) {
     const parent = findPageNode(afterRemoval, newParentId);
-    if (!parent || isDescendant(removed, newParentId)) return nodes;
+    if (!parent) return nodes;
     if (!canNestPageNode(parent, removed.type)) return nodes;
   }
 
-  if (!newParentId) {
-    if (typeof index === 'number') {
-      const next = [...afterRemoval];
-      next.splice(Math.max(0, Math.min(index, next.length)), 0, removed);
-      return next;
-    }
-    return [...afterRemoval, removed];
-  }
+  const sameParent = originalLocation?.parentId === newParentId;
+  const adjustedIndex = sameParent && typeof index === 'number' && index > originalLocation.index
+    ? index - 1
+    : index;
 
-  return updatePageNodeTree(afterRemoval, newParentId, (node) => ({
-    ...node,
-    children: [...(node.children ?? []), removed],
-  }));
+  return insertNodeIntoTree(afterRemoval, newParentId, removed, adjustedIndex);
 };

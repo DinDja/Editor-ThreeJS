@@ -6,15 +6,21 @@ import {
   appendPageNode,
   duplicatePageNodeTree,
   findPageNode,
+  findPageNodeLocation,
   flattenPageNodes,
+  insertPageNodeTree,
   movePageNodeTree,
   type PageNodeMoveDirection,
   removePageNodeTree,
   reparentPageNodeTree,
   updatePageNodeTree,
 } from '@/lib/page-builder/tree';
-import type { EditorMode, ExportTarget, PageDocument, PageNode, PageNodeType, PreviewDevice, ProjectSettings } from '@/lib/page-builder/types';
+import type { EditorMode, ExportTarget, PageDocument, PageEffect, PageEffectsConfig, PageNode, PageNodeType, PreviewDevice, ProjectSettings } from '@/lib/page-builder/types';
+import { createDefaultEffect, getEffectDefinition } from '@/lib/effects-system/registry';
+import type { EffectType } from '@/lib/effects-system/types';
 import { instantiateTemplate, type ExperienceTemplateId } from '@/lib/template-engine/templates';
+import { applyPresetToPage } from '@/lib/template-engine/sections';
+import { getVisualPreset, type VisualPresetId } from '@/lib/template-engine/presets';
 import { createId } from './types';
 
 type InteractionPatch = Partial<Omit<InteractionDocument, 'id'>>;
@@ -45,6 +51,14 @@ type ExperienceState = {
   duplicatePageNode: (id: string) => void;
   resetPage: () => void;
   applyTemplate: (templateId: ExperienceTemplateId, sceneTargetId?: string) => void;
+  applyPreset: (presetId: VisualPresetId) => void;
+  addEffect: (type: EffectType, scope?: 'page' | string) => PageEffect;
+  updateEffect: (id: string, patch: Partial<Omit<PageEffect, 'id' | 'type'>>) => void;
+  updateEffectProps: (id: string, propsPatch: Record<string, unknown>) => void;
+  toggleEffect: (id: string) => void;
+  removeEffect: (id: string) => void;
+  reorderEffect: (id: string, direction: PageNodeMoveDirection) => void;
+  setEffectIntensity: (intensity: number) => void;
   addInteraction: (sourceId?: string, targetId?: string, trigger?: InteractionTrigger, action?: InteractionAction) => InteractionDocument;
   updateInteraction: (id: string, patch: InteractionPatch) => void;
   setInteractionAction: (id: string, action: InteractionAction) => void;
@@ -184,10 +198,14 @@ export const useExperienceStore = create<ExperienceState>((set, get) => ({
   duplicatePageNode: (id) =>
     set((state) => {
       const original = findPageNode(state.page.children, id);
+      const location = findPageNodeLocation(state.page.children, id);
       if (!original) return state;
       const copy = duplicatePageNodeTree(original, createId);
       return {
-        page: { ...state.page, children: appendPageNode(state.page.children, null, copy) },
+        page: {
+          ...state.page,
+          children: insertPageNodeTree(state.page.children, location?.parentId ?? null, copy, (location?.index ?? state.page.children.length) + 1),
+        },
         selectedPageNodeId: copy.id,
       };
     }),
@@ -213,6 +231,98 @@ export const useExperienceStore = create<ExperienceState>((set, get) => ({
       selectedInteractionId: template.interactions[0]?.id ?? null,
     }));
   },
+
+  applyPreset: (presetId) => {
+    const preset = getVisualPreset(presetId);
+    set((state) => ({ page: applyPresetToPage(state.page, preset) }));
+  },
+
+  addEffect: (type, scope = 'page') => {
+    const def = getEffectDefinition(type);
+    const newEffect = createDefaultEffect(type, scope, { zIndex: def.category === 'background' ? 0 : 40 });
+    set((state) => {
+      const effects: PageEffectsConfig = state.page.effects ?? { version: 1, items: [], intensity: 1 };
+      return {
+        page: { ...state.page, effects: { ...effects, items: [...effects.items, newEffect] } },
+      };
+    });
+    return newEffect;
+  },
+
+  updateEffect: (id, patch) =>
+    set((state) => {
+      if (!state.page.effects) return state;
+      return {
+        page: {
+          ...state.page,
+          effects: {
+            ...state.page.effects,
+            items: state.page.effects.items.map((item) => (item.id === id ? { ...item, ...patch } : item)),
+          },
+        },
+      };
+    }),
+
+  updateEffectProps: (id, propsPatch) =>
+    set((state) => {
+      if (!state.page.effects) return state;
+      return {
+        page: {
+          ...state.page,
+          effects: {
+            ...state.page.effects,
+            items: state.page.effects.items.map((item) =>
+              item.id === id ? { ...item, props: { ...item.props, ...propsPatch } } : item,
+            ),
+          },
+        },
+      };
+    }),
+
+  toggleEffect: (id) =>
+    set((state) => {
+      if (!state.page.effects) return state;
+      return {
+        page: {
+          ...state.page,
+          effects: {
+            ...state.page.effects,
+            items: state.page.effects.items.map((item) =>
+              item.id === id ? { ...item, enabled: !item.enabled } : item,
+            ),
+          },
+        },
+      };
+    }),
+
+  removeEffect: (id) =>
+    set((state) => {
+      if (!state.page.effects) return state;
+      return {
+        page: {
+          ...state.page,
+          effects: { ...state.page.effects, items: state.page.effects.items.filter((item) => item.id !== id) },
+        },
+      };
+    }),
+
+  reorderEffect: (id, direction) =>
+    set((state) => {
+      if (!state.page.effects) return state;
+      const items = [...state.page.effects.items];
+      const index = items.findIndex((item) => item.id === id);
+      if (index < 0) return state;
+      const target = direction === 'up' ? index - 1 : index + 1;
+      if (target < 0 || target >= items.length) return state;
+      [items[index], items[target]] = [items[target], items[index]];
+      return { page: { ...state.page, effects: { ...state.page.effects, items } } };
+    }),
+
+  setEffectIntensity: (intensity) =>
+    set((state) => {
+      const effects = state.page.effects ?? { version: 1, items: [], intensity: 1 };
+      return { page: { ...state.page, effects: { ...effects, intensity: Math.max(0, Math.min(1, intensity)) } } };
+    }),
 
   addInteraction: (sourceId, targetId, trigger = 'hover', action = 'rotateObject3D') => {
     const pageNodes = flattenPageNodes(get().page);

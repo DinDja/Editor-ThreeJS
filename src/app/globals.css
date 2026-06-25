@@ -73,3 +73,25 @@ input:disabled {
 .safe-area-right {
   padding-right: env(safe-area-inset-right, 0px);
 }
+
+/* ----------------------------- Visual Effects ----------------------------- */
+
+@keyframes effectMeshDrift {
+  0%, 100% { transform: translate3d(0, 0, 0) scale(1); }
+  33% { transform: translate3d(8vw, 6vh, 0) scale(1.1); }
+  66% { transform: translate3d(-6vw, 10vh, 0) scale(0.95); }
+}
+
+@keyframes effectAurora {
+  0% { transform: translateX(-8%) skewX(-8deg); opacity: 0.7; }
+  100% { transform: translateX(8%) skewX(8deg); opacity: 1; }
+}
+
+@keyframes effectBeam {
+  0%, 100% { transform: rotate(var(--beam-angle, -12deg)) translateX(-10%); opacity: 0.2; }
+  50% { transform: rotate(var(--beam-angle, -12deg)) translateX(10%); opacity: 0.7; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  [data-reveal] { opacity: 1 !important; transform: none !important; }
+}

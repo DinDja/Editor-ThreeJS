@@ -1,5 +1,8 @@
 import type { InteractionDocument } from '@/lib/interaction-engine/types';
+import type { PageEffectsConfig } from '@/lib/effects-system/types';
 import type { SceneDocument } from '@/lib/scene-engine/types';
+
+export type { PageEffect, PageEffectsConfig } from '@/lib/effects-system/types';
 
 export type EditorMode = 'scene' | 'page' | 'interactions' | 'preview' | 'export';
 
@@ -47,9 +50,18 @@ export type PageStyle = Partial<{
   gridTemplateColumns: string;
   position: 'static' | 'relative' | 'absolute' | 'sticky' | 'fixed';
   top: CSSLength;
+  right: CSSLength;
+  bottom: CSSLength;
   left: CSSLength;
   zIndex: number;
+  transform: string;
+  opacity: number | string;
+  cursor: string;
   background: string;
+  backgroundImage: string;
+  backgroundSize: string;
+  backgroundPosition: string;
+  backdropFilter: string;
   color: string;
   fontFamily: string;
   fontSize: CSSLength;
@@ -57,9 +69,12 @@ export type PageStyle = Partial<{
   lineHeight: CSSLength;
   letterSpacing: CSSLength;
   textAlign: 'left' | 'center' | 'right';
+  textTransform: string;
   borderRadius: CSSLength;
   border: string;
+  borderTop: string;
   boxShadow: string;
+  transition: string;
   overflow: 'visible' | 'hidden' | 'auto' | 'clip';
   objectFit: 'cover' | 'contain' | 'fill';
 }>;
@@ -85,6 +100,11 @@ export type PageDocument = {
   name: string;
   children: PageNode[];
   responsive: ResponsiveSettings;
+  /**
+   * Optional page-level visual effects (particles, shaders, overlays...).
+   * Absent on legacy project files — remains fully backward compatible.
+   */
+  effects?: PageEffectsConfig;
 };
 
 export type ProjectSettings = {

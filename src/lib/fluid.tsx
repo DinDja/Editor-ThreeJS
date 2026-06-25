@@ -202,6 +202,8 @@ type FluidSurfaceProps = {
   rainEnabled: boolean;
   size: [number, number];
   position: [number, number, number];
+  rotation?: [number, number, number];
+  opacity?: number;
 };
 
 export default function FluidSurface({
@@ -212,6 +214,8 @@ export default function FluidSurface({
   rainEnabled,
   size,
   position,
+  rotation = [-Math.PI / 2, 0, 0],
+  opacity = 1,
 }: FluidSurfaceProps) {
   const { gl } = useThree();
   const meshRef = useRef<THREE.Mesh>(null);
@@ -252,10 +256,12 @@ export default function FluidSurface({
       envMap,
       envMapIntensity: 1,
       normalMap: normTarget.texture,
-      normalScale: new THREE.Vector2(1, 1),
+      normalScale: new THREE.Vector2(displacementScale, displacementScale),
+      transparent: opacity < 1,
+      opacity,
     });
     return mat;
-  }, [color, metalness, roughness, envMap, normTarget.texture]);
+  }, [color, metalness, roughness, envMap, normTarget.texture, opacity, displacementScale]);
 
   useEffect(() => {
     if (!meshRef.current) return;
@@ -265,7 +271,10 @@ export default function FluidSurface({
     mat.roughness = roughness;
     mat.envMap = envMap;
     mat.normalMap = normTarget.texture;
-  }, [color, metalness, roughness, envMap, normTarget.texture]);
+    mat.normalScale.set(displacementScale, displacementScale);
+    mat.transparent = opacity < 1;
+    mat.opacity = opacity;
+  }, [color, metalness, roughness, envMap, normTarget.texture, opacity, displacementScale]);
 
   useFrame((_, delta) => {
     if (rainEnabled) {
@@ -291,7 +300,7 @@ export default function FluidSurface({
   }, []);
 
   return (
-    <mesh ref={meshRef} rotation={[-Math.PI / 2, 0, 0]} position={position} material={material}>
+    <mesh ref={meshRef} rotation={rotation} position={position} material={material}>
       <planeGeometry args={size} />
     </mesh>
   );

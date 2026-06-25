@@ -1,7 +1,7 @@
 'use client';
 
 import { type ChangeEvent, type ReactNode, useRef, useState } from 'react';
-import { Download, FileUp, Grid3X3, History, Monitor, MousePointer2, Plus, RotateCcw, Save, Smartphone, Tablet } from 'lucide-react';
+import { Download, FileUp, History, LayoutTemplate, Monitor, MousePointer2, Plus, RotateCcw, Save, Smartphone, Tablet } from 'lucide-react';
 import { exportTargetLabel } from '@/lib/export-engine/exportExperience';
 import type { ExportTarget, PageNodeType, PreviewDevice } from '@/lib/page-builder/types';
 import {
@@ -11,11 +11,11 @@ import {
 } from '@/lib/project-experience/persistence';
 import { listProjectHistory, loadAutosaveEntry, restoreFromEntry } from '@/lib/project-experience/projectHistory';
 import { createSceneDocument } from '@/lib/scene-engine/sceneDocument';
-import { EXPERIENCE_TEMPLATES, type ExperienceTemplateId } from '@/lib/template-engine/templates';
 import { useExperienceStore } from '@/store/experienceStore';
 import { useMaterialStore } from '@/store/materialStore';
 import { useSceneStore } from '@/store/sceneStore';
 import { useTimelineStore } from '@/store/timelineStore';
+import TemplateGallery from './TemplateGallery';
 
 const pageNodeTypes: Array<{ type: PageNodeType; label: string }> = [
   { type: 'section', label: 'Section' },
@@ -39,6 +39,7 @@ const deviceIcons: Record<PreviewDevice, ReactNode> = {
 export default function ExperienceToolbar() {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [historyOpen, setHistoryOpen] = useState(false);
+  const [galleryOpen, setGalleryOpen] = useState(false);
   const activeMode = useExperienceStore((state) => state.activeMode);
   const page = useExperienceStore((state) => state.page);
   const interactions = useExperienceStore((state) => state.interactions);
@@ -47,7 +48,6 @@ export default function ExperienceToolbar() {
   const exportTarget = useExperienceStore((state) => state.exportTarget);
   const addPageNode = useExperienceStore((state) => state.addPageNode);
   const addInteraction = useExperienceStore((state) => state.addInteraction);
-  const applyTemplate = useExperienceStore((state) => state.applyTemplate);
   const setPreviewDevice = useExperienceStore((state) => state.setPreviewDevice);
   const setExportTarget = useExperienceStore((state) => state.setExportTarget);
   const objects = useSceneStore((state) => state.objects);
@@ -142,23 +142,15 @@ export default function ExperienceToolbar() {
       />
       {activeMode === 'page' && (
         <>
-          <div className="relative shrink-0">
-            <select
-              aria-label="Templates"
-              defaultValue=""
-              onChange={(event) => {
-                if (event.target.value) applyTemplate(event.target.value as ExperienceTemplateId);
-                event.currentTarget.value = '';
-              }}
-              className="h-8 appearance-none rounded-md border border-neutral-700/50 bg-neutral-900 px-8 text-[11px] font-medium text-neutral-400 outline-none transition hover:border-neutral-600 focus:border-emerald-500"
-            >
-              <option value="" disabled>Template</option>
-              {EXPERIENCE_TEMPLATES.map((template) => (
-                <option key={template.id} value={template.id}>{template.name}</option>
-              ))}
-            </select>
-            <Grid3X3 size={12} className="pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2 text-neutral-500" />
-          </div>
+          <button
+            type="button"
+            onClick={() => setGalleryOpen(true)}
+            className="flex h-8 shrink-0 items-center gap-1.5 rounded-md border border-emerald-600/40 bg-emerald-950/30 px-3 text-[11px] font-semibold text-emerald-300 transition hover:border-emerald-500/60 hover:bg-emerald-900/40"
+            title="Galeria de templates"
+          >
+            <LayoutTemplate size={13} />
+            Templates
+          </button>
           <div className="h-5 w-px shrink-0 bg-neutral-800" />
           {pageNodeTypes.map((item) => (
             <button
@@ -282,6 +274,7 @@ export default function ExperienceToolbar() {
           Carregar
         </button>
       </div>
+      {galleryOpen && <TemplateGallery onClose={() => setGalleryOpen(false)} />}
     </header>
   );
 }

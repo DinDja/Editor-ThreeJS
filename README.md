@@ -181,6 +181,24 @@ O produto deixou de ser somente um editor de cena/modelagem 3D e passou a ter um
 - Botoes de `Salvar`, `Carregar` e `Historico` (restaurar autosave/versao) no toolbar dos modos web.
 - Reordenacao manual de elementos no Project Tree com mover para cima/baixo entre irmaos.
 - Drag-and-drop com reparenting na arvore de pagina (indicadores before/after/inside).
+- Drag-and-drop corrigido para elementos aninhados, respeitando pai e indice real do alvo.
+- Edição direta no canvas do Modo Pagina:
+  - textos
+  - labels de botoes
+  - titulo/body de cards
+  - marca da navbar
+  - texto do footer
+- Guias e handles no canvas do Modo Pagina:
+  - alca para mover o elemento selecionado
+  - handles para redimensionar largura, altura e canto inferior direito
+  - snapping de 8px em movimento/redimensionamento
+  - linhas-guia de centro e leitura visual de largura x altura
+- Atalhos no canvas de pagina:
+  - `Delete` / `Backspace` remove o elemento selecionado
+  - `Ctrl+D` duplica ao lado do elemento original
+  - setas movem o elemento selecionado via `top/left`
+  - `Shift + setas` move em passos maiores
+- Painel de propriedades web expandido com edição por breakpoint (`base`, `tablet`, `mobile`) e controles de position, top/left/right/bottom, flex/grid, transform, background image, border, overflow, object fit, opacity e transition.
 - Novos modelos de dados para:
   - `ProjectExperience`
   - `PageDocument`
@@ -274,6 +292,7 @@ O produto deixou de ser somente um editor de cena/modelagem 3D e passou a ter um
   - Showcase GLB
   - Card 3D interativo
   - Background particulas
+  - Background superficie liquida
   - Pagina jogo indie
 
 ### Correcoes feitas apos os primeiros testes
@@ -361,7 +380,7 @@ O primeiro runtime do Modo Pagina estava simples demais e nao respeitava a cena 
 - [x] Drag-and-drop para montar e reordenar elementos.
 - [x] Reparenting na arvore (com indicadores visuais before/after/inside).
 - [ ] Selecao direta mais precisa no canvas de pagina.
-- [ ] Guias, snapping e handles para layout web.
+- [x] Guias, snapping e handles para layout web.
 - [ ] Editor de breakpoints mais completo.
 - [ ] Estados hover/active/focus para elementos web.
 - [ ] Sistema de componentes reutilizaveis.
@@ -1212,6 +1231,11 @@ Confira se existe algum objeto na cena e tente novamente em um navegador moderno
 - [x] Snap to vertex / edge / face durante transform de sub-elemento
 - [x] Paridade total entre renderer do Modo Cena e renderer web do Modo Pagina/Preview (effects, behaviors, flat shading, multi-materiais)
 - [x] Drag-and-drop, reparenting e indicadores de drop no Page Builder
+- [x] Edição inline no canvas do Page Builder para textos, botoes, cards, navbar e footer
+- [x] Atalhos de produtividade no canvas de pagina: duplicar, remover e mover com setas
+- [x] Painel web com edição por breakpoint e controles CSS avançados
+- [x] Guias, snapping e handles de mover/redimensionar no canvas do Page Builder
+- [x] Template `Background Superficie Liquida` com efeito WebGL `liquidSurface`
 - [x] Autosave, historico de versoes e migracoes do `ProjectExperience` (localStorage com ate 24 entradas)
 - [x] ZIP exportavel com assets reais organizados em `public/models`, `public/textures`, `public/images`
 - [x] Runtime exportado standalone com Three.js via CDN e todas as interacoes (HTML/CSS/JS puro, sem build)

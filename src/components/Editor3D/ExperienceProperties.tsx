@@ -24,12 +24,13 @@ import {
 } from '@/lib/interaction-engine/types';
 import { exportTargetLabel } from '@/lib/export-engine/exportExperience';
 import { flattenPageNodes, findPageNode } from '@/lib/page-builder/tree';
-import type { ExportTarget, PageStyle } from '@/lib/page-builder/types';
+import type { Breakpoint, ExportTarget, PageStyle } from '@/lib/page-builder/types';
 import { computePreviewRuntimeMetrics } from '@/lib/preview-runtime/metrics';
 import { useEditorStore } from '@/store/editorStore';
 import { useExperienceStore } from '@/store/experienceStore';
 import { useMaterialStore } from '@/store/materialStore';
 import { useSceneStore } from '@/store/sceneStore';
+import { EffectsPanel, GlobalStylePanel } from './EffectsPanel';
 
 const labelClass = 'text-[10px] font-medium uppercase tracking-[0.14em] text-neutral-500';
 const inputClass =
@@ -133,6 +134,7 @@ function ToggleRow({
 }
 
 function WebNodeProperties() {
+  const [styleBreakpoint, setStyleBreakpoint] = useState<Breakpoint>('base');
   const page = useExperienceStore((state) => state.page);
   const selectedPageNodeId = useExperienceStore((state) => state.selectedPageNodeId);
   const updatePageNode = useExperienceStore((state) => state.updatePageNode);
@@ -144,20 +146,28 @@ function WebNodeProperties() {
 
   if (!node) {
     return (
-      <div className="grid h-full place-items-center px-6 text-center text-sm text-neutral-500">
-        Page
+      <div className="min-h-0 flex-1 space-y-1 overflow-auto py-3">
+        <GlobalStylePanel />
+        <EffectsPanel />
+        <div className="grid h-32 place-items-center px-6 text-center text-xs text-neutral-500">
+          Selecione um elemento da pagina para editar conteudo, layout e estilo.
+        </div>
       </div>
     );
   }
 
-  const style = node.styles.base;
+  const style = node.styles[styleBreakpoint] ?? {};
+  const styleValue = (key: keyof PageStyle) =>
+    style[key] ?? (styleBreakpoint !== 'base' ? node.styles.base[key] : undefined) ?? '';
   const setStyle = (key: keyof PageStyle, value: string | number) => {
-    updatePageNodeStyle(node.id, { [key]: value } as Partial<PageStyle>);
+    updatePageNodeStyle(node.id, { [key]: value } as Partial<PageStyle>, styleBreakpoint);
   };
   const setProp = (key: string, value: unknown) => updatePageNodeProps(node.id, { [key]: value });
 
   return (
     <div className="min-h-0 flex-1 space-y-1 overflow-auto py-3">
+      <GlobalStylePanel />
+      <EffectsPanel />
       <Section title="Elemento" icon={<Settings size={11} />}>
         <TextField label="Nome" value={node.name} onChange={(name) => updatePageNode(node.id, { name })} />
         <div className="rounded-md border border-neutral-800 bg-neutral-950/50 p-2 text-xs text-neutral-400">{node.type}</div>
@@ -241,37 +251,97 @@ function WebNodeProperties() {
       )}
 
       <Section title="Layout" icon={<PanelRight size={11} />}>
-        <div className="grid grid-cols-2 gap-2">
-          <TextField label="Largura" value={String(style.width ?? '')} onChange={(value) => setStyle('width', value)} />
-          <TextField label="Altura" value={String(style.height ?? style.minHeight ?? '')} onChange={(value) => setStyle('height', value)} />
-          <TextField label="Padding" value={String(style.padding ?? '')} onChange={(value) => setStyle('padding', value)} />
-          <TextField label="Margin" value={String(style.margin ?? '')} onChange={(value) => setStyle('margin', value)} />
-          <TextField label="Gap" value={String(style.gap ?? '')} onChange={(value) => setStyle('gap', value)} />
-          <TextField label="Z-index" value={String(style.zIndex ?? '')} onChange={(value) => setStyle('zIndex', Number(value) || 0)} />
+        <div className="grid grid-cols-3 gap-1 rounded-md bg-neutral-950/70 p-1">
+          {(['base', 'tablet', 'mobile'] as Breakpoint[]).map((breakpoint) => (
+            <button
+              key={breakpoint}
+              type="button"
+              onClick={() => setStyleBreakpoint(breakpoint)}
+              className={`h-7 rounded text-[10px] font-medium uppercase tracking-[0.12em] transition ${
+                styleBreakpoint === breakpoint ? 'bg-emerald-400/12 text-emerald-200' : 'text-neutral-500 hover:bg-neutral-800 hover:text-neutral-200'
+              }`}
+            >
+              {breakpoint}
+            </button>
+          ))}
         </div>
-        <SelectField
-          label="Display"
-          value={String(style.display ?? 'block')}
-          options={['block', 'flex', 'grid', 'none'].map((value) => ({ value, label: value }))}
-          onChange={(value) => setStyle('display', value)}
-        />
         <div className="grid grid-cols-2 gap-2">
-          <TextField label="Align" value={String(style.alignItems ?? '')} onChange={(value) => setStyle('alignItems', value)} />
-          <TextField label="Justify" value={String(style.justifyContent ?? '')} onChange={(value) => setStyle('justifyContent', value)} />
+          <TextField label="Largura" value={String(styleValue('width'))} onChange={(value) => setStyle('width', value)} />
+          <TextField label="Altura" value={String(styleValue('height'))} onChange={(value) => setStyle('height', value)} />
+          <TextField label="Min H" value={String(styleValue('minHeight'))} onChange={(value) => setStyle('minHeight', value)} />
+          <TextField label="Max W" value={String(styleValue('maxWidth'))} onChange={(value) => setStyle('maxWidth', value)} />
+          <TextField label="Padding" value={String(styleValue('padding'))} onChange={(value) => setStyle('padding', value)} />
+          <TextField label="Margin" value={String(styleValue('margin'))} onChange={(value) => setStyle('margin', value)} />
+          <TextField label="Gap" value={String(styleValue('gap'))} onChange={(value) => setStyle('gap', value)} />
+          <TextField label="Z-index" value={String(styleValue('zIndex'))} onChange={(value) => setStyle('zIndex', Number(value) || 0)} />
         </div>
-        <TextField label="Grid" value={String(style.gridTemplateColumns ?? '')} onChange={(value) => setStyle('gridTemplateColumns', value)} />
+        <div className="grid grid-cols-2 gap-2">
+          <SelectField
+            label="Display"
+            value={String(styleValue('display') || 'block')}
+            options={['block', 'flex', 'grid', 'none'].map((value) => ({ value, label: value }))}
+            onChange={(value) => setStyle('display', value)}
+          />
+          <SelectField
+            label="Position"
+            value={String(styleValue('position') || 'relative')}
+            options={['static', 'relative', 'absolute', 'sticky', 'fixed'].map((value) => ({ value, label: value }))}
+            onChange={(value) => setStyle('position', value)}
+          />
+          <TextField label="Top" value={String(styleValue('top'))} onChange={(value) => setStyle('top', value)} />
+          <TextField label="Left" value={String(styleValue('left'))} onChange={(value) => setStyle('left', value)} />
+          <TextField label="Right" value={String(styleValue('right'))} onChange={(value) => setStyle('right', value)} />
+          <TextField label="Bottom" value={String(styleValue('bottom'))} onChange={(value) => setStyle('bottom', value)} />
+        </div>
+        <div className="grid grid-cols-2 gap-2">
+          <SelectField
+            label="Flex dir"
+            value={String(styleValue('flexDirection') || 'row')}
+            options={['row', 'column'].map((value) => ({ value, label: value }))}
+            onChange={(value) => setStyle('flexDirection', value)}
+          />
+          <TextField label="Place" value={String(styleValue('placeItems'))} onChange={(value) => setStyle('placeItems', value)} />
+          <TextField label="Align" value={String(styleValue('alignItems'))} onChange={(value) => setStyle('alignItems', value)} />
+          <TextField label="Justify" value={String(styleValue('justifyContent'))} onChange={(value) => setStyle('justifyContent', value)} />
+        </div>
+        <TextField label="Grid" value={String(styleValue('gridTemplateColumns'))} onChange={(value) => setStyle('gridTemplateColumns', value)} />
+        <TextField label="Transform" value={String(styleValue('transform'))} onChange={(value) => setStyle('transform', value)} />
       </Section>
 
       <Section title="Visual" icon={<Palette size={11} />}>
-        <TextField label="Background" value={String(style.background ?? '')} onChange={(value) => setStyle('background', value)} />
-        <TextField label="Cor" value={String(style.color ?? '')} onChange={(value) => setStyle('color', value)} />
+        <TextField label="Background" value={String(styleValue('background'))} onChange={(value) => setStyle('background', value)} />
+        <TextField label="Bg image" value={String(styleValue('backgroundImage'))} onChange={(value) => setStyle('backgroundImage', value)} />
+        <TextField label="Cor" value={String(styleValue('color'))} onChange={(value) => setStyle('color', value)} />
+        <TextField label="Borda" value={String(styleValue('border'))} onChange={(value) => setStyle('border', value)} />
         <div className="grid grid-cols-2 gap-2">
-          <TextField label="Fonte" value={String(style.fontSize ?? '')} onChange={(value) => setStyle('fontSize', value)} />
-          <TextField label="Peso" value={String(style.fontWeight ?? '')} onChange={(value) => setStyle('fontWeight', value)} />
-          <TextField label="Radius" value={String(style.borderRadius ?? '')} onChange={(value) => setStyle('borderRadius', value)} />
-          <TextField label="Line" value={String(style.lineHeight ?? '')} onChange={(value) => setStyle('lineHeight', value)} />
+          <TextField label="Fonte" value={String(styleValue('fontSize'))} onChange={(value) => setStyle('fontSize', value)} />
+          <TextField label="Peso" value={String(styleValue('fontWeight'))} onChange={(value) => setStyle('fontWeight', value)} />
+          <TextField label="Radius" value={String(styleValue('borderRadius'))} onChange={(value) => setStyle('borderRadius', value)} />
+          <TextField label="Line" value={String(styleValue('lineHeight'))} onChange={(value) => setStyle('lineHeight', value)} />
+          <SelectField
+            label="Texto"
+            value={String(styleValue('textAlign') || 'left')}
+            options={['left', 'center', 'right'].map((value) => ({ value, label: value }))}
+            onChange={(value) => setStyle('textAlign', value)}
+          />
+          <TextField label="Opacity" value={String(styleValue('opacity'))} onChange={(value) => setStyle('opacity', value)} />
         </div>
-        <TextField label="Sombra" value={String(style.boxShadow ?? '')} onChange={(value) => setStyle('boxShadow', value)} />
+        <div className="grid grid-cols-2 gap-2">
+          <SelectField
+            label="Overflow"
+            value={String(styleValue('overflow') || 'visible')}
+            options={['visible', 'hidden', 'auto', 'clip'].map((value) => ({ value, label: value }))}
+            onChange={(value) => setStyle('overflow', value)}
+          />
+          <SelectField
+            label="Object fit"
+            value={String(styleValue('objectFit') || 'cover')}
+            options={['cover', 'contain', 'fill'].map((value) => ({ value, label: value }))}
+            onChange={(value) => setStyle('objectFit', value)}
+          />
+        </div>
+        <TextField label="Sombra" value={String(styleValue('boxShadow'))} onChange={(value) => setStyle('boxShadow', value)} />
+        <TextField label="Transition" value={String(styleValue('transition'))} onChange={(value) => setStyle('transition', value)} />
       </Section>
 
       <Section title="Responsivo" icon={<Eye size={11} />}>

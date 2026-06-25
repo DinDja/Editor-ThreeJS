@@ -1,7 +1,15 @@
 'use client';
 
-import { createElement, type CSSProperties, type MouseEvent, type ReactNode } from 'react';
+import {
+  createElement,
+  type CSSProperties,
+  type FocusEvent,
+  type KeyboardEvent as ReactKeyboardEvent,
+  type MouseEvent,
+  type ReactNode,
+} from 'react';
 import ExperienceSceneCanvas from './ExperienceSceneCanvas';
+import { EffectsLayer } from '@/components/effects';
 import type { InteractionDocument } from '@/lib/interaction-engine/types';
 import type { PageDocument, PageNode, PreviewDevice } from '@/lib/page-builder/types';
 
@@ -12,6 +20,9 @@ type PageExperienceProps = {
   device?: PreviewDevice;
   mode?: 'edit' | 'preview';
   onSelectNode?: (id: string) => void;
+  onUpdateNodeProps?: (id: string, patch: Record<string, unknown>) => void;
+  onDuplicateNode?: (id: string) => void;
+  onRemoveNode?: (id: string) => void;
 };
 
 const deviceToBreakpoint: Record<PreviewDevice, 'base' | 'tablet' | 'mobile'> = {
@@ -80,6 +91,7 @@ function PageNodeView({
   device,
   mode,
   onSelectNode,
+  onUpdateNodeProps,
 }: {
   node: PageNode;
   interactions: InteractionDocument[];
@@ -87,10 +99,12 @@ function PageNodeView({
   device: PreviewDevice;
   mode: 'edit' | 'preview';
   onSelectNode?: (id: string) => void;
+  onUpdateNodeProps?: (id: string, patch: Record<string, unknown>) => void;
 }) {
   const style = toCssProperties(node, device);
   const nodeInteractions = interactions.filter((interaction) => interaction.sourceId === node.id);
   const selected = selectedNodeId === node.id && mode === 'edit';
+  const editable = mode === 'edit' && Boolean(onUpdateNodeProps);
 
   const handleSelect = (event: MouseEvent<HTMLElement>) => {
     if (mode !== 'edit') return;
@@ -102,19 +116,29 @@ function PageNodeView({
   const handlers = {
     onClick: (event: MouseEvent<HTMLElement>) => {
       handleSelect(event);
+      if (mode !== 'preview') return;
       const clickInteractions = nodeInteractions.filter((interaction) => interaction.trigger === 'click');
       triggerInteractions(clickInteractions, true);
       window.setTimeout(() => triggerInteractions(clickInteractions, false), 360);
     },
     onDoubleClick: () => {
+      if (mode !== 'preview') return;
       const list = nodeInteractions.filter((interaction) => interaction.trigger === 'doubleClick');
       triggerInteractions(list, true);
       window.setTimeout(() => triggerInteractions(list, false), 360);
     },
-    onMouseEnter: () => triggerInteractions(nodeInteractions.filter((interaction) => interaction.trigger === 'hover' || interaction.trigger === 'sectionEnter'), true),
-    onMouseLeave: () => triggerInteractions(nodeInteractions.filter((interaction) => interaction.trigger === 'hover' || interaction.trigger === 'sectionLeave'), false),
-    onFocus: () => triggerInteractions(nodeInteractions.filter((interaction) => interaction.trigger === 'focus'), true),
-    onBlur: () => triggerInteractions(nodeInteractions.filter((interaction) => interaction.trigger === 'blur'), false),
+    onMouseEnter: () => {
+      if (mode === 'preview') triggerInteractions(nodeInteractions.filter((interaction) => interaction.trigger === 'hover' || interaction.trigger === 'sectionEnter'), true);
+    },
+    onMouseLeave: () => {
+      if (mode === 'preview') triggerInteractions(nodeInteractions.filter((interaction) => interaction.trigger === 'hover' || interaction.trigger === 'sectionLeave'), false);
+    },
+    onFocus: () => {
+      if (mode === 'preview') triggerInteractions(nodeInteractions.filter((interaction) => interaction.trigger === 'focus'), true);
+    },
+    onBlur: () => {
+      if (mode === 'preview') triggerInteractions(nodeInteractions.filter((interaction) => interaction.trigger === 'blur'), false);
+    },
   };
 
   const className = selected
@@ -125,11 +149,34 @@ function PageNodeView({
 
   const sharedProps = {
     'data-experience-node': node.id,
+    'data-node-type': node.type,
     style,
     className,
     tabIndex: nodeInteractions.some((interaction) => interaction.trigger === 'focus' || interaction.trigger === 'blur') ? 0 : undefined,
     ...handlers,
   };
+
+  const editableTextProps = (field: string, multiline = false) =>
+    editable
+      ? {
+          contentEditable: true,
+          suppressContentEditableWarning: true,
+          spellCheck: false,
+          onBlur: (event: FocusEvent<HTMLElement>) => {
+            onUpdateNodeProps?.(node.id, { [field]: event.currentTarget.textContent ?? '' });
+          },
+          onKeyDown: (event: ReactKeyboardEvent<HTMLElement>) => {
+            if (event.key === 'Escape') {
+              event.preventDefault();
+              event.currentTarget.blur();
+            }
+            if (event.key === 'Enter' && !multiline) {
+              event.preventDefault();
+              event.currentTarget.blur();
+            }
+          },
+        }
+      : {};
 
   if (node.type === 'sceneCanvas') {
     return (
@@ -144,12 +191,12 @@ function PageNodeView({
 
   if (node.type === 'text') {
     const tag = typeof node.props.as === 'string' ? node.props.as : 'p';
-    return createElement(tag, sharedProps, String(node.props.text ?? ''));
+    return createElement(tag, { ...sharedProps, ...editableTextProps('text', true) }, String(node.props.text ?? ''));
   }
 
   if (node.type === 'button') {
     return (
-      <a {...sharedProps} href={mode === 'preview' ? String(node.props.href ?? '#') : '#'} role="button">
+      <a {...sharedProps} {...editableTextProps('label')} href={mode === 'preview' ? String(node.props.href ?? '#') : '#'} role="button">
         {String(node.props.label ?? 'Button')}
       </a>
     );
@@ -194,7 +241,7 @@ function PageNodeView({
 
   if (node.type === 'navbar') {
     children.push(
-      <strong key="brand" className="text-sm font-semibold text-neutral-50">{String(node.props.brand ?? '3D Web')}</strong>,
+      <strong key="brand" className="text-sm font-semibold text-neutral-50" {...editableTextProps('brand')}>{String(node.props.brand ?? '3D Web')}</strong>,
       <div key="links" className="flex flex-wrap items-center gap-4 text-xs text-neutral-300">
         {Array.isArray(node.props.links)
           ? node.props.links.map((link) => <span key={String(link)}>{String(link)}</span>)
@@ -206,14 +253,14 @@ function PageNodeView({
   if (node.type === 'card') {
     children.push(
       <div key="card-content" className="grid gap-2">
-        <h3 className="text-sm font-semibold text-neutral-50">{String(node.props.title ?? 'Card')}</h3>
-        <p className="text-sm leading-6 text-neutral-400">{String(node.props.body ?? '')}</p>
+        <h3 className="text-sm font-semibold text-neutral-50" {...editableTextProps('title')}>{String(node.props.title ?? 'Card')}</h3>
+        <p className="text-sm leading-6 text-neutral-400" {...editableTextProps('body', true)}>{String(node.props.body ?? '')}</p>
       </div>,
     );
   }
 
   if (node.type === 'footer') {
-    children.push(<span key="footer-text" className="text-xs text-neutral-500">{String(node.props.text ?? '')}</span>);
+    children.push(<span key="footer-text" className="text-xs text-neutral-500" {...editableTextProps('text')}>{String(node.props.text ?? '')}</span>);
   }
 
   children.push(
@@ -226,6 +273,7 @@ function PageNodeView({
         device={device}
         mode={mode}
         onSelectNode={onSelectNode}
+        onUpdateNodeProps={onUpdateNodeProps}
       />
     )),
   );
@@ -240,20 +288,27 @@ export default function PageExperience({
   device = 'desktop',
   mode = 'preview',
   onSelectNode,
+  onUpdateNodeProps,
 }: PageExperienceProps) {
+  const effects = page.effects?.items ?? [];
+  const effectIntensity = page.effects?.intensity ?? 1;
   return (
-    <main className="min-h-full w-full bg-[#101214] text-neutral-100">
-      {page.children.map((node) => (
-        <PageNodeView
-          key={node.id}
-          node={node}
-          interactions={interactions}
-          selectedNodeId={selectedNodeId}
-          device={device}
-          mode={mode}
-          onSelectNode={onSelectNode}
-        />
-      ))}
+    <main className="relative min-h-full w-full bg-[#101214] text-neutral-100">
+      {effects.length > 0 && <EffectsLayer effects={effects} globalIntensity={effectIntensity} mode={mode} />}
+      <div className="relative" style={{ zIndex: 10 }}>
+        {page.children.map((node) => (
+          <PageNodeView
+            key={node.id}
+            node={node}
+            interactions={interactions}
+            selectedNodeId={selectedNodeId}
+            device={device}
+            mode={mode}
+            onSelectNode={onSelectNode}
+            onUpdateNodeProps={onUpdateNodeProps}
+          />
+        ))}
+      </div>
     </main>
   );
 }
