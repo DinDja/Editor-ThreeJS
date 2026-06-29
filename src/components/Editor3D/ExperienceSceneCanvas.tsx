@@ -15,6 +15,8 @@ import { BehaviorEngine } from '@/lib/behaviors';
 import { buildSceneTree, type SceneTreeNode } from '@/store/sceneTree';
 import { usePreviewStatsStore } from '@/store/previewStatsStore';
 import { useExperienceStore } from '@/store/experienceStore';
+import { useEditorStore } from '@/store/editorStore';
+import Scene3DSelection from './Scene3DSelection';
 import { useMaterialStore } from '@/store/materialStore';
 import { useSceneStore } from '@/store/sceneStore';
 import type { EditorMaterial, SceneObject } from '@/store/types';
@@ -926,6 +928,7 @@ function RuntimeScene({ interactive }: { interactive: boolean }) {
   const materials = useMaterialStore((state) => state.materials);
   const objectRefs = useRef(new Map<string, THREE.Object3D>());
   const rootRef = useRef<THREE.Group>(null);
+  const [orbitEnabled, setOrbitEnabled] = useState(true);
 
   const visibleLayerIds = useMemo(
     () => new Set(layers.filter((layer) => layer.visible).map((layer) => layer.id)),
@@ -967,7 +970,17 @@ function RuntimeScene({ interactive }: { interactive: boolean }) {
       </group>
       <InteractionBridge objectRefs={objectRefs} rootRef={rootRef} />
       <RuntimeStatsReporter />
-      <OrbitControls enabled={interactive} enableDamping autoRotate={!interactive} autoRotateSpeed={0.35} />
+      <OrbitControls
+        enabled={interactive && orbitEnabled}
+        enableDamping
+        autoRotate={!interactive}
+        autoRotateSpeed={0.35}
+      />
+      <Scene3DSelection
+        enabled={interactive}
+        objectRefs={objectRefs}
+        setOrbitEnabled={setOrbitEnabled}
+      />
     </>
   );
 }

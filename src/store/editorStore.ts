@@ -64,6 +64,10 @@ type EditorState = {
   clearSelectedObjects: () => void;
   setSelectedReference: (id: string | null) => void;
   setActiveTool: (tool: ActiveTool) => void;
+  scene3DGizmoMode: 'translate' | 'rotate' | 'scale';
+  setScene3DGizmoMode: (mode: 'translate' | 'rotate' | 'scale') => void;
+  scene3DSelectionEnabled: boolean;
+  setScene3DSelectionEnabled: (enabled: boolean) => void;
   setObjectSelectionMode: (mode: ObjectSelectionMode) => void;
   setViewportDisplayMode: (mode: ViewportDisplayMode) => void;
   setMeshSelectionMode: (mode: MeshSelectionMode) => void;
@@ -127,6 +131,8 @@ type EditorState = {
 export const useEditorStore = create<EditorState>((set) => ({
   selectedObjectIds: [],
   activeTool: 'select',
+  scene3DGizmoMode: 'translate',
+  scene3DSelectionEnabled: true,
   objectSelectionMode: 'subelement',
   viewportDisplayMode: 'textured',
   meshSelectionMode: 'vertex',
@@ -248,6 +254,8 @@ export const useEditorStore = create<EditorState>((set) => ({
             sculptBrushNormal: null,
         },
     ),
+  setScene3DGizmoMode: (scene3DGizmoMode) => set({ scene3DGizmoMode }),
+  setScene3DSelectionEnabled: (scene3DSelectionEnabled) => set({ scene3DSelectionEnabled }),
   setObjectSelectionMode: (objectSelectionMode) => set({ objectSelectionMode }),
   setViewportDisplayMode: (viewportDisplayMode) => set({ viewportDisplayMode }),
   setMeshSelectionMode: (meshSelectionMode) =>
