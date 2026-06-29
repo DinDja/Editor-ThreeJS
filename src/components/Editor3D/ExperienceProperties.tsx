@@ -2,21 +2,48 @@
 
 import { useMemo, useState } from 'react';
 import {
+  AlignCenter,
+  AlignLeft,
+  AlignRight,
+  ArrowDown,
+  ArrowRight,
   Box,
   Check,
+  ChevronDown,
+  Circle,
+  Code2,
   Component,
   Copy,
   Database,
   Eye,
+  EyeOff,
+  Grid3X3,
+  Image as ImageIcon,
+  Layers,
+  LayoutGrid,
+  Link2,
+  Lock,
+  LockOpen,
+  Maximize,
+  Minimize,
+  Minus,
+  Monitor,
   MousePointer2,
-  PanelRight,
+  Move,
+  Package,
   Palette,
+  PanelRight,
+  Pencil,
   Plus,
+  RectangleHorizontal,
   Settings,
   SlidersHorizontal,
+  Sparkles,
+  Square,
   Trash2,
   Type,
   Unlink,
+  Zap,
 } from 'lucide-react';
 import {
   INTERACTION_ACTION_LABELS,
@@ -37,20 +64,480 @@ import { useExperienceStore } from '@/store/experienceStore';
 import { useMaterialStore } from '@/store/materialStore';
 import { useSceneStore } from '@/store/sceneStore';
 import { useVariableStore } from '@/store/variableStore';
+import { CursorLibrary } from './CursorLibrary';
 import { EffectsPanel, GlobalStylePanel } from './EffectsPanel';
 import {
   EmptyState,
-  fieldInputClass,
-  fieldLabelClass,
+  Field,
   Section,
   SegmentedControl,
   SelectField,
   TextField,
   ToggleRow,
+  fieldInputClass,
+  fieldLabelClass,
 } from './ui/primitives';
 
 const labelClass = fieldLabelClass;
 const inputClass = fieldInputClass;
+
+/* ----------------------------------------------------------------- Helpers */
+
+const TYPE_LABELS: Record<string, string> = {
+  section: 'Seção',
+  container: 'Container',
+  text: 'Texto',
+  button: 'Botão',
+  image: 'Imagem',
+  video: 'Vídeo',
+  card: 'Cartão',
+  navbar: 'Barra de navegação',
+  footer: 'Rodapé',
+  sceneCanvas: 'Cena 3D',
+  form: 'Formulário',
+  input: 'Campo de texto',
+  select: 'Lista de opções',
+  textarea: 'Área de texto',
+  label: 'Rótulo',
+  modal: 'Modal',
+  menu: 'Menu',
+  menuitem: 'Item de menu',
+  dataTable: 'Tabela de dados',
+  dataForm: 'Formulário de dados',
+  dataList: 'Lista de dados',
+  dataChart: 'Gráfico',
+  dataStat: 'Indicador',
+  pageRoute: 'Rota de página',
+};
+
+const toCssNumber = (value: unknown): number => {
+  if (typeof value === 'number') return value;
+  if (typeof value === 'string') {
+    const trimmed = value.trim();
+    if (!trimmed) return 0;
+    const parsed = Number.parseFloat(trimmed);
+    return Number.isFinite(parsed) ? parsed : 0;
+  }
+  return 0;
+};
+
+const isColorLike = (value: unknown): value is string => {
+  if (typeof value !== 'string') return false;
+  const v = value.trim();
+  return /^#([0-9a-fA-F]{3}|[0-9a-fA-F]{6}|[0-9a-fA-F]{8})$/.test(v)
+    || /^rgba?\(/i.test(v)
+    || /^hsla?\(/i.test(v)
+    || v.startsWith('linear-gradient')
+    || v.startsWith('radial-gradient');
+};
+
+const isOnlyColor = (value: unknown): boolean => {
+  if (typeof value !== 'string') return false;
+  const v = value.trim();
+  return /^#([0-9a-fA-F]{3}|[0-9a-fA-F]{6}|[0-9a-fA-F]{8})$/.test(v)
+    || /^rgba?\(/i.test(v)
+    || /^hsla?\(/i.test(v);
+};
+
+const isTransparentValue = (value: unknown): boolean => {
+  if (typeof value !== 'string') return false;
+  const v = value.trim().toLowerCase();
+  return v === 'transparent' || v === 'none' || v === '';
+};
+
+type Sides = { top: number; right: number; bottom: number; left: number };
+
+const parseSides = (value: unknown): Sides => {
+  const fallback: Sides = { top: 0, right: 0, bottom: 0, left: 0 };
+  if (typeof value !== 'string' || !value.trim()) return fallback;
+  const parts = value.trim().split(/\s+/).map((p) => Number.parseFloat(p));
+  if (parts.some((n) => !Number.isFinite(n))) return fallback;
+  const [top = 0, right = 0, bottom = 0, left = 0] = parts;
+  if (parts.length === 1) return { top, right: top, bottom: top, left: top };
+  if (parts.length === 2) return { top, right, bottom: top, left: right };
+  return { top, right, bottom, left };
+};
+
+const sidesToCss = (sides: Sides): string =>
+  `${sides.top}px ${sides.right}px ${sides.bottom}px ${sides.left}px`;
+
+/* -------------------------------------------------- Friendly Field widgets */
+
+function SliderField({
+  label,
+  value,
+  onChange,
+  min = 0,
+  max = 100,
+  step = 1,
+  unit = 'px',
+  hint,
+}: {
+  label: string;
+  value: number;
+  onChange: (value: number) => void;
+  min?: number;
+  max?: number;
+  step?: number;
+  unit?: string;
+  hint?: string;
+}) {
+  return (
+    <div className="grid gap-1.5">
+      <div className="flex items-center justify-between">
+        <span className={labelClass}>{label}</span>
+        <div className="flex items-center gap-1">
+          <input
+            type="number"
+            value={value}
+            min={min}
+            max={max}
+            step={step}
+            onChange={(e) => onChange(Math.max(min, Math.min(max, Number(e.target.value) || 0)))}
+            className="h-6 w-14 rounded border border-neutral-700/60 bg-[#0d0f10] px-1.5 text-right text-[11px] text-neutral-100 outline-none transition focus:border-emerald-400"
+          />
+          <span className="text-[9px] uppercase text-neutral-600">{unit}</span>
+        </div>
+      </div>
+      <input
+        type="range"
+        min={min}
+        max={max}
+        step={step}
+        value={value}
+        onChange={(e) => onChange(Number(e.target.value))}
+        className="h-1.5 w-full cursor-pointer appearance-none rounded-full bg-neutral-800 accent-emerald-400"
+        aria-label={label}
+      />
+      {hint && <span className="text-[10px] text-neutral-600">{hint}</span>}
+    </div>
+  );
+}
+
+function SpacingField({
+  label,
+  value,
+  onChange,
+  hint,
+}: {
+  label: string;
+  value: unknown;
+  onChange: (css: string) => void;
+  hint?: string;
+}) {
+  const initial = parseSides(value);
+  const [linked, setLinked] = useState(true);
+  const [sides, setSides] = useState<Sides>(initial);
+
+  // If the parent value changes externally, re-parse it.
+  const current = parseSides(value);
+  const isStale = (
+    sides.top !== current.top
+    || sides.right !== current.right
+    || sides.bottom !== current.bottom
+    || sides.left !== current.left
+  );
+  if (isStale && (current.top + current.right + current.bottom + current.left > 0 || isTransparentValue(value))) {
+    // sync state with the latest value
+    setSides(current);
+  }
+
+  const update = (next: Partial<Sides>) => {
+    const merged = { ...sides, ...next };
+    setSides(merged);
+    onChange(linked ? sidesToCss({
+      top: merged.top, right: merged.left, bottom: merged.top, left: merged.left,
+    }) : sidesToCss(merged));
+  };
+
+  return (
+    <div className="grid gap-2 rounded-md border border-neutral-800 bg-neutral-950/30 p-2.5">
+      <div className="flex items-center justify-between">
+        <span className={labelClass}>{label}</span>
+        <button
+          type="button"
+          onClick={() => {
+            const next = !linked;
+            setLinked(next);
+            if (next) {
+              onChange(sidesToCss({
+                top: sides.top, right: sides.left, bottom: sides.top, left: sides.left,
+              }));
+            } else {
+              onChange(sidesToCss(sides));
+            }
+          }}
+          className={`grid h-6 w-6 place-items-center rounded transition ${
+            linked ? 'bg-emerald-400/15 text-emerald-300' : 'text-neutral-500 hover:bg-neutral-800 hover:text-neutral-200'
+          }`}
+          title={linked ? 'Valores vinculados (mude um e todos acompanham)' : 'Valores independentes por lado'}
+          aria-label="Vincular lados"
+          aria-pressed={linked}
+        >
+          <Link2 size={11} />
+        </button>
+      </div>
+      <div className="relative aspect-square w-full max-w-[120px] self-center">
+        <div className="absolute inset-0 rounded border border-dashed border-neutral-700 bg-neutral-950" />
+        <div
+          className="absolute rounded border border-emerald-400/50 bg-emerald-400/10"
+          style={{
+            top: Math.min(sides.top, 60),
+            right: Math.min(sides.right, 60),
+            bottom: Math.min(sides.bottom, 60),
+            left: Math.min(sides.left, 60),
+          }}
+        />
+        {[
+          { key: 'top', pos: 'top-0 left-1/2 -translate-x-1/2 -translate-y-1/2' },
+          { key: 'right', pos: 'right-0 top-1/2 translate-x-1/2 -translate-y-1/2' },
+          { key: 'bottom', pos: 'bottom-0 left-1/2 -translate-x-1/2 translate-y-1/2' },
+          { key: 'left', pos: 'left-0 top-1/2 -translate-x-1/2 -translate-y-1/2' },
+        ].map((side) => (
+          <input
+            key={side.key}
+            type="number"
+            value={sides[side.key as keyof Sides]}
+            min={0}
+            max={500}
+            onChange={(e) => update({ [side.key]: Math.max(0, Number(e.target.value) || 0) } as Partial<Sides>)}
+            className={`absolute h-6 w-10 -translate-x-1/2 -translate-y-1/2 rounded border border-neutral-700/60 bg-[#0d0f10] px-1 text-center text-[10px] text-neutral-100 outline-none transition focus:border-emerald-400 ${
+              side.pos
+            }`}
+            aria-label={side.key}
+            placeholder="0"
+          />
+        ))}
+      </div>
+      {hint && <span className="text-[10px] text-neutral-600">{hint}</span>}
+    </div>
+  );
+}
+
+function ColorField({ label, value, onChange }: { label: string; value: string; onChange: (v: string) => void }) {
+  const safe = /^#([0-9a-fA-F]{3}|[0-9a-fA-F]{6})$/.test(value) ? value : '#000000';
+  return (
+    <div className="grid gap-1.5">
+      <div className="flex items-center justify-between">
+        <span className={labelClass}>{label}</span>
+        <div className="flex items-center gap-1.5">
+          <input
+            type="color"
+            value={safe}
+            onChange={(event) => onChange(event.target.value)}
+            className="h-7 w-8 shrink-0 cursor-pointer rounded-md border border-neutral-700/80 bg-transparent p-0.5 outline-none transition focus:border-emerald-400"
+            aria-label={`${label} cor`}
+          />
+          <input
+            value={value}
+            onChange={(event) => onChange(event.target.value)}
+            placeholder="#000000 ou rgba(…)"
+            className="h-7 w-32 rounded border border-neutral-700/80 bg-[#0d0f10] px-2 font-mono text-[11px] text-neutral-100 outline-none transition focus:border-emerald-400"
+          />
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function BackgroundField({ value, onChange }: { value: string; onChange: (v: string) => void }) {
+  const isColor = isOnlyColor(value);
+  return (
+    <div className="grid gap-2">
+      <div className="flex items-center gap-1 rounded-md border border-neutral-800 bg-neutral-950/40 p-0.5">
+        {(['Cor', 'Gradiente', 'Imagem'] as const).map((tab) => {
+          const isActive =
+            tab === 'Cor'
+              ? (isColor || isTransparentValue(value))
+              : tab === 'Gradiente'
+                ? typeof value === 'string' && value.startsWith('linear-gradient')
+                : typeof value === 'string' && value.startsWith('url(');
+          return (
+            <button
+              key={tab}
+              type="button"
+              onClick={() => {
+                if (tab === 'Cor' && !isColor) onChange('#34d399');
+                else if (tab === 'Gradiente' && !value.startsWith('linear-gradient')) {
+                  onChange('linear-gradient(135deg, #34d399 0%, #38bdf8 100%)');
+                } else if (tab === 'Imagem' && !value.startsWith('url(')) {
+                  onChange('url(https://images.unsplash.com/photo-1518770660439-4636190af475?w=1280)');
+                }
+              }}
+              className={`flex-1 rounded px-2 py-1 text-[10px] font-medium transition ${
+                isActive
+                  ? 'bg-emerald-400/15 text-emerald-200'
+                  : 'text-neutral-500 hover:bg-neutral-800 hover:text-neutral-200'
+              }`}
+            >
+              {tab}
+            </button>
+          );
+        })}
+        <button
+          type="button"
+          onClick={() => onChange('transparent')}
+          className="rounded px-2 py-1 text-[10px] text-neutral-500 transition hover:bg-neutral-800 hover:text-neutral-300"
+          title="Remover fundo"
+        >
+          Nenhum
+        </button>
+      </div>
+      {isColor || isTransparentValue(value) ? (
+        <ColorField label="Cor de fundo" value={value || '#000000'} onChange={onChange} />
+      ) : (
+        <div className="grid gap-1.5">
+          <span className={labelClass}>Valor</span>
+          <input
+            value={value}
+            onChange={(event) => onChange(event.target.value)}
+            className={`${fieldInputClass} font-mono`}
+            placeholder="linear-gradient(…) ou url(…)"
+          />
+        </div>
+      )}
+    </div>
+  );
+}
+
+function SegmentedIcons<T extends string>({
+  value,
+  options,
+  onChange,
+}: {
+  value: T;
+  options: Array<{ value: T; icon: React.ReactNode; label: string }>;
+  onChange: (v: T) => void;
+}) {
+  return (
+    <div className="inline-flex items-center gap-0.5 rounded-md border border-neutral-800 bg-neutral-950/60 p-0.5">
+      {options.map((option) => {
+        const active = option.value === value;
+        return (
+          <button
+            key={option.value}
+            type="button"
+            onClick={() => onChange(option.value)}
+            title={option.label}
+            aria-label={option.label}
+            aria-pressed={active}
+            className={`grid h-7 w-7 place-items-center rounded transition ${
+              active
+                ? 'bg-emerald-400/15 text-emerald-200 shadow-[inset_0_0_0_1px_rgba(52,211,153,0.35)]'
+                : 'text-neutral-500 hover:bg-neutral-800 hover:text-neutral-200'
+            }`}
+          >
+            {option.icon}
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
+function QuickPresets({
+  node,
+  onApply,
+}: {
+  node: PageNode;
+  onApply: (patch: Partial<PageStyle>) => void;
+}) {
+  const presets: Array<{ id: string; label: string; icon: React.ReactNode; patch: Partial<PageStyle> }> = [
+    {
+      id: 'card-soft',
+      label: 'Cartão suave',
+      icon: <Square size={11} />,
+      patch: {
+        background: '#181b1d',
+        border: '1px solid rgba(255,255,255,0.08)',
+        borderRadius: 12,
+        padding: '24px',
+        boxShadow: '0 12px 32px rgba(0,0,0,0.3)',
+      },
+    },
+    {
+      id: 'button-primary',
+      label: 'Botão primário',
+      icon: <Box size={11} />,
+      patch: {
+        background: '#34d399',
+        color: '#06231b',
+        padding: '12px 24px',
+        borderRadius: 8,
+        fontWeight: 700,
+        textAlign: 'center',
+        display: 'flex',
+      },
+    },
+    {
+      id: 'section-hero',
+      label: 'Seção hero',
+      icon: <Maximize size={11} />,
+      patch: {
+        width: '100%',
+        minHeight: 520,
+        padding: '96px 72px',
+        display: 'flex',
+        flexDirection: 'column',
+        justifyContent: 'center',
+        alignItems: 'center',
+        textAlign: 'center',
+        background: 'linear-gradient(135deg, #101214 0%, #17201d 48%, #101419 100%)',
+      },
+    },
+    {
+      id: 'container-narrow',
+      label: 'Container',
+      icon: <RectangleHorizontal size={11} />,
+      patch: {
+        width: '100%',
+        maxWidth: 1160,
+        margin: '0 auto',
+        padding: '24px',
+        display: 'flex',
+        gap: 24,
+      },
+    },
+    {
+      id: 'text-large',
+      label: 'Título grande',
+      icon: <Type size={11} />,
+      patch: {
+        fontSize: 48,
+        fontWeight: 700,
+        lineHeight: 1.1,
+        color: '#f9fafb',
+      },
+    },
+    {
+      id: 'pill',
+      label: 'Pílula',
+      icon: <Circle size={11} />,
+      patch: {
+        borderRadius: 9999,
+        padding: '8px 20px',
+        display: 'flex',
+      },
+    },
+  ];
+  return (
+    <div className="grid grid-cols-3 gap-1.5">
+      {presets.map((preset) => (
+        <button
+          key={preset.id}
+          type="button"
+          onClick={() => onApply(preset.patch)}
+          className="flex flex-col items-center gap-1 rounded-md border border-neutral-800 bg-neutral-950/40 p-2 text-[10px] font-medium text-neutral-300 transition hover:border-emerald-400/40 hover:bg-emerald-400/5 hover:text-emerald-200"
+        >
+          <span className="grid h-6 w-6 place-items-center rounded bg-emerald-400/10 text-emerald-300">
+            {preset.icon}
+          </span>
+          {preset.label}
+        </button>
+      ))}
+    </div>
+  );
+}
 
 function PseudoField({ label, placeholder, node, pseudo, bp, prop, onChange }: {
   label: string;
@@ -77,12 +564,10 @@ function PseudoField({ label, placeholder, node, pseudo, bp, prop, onChange }: {
 }
 
 function WebNodeProperties() {
-  const [styleBreakpoint, setStyleBreakpoint] = useState<string>('base');
-  const [editingPseudo, setEditingPseudo] = useState<PseudoClass | null>(null);
-  const [designTab, setDesignTab] = useState<'conteudo' | 'design'>('design');
   const page = useExperienceStore((state) => state.page);
   const selectedPageNodeId = useExperienceStore((state) => state.selectedPageNodeId);
-  const setPreviewPseudo = useExperienceStore((state) => state.setPreviewPseudo);
+  const selectedPageNodeIds = useExperienceStore((state) => state.selectedPageNodeIds);
+  const setSelectedPageNode = useExperienceStore((state) => state.setSelectedPageNode);
   const updatePageNode = useExperienceStore((state) => state.updatePageNode);
   const updatePageNodeStyle = useExperienceStore((state) => state.updatePageNodeStyle);
   const updatePageNodePseudoStyle = useExperienceStore((state) => state.updatePageNodePseudoStyle);
@@ -90,25 +575,80 @@ function WebNodeProperties() {
   const removePageNode = useExperienceStore((state) => state.removePageNode);
   const duplicatePageNode = useExperienceStore((state) => state.duplicatePageNode);
   const addPageNode = useExperienceStore((state) => state.addPageNode);
+  const togglePageNodeLock = useExperienceStore((state) => state.togglePageNodeLock);
+  const togglePageNodeVisibility = useExperienceStore((state) => state.togglePageNodeVisibility);
   const syncComponentInstances = useExperienceStore((state) => state.syncComponentInstances);
   const detachComponentInstance = useExperienceStore((state) => state.detachComponentInstance);
-  const addBreakpoint = useExperienceStore((state) => state.addBreakpoint);
-  const renameBreakpoint = useExperienceStore((state) => state.renameBreakpoint);
-  const removeBreakpoint = useExperienceStore((state) => state.removeBreakpoint);
-  const updateBreakpointWidth = useExperienceStore((state) => state.updateBreakpointWidth);
-  const dataSchema = useDataModelStore((state) => state.schema);
-  const breakpointDefs = page.responsive;
+  const removePageNodes = useExperienceStore((state) => state.removePageNodes);
+  const duplicatePageNodes = useExperienceStore((state) => state.duplicatePageNodes);
+  const isMultiSelect = selectedPageNodeIds.length > 1;
   const node = findPageNode(page.children, selectedPageNodeId);
+
+  const [showAdvanced, setShowAdvanced] = useState(false);
+  const [editingPseudo, setEditingPseudo] = useState<PseudoClass | null>(null);
+
+  if (isMultiSelect) {
+    return (
+      <div className="ed-scroll flex h-full min-h-0 flex-col overflow-auto">
+        <div className="border-b border-neutral-800 bg-[#151719] px-3 py-2.5">
+          <div className="text-[9px] font-semibold uppercase tracking-[0.18em] text-neutral-500">Propriedades</div>
+          <div className="text-[11px] text-neutral-300">{selectedPageNodeIds.length} elementos</div>
+        </div>
+        <div className="flex-1 space-y-3 px-3 py-3">
+          <div className="rounded-md border border-sky-400/30 bg-sky-400/[0.06] p-3">
+            <div className="flex items-center gap-2 text-[11px] font-semibold text-sky-200">
+              <Package size={12} />
+              {selectedPageNodeIds.length} elementos selecionados
+            </div>
+            <p className="mt-2 text-[11px] leading-4 text-neutral-300">
+              Para editar o visual de vários elementos ao mesmo tempo, use os botões na barra superior:
+            </p>
+            <ul className="mt-2 space-y-1.5 text-[11px] text-neutral-300">
+              <li className="flex items-center gap-2">
+                <span className="grid h-5 w-5 place-items-center rounded bg-neutral-800 text-[9px]">⤓</span>
+                Subir/Descer — mover na lista
+              </li>
+              <li className="flex items-center gap-2">
+                <span className="grid h-5 w-5 place-items-center rounded bg-neutral-800 text-[9px]">⊟</span>
+                Alinhar — esquerda/centro/direita/topo/meio/base
+              </li>
+              <li className="flex items-center gap-2">
+                <span className="grid h-5 w-5 place-items-center rounded bg-neutral-800 text-[9px]">⇅</span>
+                Ordem Z — frente/trás
+              </li>
+            </ul>
+          </div>
+          <button
+            type="button"
+            onClick={() => duplicatePageNodes(selectedPageNodeIds)}
+            className="flex w-full items-center justify-center gap-2 rounded-md border border-emerald-400/30 bg-emerald-400/[0.08] px-3 py-2.5 text-[12px] font-medium text-emerald-200 transition hover:border-emerald-400/60 hover:bg-emerald-400/[0.12]"
+          >
+            <Copy size={13} />
+            Duplicar {selectedPageNodeIds.length} elementos
+          </button>
+          <button
+            type="button"
+            onClick={() => removePageNodes(selectedPageNodeIds)}
+            className="flex w-full items-center justify-center gap-2 rounded-md border border-red-400/30 bg-red-400/[0.08] px-3 py-2.5 text-[12px] font-medium text-red-200 transition hover:border-red-400/60 hover:bg-red-400/[0.12]"
+          >
+            <Trash2 size={13} />
+            Remover {selectedPageNodeIds.length} elementos
+          </button>
+        </div>
+      </div>
+    );
+  }
 
   if (!node) {
     return (
       <div className="ed-scroll min-h-0 flex-1 space-y-1 overflow-auto py-3">
         <GlobalStylePanel />
+        <CursorLibrary />
         <EffectsPanel />
         <EmptyState
           icon={<MousePointer2 size={20} />}
-          title="Nenhum elemento selecionado"
-          description="Clique em um elemento no canvas ou na árvore para editar conteúdo, layout e estilo."
+          title="Nada selecionado"
+          description="Clique em um elemento no canvas ou na árvore para editar suas propriedades."
           action={
             <div className="flex flex-wrap justify-center gap-1.5">
               <button
@@ -117,7 +657,7 @@ function WebNodeProperties() {
                 className="flex h-8 items-center gap-1.5 rounded-md border border-emerald-400/40 bg-emerald-400/10 px-3 text-[11px] font-medium text-emerald-200 transition hover:border-emerald-300/60"
               >
                 <Plus size={12} />
-                Section
+                Seção
               </button>
               <button
                 type="button"
@@ -130,7 +670,7 @@ function WebNodeProperties() {
               <button
                 type="button"
                 onClick={() => addPageNode('button')}
-                className="flex h-8 items-center gap-1.5 rounded-md border border-neutral-700/60 px-3 text-[11px] font-medium text-neutral-300 transition hover:border-emerald-400/40 hover:text-emerald-200"
+                className="flex h-8 items-center gap-1.5 rounded-md border border-neutral-700/60 px-3 text-[11px] font-medium text-medium text-neutral-300 transition hover:border-emerald-400/40 hover:text-emerald-200"
               >
                 <Plus size={12} />
                 Botão
@@ -142,527 +682,859 @@ function WebNodeProperties() {
     );
   }
 
-  const style = node.styles[styleBreakpoint] ?? {};
-  const styleValue = (key: keyof PageStyle) =>
-    style[key] ?? (styleBreakpoint !== 'base' ? node.styles.base[key] : undefined) ?? '';
+  const style = node.styles.base ?? {};
+  const styleValue = (key: keyof PageStyle) => style[key] ?? '';
   const setStyle = (key: keyof PageStyle, value: string | number) => {
-    updatePageNodeStyle(node.id, { [key]: value } as Partial<PageStyle>, styleBreakpoint);
+    updatePageNodeStyle(node.id, { [key]: value } as Partial<PageStyle>, 'base');
   };
   const setProp = (key: string, value: unknown) => updatePageNodeProps(node.id, { [key]: value });
+
+  const showTypography = ['text', 'button', 'card', 'navbar', 'footer', 'label', 'menuitem', 'modal', 'dataForm', 'dataStat'].includes(node.type);
 
   return (
     <div className="ed-scroll min-h-0 flex-1 space-y-1 overflow-auto py-3">
       <GlobalStylePanel />
+      <CursorLibrary />
       <EffectsPanel />
-      <Section title="Elemento" icon={<Box size={11} />}>
-        <TextField label="Nome" value={node.name} onChange={(name) => updatePageNode(node.id, { name })} />
-        <div className="flex items-center gap-2 rounded-md border border-neutral-800 bg-neutral-950/50 px-2.5 py-1.5 text-xs text-neutral-400">
-          <span className="grid h-5 w-5 place-items-center rounded bg-emerald-400/10 text-[9px] font-bold uppercase text-emerald-300">
-            {node.type.slice(0, 2)}
+
+      {/* Header: tipo + ações rápidas */}
+      <div className="px-2">
+        <div className="flex items-center gap-2 rounded-md border border-neutral-800 bg-neutral-950/50 px-2.5 py-2">
+          <span className="grid h-9 w-9 shrink-0 place-items-center rounded-md bg-emerald-400/10 text-emerald-300">
+            {node.type === 'section' ? <Maximize size={16} /> :
+             node.type === 'container' ? <Grid3X3 size={16} /> :
+             node.type === 'text' ? <Type size={16} /> :
+             node.type === 'button' ? <Box size={16} /> :
+             node.type === 'image' ? <ImageIcon size={16} /> :
+             node.type === 'card' ? <Layers size={16} /> :
+             node.type === 'navbar' ? <PanelRight size={16} /> :
+             node.type === 'footer' ? <PanelRight size={16} className="rotate-180" /> :
+             node.type === 'video' ? <ImageIcon size={16} /> :
+             <Box size={16} />}
           </span>
-          <span className="font-mono text-[11px]">{node.type}</span>
+          <div className="min-w-0 flex-1">
+            <input
+              value={node.name}
+              onChange={(event) => updatePageNode(node.id, { name: event.target.value })}
+              className="h-6 w-full truncate rounded bg-transparent px-1 text-[13px] font-semibold text-neutral-100 outline-none transition focus:bg-[#0d0f10]"
+              placeholder="Nome do elemento"
+            />
+            <div className="px-1 text-[10px] uppercase tracking-[0.14em] text-neutral-500">{TYPE_LABELS[node.type] ?? node.type}</div>
+          </div>
         </div>
-        <div className="grid grid-cols-2 gap-2">
+        <div className="mt-2 flex items-center gap-1">
           <button
             type="button"
             onClick={() => duplicatePageNode(node.id)}
-            className="flex h-8 items-center justify-center gap-1 rounded-md border border-neutral-700/60 text-[10px] text-neutral-400 transition hover:border-emerald-400/50 hover:text-emerald-200"
+            className="flex h-8 flex-1 items-center justify-center gap-1.5 rounded-md border border-neutral-700/60 text-[11px] text-neutral-300 transition hover:border-emerald-400/50 hover:text-emerald-200"
           >
-            <Plus size={12} />
+            <Copy size={12} />
             Duplicar
           </button>
           <button
             type="button"
-            onClick={() => removePageNode(node.id)}
-            className="flex h-8 items-center justify-center gap-1 rounded-md border border-red-400/25 text-[10px] text-red-300 transition hover:border-red-400/60 hover:bg-red-400/8"
+            onClick={() => togglePageNodeLock(node.id)}
+            className={`grid h-8 w-8 place-items-center rounded-md border transition ${
+              node.locked
+                ? 'border-amber-400/60 bg-amber-400/10 text-amber-200'
+                : 'border-neutral-700/60 text-neutral-400 hover:border-neutral-500 hover:text-neutral-200'
+            }`}
+            title={node.locked ? 'Desbloquear' : 'Bloquear'}
+            aria-pressed={node.locked}
+          >
+            {node.locked ? <LockOpen size={12} /> : <Lock size={12} />}
+          </button>
+          <button
+            type="button"
+            onClick={() => togglePageNodeVisibility(node.id)}
+            className={`grid h-8 w-8 place-items-center rounded-md border transition ${
+              node.hidden
+                ? 'border-amber-400/60 bg-amber-400/10 text-amber-200'
+                : 'border-neutral-700/60 text-neutral-400 hover:border-neutral-500 hover:text-neutral-200'
+            }`}
+            title={node.hidden ? 'Mostrar' : 'Ocultar'}
+            aria-pressed={node.hidden}
+          >
+            {node.hidden ? <Eye size={12} /> : <EyeOff size={12} />}
+          </button>
+          <button
+            type="button"
+            onClick={() => {
+              if (window.confirm(`Remover "${node.name}"?`)) removePageNode(node.id);
+            }}
+            className="grid h-8 w-8 place-items-center rounded-md border border-red-400/20 text-red-300 transition hover:border-red-400/60 hover:bg-red-400/[0.08]"
+            title="Remover"
+            aria-label="Remover"
           >
             <Trash2 size={12} />
-            Remover
           </button>
         </div>
         {node.componentId && (
-          <div className="flex items-center gap-2 rounded-md border border-emerald-400/20 bg-emerald-400/5 px-2 py-1.5 text-[10px]">
-            <Component size={11} className="shrink-0 text-emerald-300" />
-            <span className="flex-1 text-emerald-200">Instancia de componente</span>
+          <div className="mt-2 flex items-center gap-2 rounded-md border border-emerald-400/30 bg-emerald-400/[0.08] px-2.5 py-1.5 text-[11px]">
+            <Component size={12} className="shrink-0 text-emerald-300" />
+            <span className="flex-1 text-emerald-200">Vinculado a um componente</span>
             <button
               type="button"
               onClick={() => syncComponentInstances(node.componentId!)}
-              className="grid h-6 w-6 place-items-center rounded text-neutral-500 transition hover:bg-neutral-800 hover:text-neutral-200"
-              title="Sincronizar"
+              className="grid h-6 w-6 place-items-center rounded text-neutral-400 transition hover:bg-neutral-800 hover:text-emerald-200"
+              title="Atualizar do original"
             >
               <Copy size={11} />
             </button>
             <button
               type="button"
               onClick={() => detachComponentInstance(node.id)}
-              className="grid h-6 w-6 place-items-center rounded text-neutral-500 transition hover:bg-amber-500/15 hover:text-amber-200"
-              title="Desvincular"
+              className="grid h-6 w-6 place-items-center rounded text-neutral-400 transition hover:bg-amber-500/15 hover:text-amber-200"
+              title="Desvincular (vira cópia independente)"
             >
               <Unlink size={11} />
             </button>
           </div>
         )}
-      </Section>
-
-      <div className="sticky top-0 z-10 flex items-center gap-1 border-y border-neutral-800 bg-[#151719]/95 px-2 py-1.5 backdrop-blur">
-        <SegmentedControl
-          value={designTab}
-          onChange={setDesignTab}
-          size="sm"
-          options={[
-            { value: 'design', label: <span className="flex items-center gap-1.5"><SlidersHorizontal size={12} /> Design</span> },
-            { value: 'conteudo', label: <span className="flex items-center gap-1.5"><Type size={12} /> Conteúdo</span> },
-          ]}
-        />
       </div>
 
-      {designTab === 'conteudo' && (
-        <>
-      {(node.type === 'text' || node.type === 'button' || node.type === 'card' || node.type === 'navbar' || node.type === 'footer' || node.type === 'form' || node.type === 'input' || node.type === 'select' || node.type === 'textarea' || node.type === 'label' || node.type === 'modal' || node.type === 'menu' || node.type === 'menuitem') && (
-        <Section title="Conteudo" icon={<Check size={11} />}>
-          {node.type === 'text' && (
-            <>
-              <TextField label="Texto" value={String(node.props.text ?? '')} onChange={(value) => setProp('text', value)} />
-              <SelectField
-                label="Tag"
-                value={String(node.props.as ?? 'p')}
-                options={['h1', 'h2', 'h3', 'p', 'span'].map((value) => ({ value, label: value }))}
-                onChange={(value) => setProp('as', value)}
-              />
-            </>
-          )}
-          {node.type === 'button' && (
-            <>
-              <TextField label="Label" value={String(node.props.label ?? '')} onChange={(value) => setProp('label', value)} />
-              <TextField label="Link" value={String(node.props.href ?? '')} onChange={(value) => setProp('href', value)} />
-            </>
-          )}
-          {node.type === 'card' && (
-            <>
-              <TextField label="Titulo" value={String(node.props.title ?? '')} onChange={(value) => setProp('title', value)} />
-              <TextField label="Texto" value={String(node.props.body ?? '')} onChange={(value) => setProp('body', value)} />
-            </>
-          )}
-          {node.type === 'navbar' && (
-            <TextField label="Marca" value={String(node.props.brand ?? '')} onChange={(value) => setProp('brand', value)} />
-          )}
-          {node.type === 'footer' && (
-            <TextField label="Texto" value={String(node.props.text ?? '')} onChange={(value) => setProp('text', value)} />
-          )}
-          {node.type === 'form' && (
-            <>
-              <TextField label="Nome" value={String(node.props.name ?? '')} onChange={(value) => setProp('name', value)} />
-              <TextField label="Action" value={String(node.props.action ?? '#')} onChange={(value) => setProp('action', value)} />
-              <SelectField
-                label="Metodo"
-                value={String(node.props.method ?? 'POST')}
-                options={['POST', 'GET'].map((v) => ({ value: v, label: v }))}
-                onChange={(value) => setProp('method', value)}
-              />
-            </>
-          )}
-          {node.type === 'input' && (
-            <>
-              <TextField label="Nome do campo" value={String(node.props.name ?? '')} onChange={(value) => setProp('name', value)} />
-              <TextField label="Label" value={String(node.props.label ?? '')} onChange={(value) => setProp('label', value)} />
-              <TextField label="Placeholder" value={String(node.props.placeholder ?? '')} onChange={(value) => setProp('placeholder', value)} />
-              <SelectField
-                label="Tipo"
-                value={String(node.props.type ?? 'text')}
-                options={['text', 'email', 'password', 'number', 'tel', 'url'].map((v) => ({ value: v, label: v }))}
-                onChange={(value) => setProp('type', value)}
-              />
-              <ToggleRow label="Obrigatorio" enabled={Boolean(node.props.required)} onChange={() => setProp('required', !node.props.required)} />
-            </>
-          )}
-          {node.type === 'select' && (
-            <>
-              <TextField label="Nome do campo" value={String(node.props.name ?? '')} onChange={(value) => setProp('name', value)} />
-              <TextField label="Label" value={String(node.props.label ?? '')} onChange={(value) => setProp('label', value)} />
-              <TextField label="Placeholder" value={String(node.props.placeholder ?? '')} onChange={(value) => setProp('placeholder', value)} />
-              <TextField label="Opcoes (separadas por virgula)" value={String((node.props.options as string[] | undefined)?.join(', ') ?? '')} onChange={(value) => setProp('options', value.split(',').map((s) => s.trim()).filter(Boolean))} />
-            </>
-          )}
-          {node.type === 'textarea' && (
-            <>
-              <TextField label="Nome do campo" value={String(node.props.name ?? '')} onChange={(value) => setProp('name', value)} />
-              <TextField label="Label" value={String(node.props.label ?? '')} onChange={(value) => setProp('label', value)} />
-              <TextField label="Placeholder" value={String(node.props.placeholder ?? '')} onChange={(value) => setProp('placeholder', value)} />
-              <TextField label="Linhas" value={String(node.props.rows ?? 4)} onChange={(value) => setProp('rows', Number(value))} />
-            </>
-          )}
-          {node.type === 'label' && (
-            <>
-              <TextField label="Texto" value={String(node.props.text ?? '')} onChange={(value) => setProp('text', value)} />
-              <TextField label="For (id do campo)" value={String(node.props.htmlFor ?? '')} onChange={(value) => setProp('htmlFor', value)} />
-            </>
-          )}
-          {node.type === 'modal' && (
-            <>
-              <TextField label="Titulo" value={String(node.props.title ?? '')} onChange={(value) => setProp('title', value)} />
-              <ToggleRow label="Fechavel" enabled={Boolean(node.props.closable)} onChange={() => setProp('closable', !node.props.closable)} />
-              <ToggleRow label="Aberto" enabled={Boolean(node.props.open)} onChange={() => setProp('open', !node.props.open)} />
-            </>
-          )}
-          {node.type === 'menu' && (
-            <TextField label="Orientacao" value={String(node.props.orientation ?? 'vertical')} onChange={(value) => setProp('orientation', value)} />
-          )}
-          {node.type === 'menuitem' && (
-            <>
-              <TextField label="Label" value={String(node.props.label ?? '')} onChange={(value) => setProp('label', value)} />
-              <TextField label="Link" value={String(node.props.href ?? '#')} onChange={(value) => setProp('href', value)} />
-              <TextField label="Icone" value={String(node.props.icon ?? '')} onChange={(value) => setProp('icon', value)} />
-            </>
-          )}
-        </Section>
-      )}
-
-      {(node.type === 'image' || node.type === 'video') && (
-        <Section title="Midia" icon={<Palette size={11} />}>
-          <TextField label="Source" value={String(node.props.src ?? '')} onChange={(value) => setProp('src', value)} />
-          {node.type === 'image' && (
-            <TextField label="Alt" value={String(node.props.alt ?? '')} onChange={(value) => setProp('alt', value)} />
-          )}
-          {node.type === 'video' && (
-            <ToggleRow label="Controles" enabled={node.props.controls !== false} onChange={() => setProp('controls', node.props.controls === false)} />
-          )}
-        </Section>
-      )}
-
-      {node.type === 'sceneCanvas' && (
-        <Section title="Cena 3D" icon={<MousePointer2 size={11} />}>
-          <SelectField
-            label="Uso"
-            value={String(node.props.placement ?? 'inline')}
-            options={['inline', 'background', 'side', 'center'].map((value) => ({ value, label: value }))}
-            onChange={(value) => setProp('placement', value)}
-          />
-          <ToggleRow label="Interativo" enabled={Boolean(node.props.interactive)} onChange={() => setProp('interactive', !node.props.interactive)} />
-          <ToggleRow label="Transparente" enabled={node.props.transparent !== false} onChange={() => setProp('transparent', node.props.transparent === false)} />
-        </Section>
-      )}
-
-      {(node.type === 'dataTable' || node.type === 'dataForm' || node.type === 'dataList' || node.type === 'dataChart' || node.type === 'dataStat' || node.type === 'pageRoute') && (
-        <Section title="Dados" icon={<Database size={11} />}>
-          {node.type === 'pageRoute' ? (
-            <>
-              <TextField label="Path" value={String(node.props.path ?? '/pagina')} onChange={(value) => setProp('path', value)} />
-              <TextField label="Titulo" value={String(node.props.title ?? '')} onChange={(value) => setProp('title', value)} />
-              <ToggleRow label="Protegida" enabled={Boolean(node.props.protected)} onChange={() => setProp('protected', !node.props.protected)} />
-            </>
-          ) : (
-            <>
-              <SelectField
-                label="Colecao"
-                value={String(node.props.collectionId ?? dataSchema.collections[0]?.id ?? '')}
-                options={dataSchema.collections.map((collection) => ({ value: collection.id, label: collection.label }))}
-                onChange={(value) => setProp('collectionId', value)}
-              />
-              {(node.type === 'dataTable' || node.type === 'dataList' || node.type === 'dataChart') && (
-                <SelectField
-                  label="Query"
-                  value={String(node.props.queryId ?? '')}
-                  options={[
-                    { value: '', label: 'Sem query' },
-                    ...(dataSchema.collections.find((collection) => collection.id === node.props.collectionId)?.queries ?? []).map((query) => ({ value: query.id, label: query.name })),
-                  ]}
-                  onChange={(value) => setProp('queryId', value)}
-                />
-              )}
-              {(node.type === 'dataTable' || node.type === 'dataList' || node.type === 'dataChart') && (
-                <TextField label="Limite" value={String(node.props.limit ?? 6)} onChange={(value) => setProp('limit', Number(value) || 1)} />
-              )}
-              {node.type === 'dataTable' && (
-                <TextField
-                  label="Colunas"
-                  value={String((node.props.columns as string[] | undefined)?.join(', ') ?? '')}
-                  onChange={(value) => setProp('columns', value.split(',').map((item) => item.trim()).filter(Boolean))}
-                />
-              )}
-              {node.type === 'dataForm' && (
-                <>
-                  <TextField label="Botao" value={String(node.props.submitLabel ?? 'Salvar')} onChange={(value) => setProp('submitLabel', value)} />
-                  <TextField label="Sucesso" value={String(node.props.successMessage ?? 'Registro salvo')} onChange={(value) => setProp('successMessage', value)} />
-                </>
-              )}
-              {node.type === 'dataList' && (
-                <>
-                  <TextField label="Campo titulo" value={String(node.props.titleField ?? 'name')} onChange={(value) => setProp('titleField', value)} />
-                  <TextField label="Campo texto" value={String(node.props.bodyField ?? 'message')} onChange={(value) => setProp('bodyField', value)} />
-                </>
-              )}
-              {node.type === 'dataChart' && (
-                <>
-                  <TextField label="Campo label" value={String(node.props.labelField ?? 'name')} onChange={(value) => setProp('labelField', value)} />
-                  <TextField label="Campo valor" value={String(node.props.valueField ?? 'id')} onChange={(value) => setProp('valueField', value)} />
-                </>
-              )}
-              {node.type === 'dataStat' && (
-                <>
-                  <TextField label="Label" value={String(node.props.label ?? 'Total')} onChange={(value) => setProp('label', value)} />
-                  <SelectField
-                    label="Agregado"
-                    value={String(node.props.aggregate ?? 'count')}
-                    options={['count', 'sum', 'avg'].map((value) => ({ value, label: value }))}
-                    onChange={(value) => setProp('aggregate', value)}
-                  />
-                  <TextField label="Campo" value={String(node.props.field ?? '')} onChange={(value) => setProp('field', value)} />
-                </>
-              )}
-            </>
-          )}
-        </Section>
-      )}
-        </>
-      )}
-
-      {designTab === 'design' && (
-        <>
-      <Section title="Layout" icon={<PanelRight size={11} />}>
-        <div className="flex flex-wrap gap-1 rounded-md bg-neutral-950/70 p-1">
-          {[{ name: 'base', width: 0 } as const, ...breakpointDefs.filter((bp) => bp.name !== 'base')].map((bp) => (
-            <button
-              key={bp.name}
-              type="button"
-              onClick={() => setStyleBreakpoint(bp.name)}
-              className={`h-7 rounded px-2 text-[10px] font-medium uppercase tracking-[0.12em] transition ${
-                styleBreakpoint === bp.name ? 'bg-emerald-400/12 text-emerald-200' : 'text-neutral-500 hover:bg-neutral-800 hover:text-neutral-200'
-              }`}
-            >
-              {bp.name}
-            </button>
-          ))}
-          <button
-            type="button"
-            onClick={() => {
-              const baseName = 'custom';
-              let i = 1;
-              while (breakpointDefs.some((bp) => bp.name === `${baseName}${i > 1 ? i : ''}`)) i++;
-              const name = `${baseName}${i > 1 ? i : ''}`;
-              addBreakpoint(name, 600);
-              setStyleBreakpoint(name);
-            }}
-            className="flex h-7 w-7 items-center justify-center rounded text-neutral-500 transition hover:bg-neutral-800 hover:text-neutral-200"
-            title="Adicionar breakpoint"
-          >
-            <Plus size={12} />
-          </button>
-        </div>
-        <div className="grid grid-cols-2 gap-2">
-          <TextField label="Largura" value={String(styleValue('width'))} onChange={(value) => setStyle('width', value)} />
-          <TextField label="Altura" value={String(styleValue('height'))} onChange={(value) => setStyle('height', value)} />
-          <TextField label="Min H" value={String(styleValue('minHeight'))} onChange={(value) => setStyle('minHeight', value)} />
-          <TextField label="Max W" value={String(styleValue('maxWidth'))} onChange={(value) => setStyle('maxWidth', value)} />
-          <TextField label="Padding" value={String(styleValue('padding'))} onChange={(value) => setStyle('padding', value)} />
-          <TextField label="Margin" value={String(styleValue('margin'))} onChange={(value) => setStyle('margin', value)} />
-          <TextField label="Gap" value={String(styleValue('gap'))} onChange={(value) => setStyle('gap', value)} />
-          <TextField label="Z-index" value={String(styleValue('zIndex'))} onChange={(value) => setStyle('zIndex', Number(value) || 0)} />
-        </div>
-        <div className="grid grid-cols-2 gap-2">
-          <SelectField
-            label="Display"
-            value={String(styleValue('display') || 'block')}
-            options={['block', 'flex', 'grid', 'none'].map((value) => ({ value, label: value }))}
-            onChange={(value) => setStyle('display', value)}
-          />
-          <SelectField
-            label="Position"
-            value={String(styleValue('position') || 'relative')}
-            options={['static', 'relative', 'absolute', 'sticky', 'fixed'].map((value) => ({ value, label: value }))}
-            onChange={(value) => setStyle('position', value)}
-          />
-          <TextField label="Top" value={String(styleValue('top'))} onChange={(value) => setStyle('top', value)} />
-          <TextField label="Left" value={String(styleValue('left'))} onChange={(value) => setStyle('left', value)} />
-          <TextField label="Right" value={String(styleValue('right'))} onChange={(value) => setStyle('right', value)} />
-          <TextField label="Bottom" value={String(styleValue('bottom'))} onChange={(value) => setStyle('bottom', value)} />
-        </div>
-        <div className="grid grid-cols-2 gap-2">
-          <SelectField
-            label="Flex dir"
-            value={String(styleValue('flexDirection') || 'row')}
-            options={['row', 'column'].map((value) => ({ value, label: value }))}
-            onChange={(value) => setStyle('flexDirection', value)}
-          />
-          <TextField label="Place" value={String(styleValue('placeItems'))} onChange={(value) => setStyle('placeItems', value)} />
-          <TextField label="Align" value={String(styleValue('alignItems'))} onChange={(value) => setStyle('alignItems', value)} />
-          <TextField label="Justify" value={String(styleValue('justifyContent'))} onChange={(value) => setStyle('justifyContent', value)} />
-        </div>
-        <TextField label="Grid" value={String(styleValue('gridTemplateColumns'))} onChange={(value) => setStyle('gridTemplateColumns', value)} />
-        <TextField label="Transform" value={String(styleValue('transform'))} onChange={(value) => setStyle('transform', value)} />
+      <Section title="Conteúdo" icon={<Type size={11} />} defaultOpen={true}>
+        {renderContentEditor(node.type, node.props, setProp)}
       </Section>
 
-      <Section title="Visual" icon={<Palette size={11} />}>
-        <TextField label="Background" value={String(styleValue('background'))} onChange={(value) => setStyle('background', value)} />
-        <TextField label="Bg image" value={String(styleValue('backgroundImage'))} onChange={(value) => setStyle('backgroundImage', value)} />
-        <TextField label="Cor" value={String(styleValue('color'))} onChange={(value) => setStyle('color', value)} />
-        <TextField label="Borda" value={String(styleValue('border'))} onChange={(value) => setStyle('border', value)} />
+      <Section title="Estilo rápido" icon={<Sparkles size={11} />} defaultOpen={true}>
+        <QuickPresets
+          node={node}
+          onApply={(patch) => updatePageNodeStyle(node.id, patch, 'base')}
+        />
+        <p className="text-[10px] leading-3 text-neutral-500">
+          Aplica um conjunto de estilos prontos. Você pode ajustar tudo abaixo.
+        </p>
+      </Section>
+
+      <Section title="Tamanho" icon={<Maximize size={11} />} defaultOpen={true}>
         <div className="grid grid-cols-2 gap-2">
-          <TextField label="Fonte" value={String(styleValue('fontSize'))} onChange={(value) => setStyle('fontSize', value)} />
-          <TextField label="Peso" value={String(styleValue('fontWeight'))} onChange={(value) => setStyle('fontWeight', value)} />
-          <TextField label="Radius" value={String(styleValue('borderRadius'))} onChange={(value) => setStyle('borderRadius', value)} />
-          <TextField label="Line" value={String(styleValue('lineHeight'))} onChange={(value) => setStyle('lineHeight', value)} />
-          <SelectField
-            label="Texto"
-            value={String(styleValue('textAlign') || 'left')}
-            options={['left', 'center', 'right'].map((value) => ({ value, label: value }))}
-            onChange={(value) => setStyle('textAlign', value)}
-          />
-          <TextField label="Opacity" value={String(styleValue('opacity'))} onChange={(value) => setStyle('opacity', value)} />
+          <div className="grid gap-1.5">
+            <span className={labelClass}>Largura</span>
+            <div className="flex gap-1">
+              <input
+                value={String(styleValue('width'))}
+                onChange={(event) => setStyle('width', event.target.value)}
+                placeholder="auto"
+                className={`${inputClass} font-mono`}
+              />
+            </div>
+            <div className="flex gap-0.5">
+              {[
+                { label: 'Auto', value: 'auto' },
+                { label: 'Cheia', value: '100%' },
+                { label: 'Tela', value: '100vw' },
+                { label: 'Ajustar', value: 'fit-content' },
+              ].map((preset) => (
+                <button
+                  key={preset.label}
+                  type="button"
+                  onClick={() => setStyle('width', preset.value)}
+                  className="flex-1 rounded border border-neutral-800 px-1 py-0.5 text-[9px] text-neutral-400 transition hover:border-emerald-400/50 hover:text-emerald-200"
+                >
+                  {preset.label}
+                </button>
+              ))}
+            </div>
+          </div>
+          <div className="grid gap-1.5">
+            <span className={labelClass}>Altura</span>
+            <input
+              value={String(styleValue('height'))}
+              onChange={(event) => setStyle('height', event.target.value)}
+              placeholder="auto"
+              className={`${inputClass} font-mono`}
+            />
+            <div className="flex gap-0.5">
+              {[
+                { label: 'Auto', value: 'auto' },
+                { label: 'Cheia', value: '100%' },
+                { label: 'Tela', value: '100vh' },
+                { label: 'Mínima', value: 'min-content' },
+              ].map((preset) => (
+                <button
+                  key={preset.label}
+                  type="button"
+                  onClick={() => setStyle('height', preset.value)}
+                  className="flex-1 rounded border border-neutral-800 px-1 py-0.5 text-[9px] text-neutral-400 transition hover:border-emerald-400/50 hover:text-emerald-200"
+                >
+                  {preset.label}
+                </button>
+              ))}
+            </div>
+          </div>
         </div>
-        <div className="grid grid-cols-2 gap-2">
+        {(String(styleValue('width')) || String(styleValue('height')) || String(styleValue('minHeight')) || String(styleValue('maxWidth'))) && (
+          <button
+            type="button"
+            onClick={() => updatePageNodeStyle(node.id, { width: undefined, height: undefined, minHeight: undefined, maxWidth: undefined }, 'base')}
+            className="flex items-center gap-1 text-[10px] text-neutral-500 transition hover:text-rose-300"
+          >
+            <Minimize size={10} />
+            Resetar tamanho para automático
+          </button>
+        )}
+      </Section>
+
+      <Section title="Espaçamento" icon={<Move size={11} />} defaultOpen={true}>
+        <SpacingField
+          label="Espaçamento interno (padding)"
+          value={styleValue('padding')}
+          onChange={(value) => setStyle('padding', value)}
+          hint="Distância entre o conteúdo e a borda."
+        />
+        <SpacingField
+          label="Espaçamento externo (margin)"
+          value={styleValue('margin')}
+          onChange={(value) => setStyle('margin', value)}
+          hint="Distância até outros elementos."
+        />
+        <SliderField
+          label="Distância entre itens"
+          value={toCssNumber(styleValue('gap'))}
+          onChange={(value) => setStyle('gap', value)}
+          min={0}
+          max={128}
+          hint="Usado em containers, listas e grids."
+        />
+      </Section>
+
+      <Section title="Cores" icon={<Palette size={11} />} defaultOpen={true}>
+        <BackgroundField value={String(styleValue('background'))} onChange={(value) => setStyle('background', value)} />
+        <ColorField
+          label="Cor do texto"
+          value={String(styleValue('color'))}
+          onChange={(value) => setStyle('color', value)}
+        />
+      </Section>
+
+      {showTypography && (
+        <Section title="Texto" icon={<Type size={11} />} defaultOpen={true}>
+          <div className="grid gap-2">
+            <span className={labelClass}>Tamanho da fonte</span>
+            <div className="flex flex-wrap gap-1">
+              {[
+                { label: 'P', size: 12 },
+                { label: 'M', size: 16 },
+                { label: 'G', size: 20 },
+                { label: 'XG', size: 28 },
+                { label: '2XG', size: 40 },
+                { label: '3XG', size: 56 },
+              ].map((preset) => (
+                <button
+                  key={preset.label}
+                  type="button"
+                  onClick={() => setStyle('fontSize', preset.size)}
+                  className="min-w-[40px] rounded border border-neutral-800 px-2 py-1 text-[11px] font-medium text-neutral-300 transition hover:border-emerald-400/50 hover:text-emerald-200"
+                >
+                  {preset.label}
+                </button>
+              ))}
+            </div>
+            <SliderField
+              label="Personalizado"
+              value={toCssNumber(styleValue('fontSize'))}
+              onChange={(value) => setStyle('fontSize', value)}
+              min={8}
+              max={120}
+            />
+          </div>
+          <div className="grid gap-1.5">
+            <span className={labelClass}>Espessura</span>
+            <SegmentedIcons
+              value={String(styleValue('fontWeight') || '400')}
+              onChange={(value) => setStyle('fontWeight', value)}
+              options={[
+                { value: '300', label: 'Leve', icon: <Minus size={12} /> },
+                { value: '400', label: 'Normal', icon: <span className="text-[10px]">N</span> },
+                { value: '600', label: 'Forte', icon: <span className="text-[10px] font-bold">B</span> },
+                { value: '700', label: 'Negrito', icon: <span className="text-[11px] font-black">B</span> },
+              ]}
+            />
+          </div>
+          <div className="grid gap-1.5">
+            <span className={labelClass}>Alinhamento</span>
+            <SegmentedIcons
+              value={String(styleValue('textAlign') || 'left')}
+              onChange={(value) => setStyle('textAlign', value as 'left' | 'center' | 'right')}
+              options={[
+                { value: 'left', label: 'Esquerda', icon: <AlignLeft size={12} /> },
+                { value: 'center', label: 'Centro', icon: <AlignCenter size={12} /> },
+                { value: 'right', label: 'Direita', icon: <AlignRight size={12} /> },
+              ]}
+            />
+          </div>
+          <SliderField
+            label="Altura da linha"
+            value={toCssNumber(styleValue('lineHeight')) || 1.5}
+            onChange={(value) => setStyle('lineHeight', value)}
+            min={0.8}
+            max={3}
+            step={0.1}
+            unit=""
+            hint="Multiplicador (ex: 1.5 = 150%)."
+          />
+        </Section>
+      )}
+
+      <Section title="Disposição" icon={<LayoutGrid size={11} />} defaultOpen={false}>
+        <div className="grid gap-1.5">
+          <span className={labelClass}>Como os filhos se organizam</span>
+          <SegmentedIcons
+            value={String(styleValue('display') || 'block')}
+            onChange={(value) => setStyle('display', value)}
+            options={[
+              { value: 'block', label: 'Em bloco', icon: <Square size={12} /> },
+              { value: 'flex', label: 'Em linha', icon: <ArrowRight size={12} /> },
+              { value: 'grid', label: 'Em grade', icon: <Grid3X3 size={12} /> },
+              { value: 'none', label: 'Ocultar', icon: <EyeOff size={12} /> },
+            ]}
+          />
+        </div>
+        {String(styleValue('display')) === 'flex' && (
+          <>
+            <div className="grid gap-1.5">
+              <span className={labelClass}>Direção</span>
+              <SegmentedIcons
+                value={String(styleValue('flexDirection') || 'row')}
+                onChange={(value) => setStyle('flexDirection', value as 'row' | 'column')}
+                options={[
+                  { value: 'row', label: 'Horizontal', icon: <ArrowRight size={12} /> },
+                  { value: 'column', label: 'Vertical', icon: <ArrowDown size={12} /> },
+                ]}
+              />
+            </div>
+            <div className="grid gap-1.5">
+              <span className={labelClass}>Alinhar filhos (horizontal)</span>
+              <SegmentedIcons
+                value={String(styleValue('justifyContent') || 'flex-start')}
+                onChange={(value) => setStyle('justifyContent', value)}
+                options={[
+                  { value: 'flex-start', label: 'Início', icon: <AlignLeft size={12} /> },
+                  { value: 'center', label: 'Centro', icon: <AlignCenter size={12} /> },
+                  { value: 'flex-end', label: 'Fim', icon: <AlignRight size={12} /> },
+                ]}
+              />
+            </div>
+            <div className="grid gap-1.5">
+              <span className={labelClass}>Alinhar filhos (vertical)</span>
+              <SegmentedIcons
+                value={String(styleValue('alignItems') || 'stretch')}
+                onChange={(value) => setStyle('alignItems', value)}
+                options={[
+                  { value: 'flex-start', label: 'Topo', icon: <AlignLeft size={12} className="rotate-90" /> },
+                  { value: 'center', label: 'Centro', icon: <AlignCenter size={12} /> },
+                  { value: 'flex-end', label: 'Base', icon: <AlignRight size={12} className="rotate-90" /> },
+                  { value: 'stretch', label: 'Esticar', icon: <Minus size={12} className="rotate-90" /> },
+                ]}
+              />
+            </div>
+          </>
+        )}
+        <div className="grid gap-1.5">
+          <span className={labelClass}>Posição</span>
+          <SegmentedIcons
+            value={String(styleValue('position') || 'relative')}
+            onChange={(value) => setStyle('position', value)}
+            options={[
+              { value: 'static', label: 'Normal', icon: <Square size={12} /> },
+              { value: 'relative', label: 'Relativo', icon: <Move size={12} /> },
+              { value: 'absolute', label: 'Absoluto', icon: <Layers size={12} /> },
+              { value: 'fixed', label: 'Fixo', icon: <Maximize size={12} /> },
+            ]}
+          />
+        </div>
+      </Section>
+
+      <Section title="Borda" icon={<Square size={11} />} defaultOpen={false}>
+        <div className="grid gap-1.5">
+          <span className={labelClass}>Borda</span>
+          <input
+            value={String(styleValue('border'))}
+            onChange={(event) => setStyle('border', event.target.value)}
+            placeholder="1px solid #cccccc"
+            className={`${inputClass} font-mono`}
+          />
+          <div className="flex gap-1">
+            {[
+              { label: 'Nenhuma', value: 'none' },
+              { label: 'Fina', value: '1px solid rgba(255,255,255,0.15)' },
+              { label: 'Média', value: '2px solid rgba(255,255,255,0.2)' },
+              { label: 'Espessa', value: '4px solid rgba(255,255,255,0.25)' },
+            ].map((preset) => (
+              <button
+                key={preset.label}
+                type="button"
+                onClick={() => setStyle('border', preset.value)}
+                className="flex-1 rounded border border-neutral-800 px-1 py-1 text-[10px] text-neutral-300 transition hover:border-emerald-400/50 hover:text-emerald-200"
+              >
+                {preset.label}
+              </button>
+            ))}
+          </div>
+        </div>
+        <SliderField
+          label="Arredondamento"
+          value={toCssNumber(styleValue('borderRadius'))}
+          onChange={(value) => setStyle('borderRadius', value)}
+          min={0}
+          max={64}
+        />
+        <div className="flex gap-0.5">
+          {[
+            { label: 'Quadrado', value: 0 },
+            { label: 'Suave', value: 8 },
+            { label: 'Arredondado', value: 16 },
+            { label: 'Pílula', value: 9999 },
+          ].map((preset) => (
+            <button
+              key={preset.label}
+              type="button"
+              onClick={() => setStyle('borderRadius', preset.value)}
+              className="flex-1 rounded border border-neutral-800 px-1 py-1 text-[10px] text-neutral-300 transition hover:border-emerald-400/50 hover:text-emerald-200"
+            >
+              {preset.label}
+            </button>
+          ))}
+        </div>
+        <div className="grid gap-1.5">
+          <span className={labelClass}>Sombra</span>
+          <div className="grid grid-cols-4 gap-1.5">
+            {[
+              { label: 'Nenhuma', value: 'none' },
+              { label: 'Suave', value: '0 2px 8px rgba(0,0,0,0.15)' },
+              { label: 'Média', value: '0 8px 24px rgba(0,0,0,0.25)' },
+              { label: 'Forte', value: '0 16px 40px rgba(0,0,0,0.4)' },
+            ].map((preset) => (
+              <button
+                key={preset.label}
+                type="button"
+                onClick={() => setStyle('boxShadow', preset.value)}
+                className="flex h-12 flex-col items-center justify-center gap-1 rounded border border-neutral-800 text-[10px] text-neutral-300 transition hover:border-emerald-400/50 hover:text-emerald-200"
+                style={{ boxShadow: preset.value === 'none' ? 'none' : preset.value }}
+              >
+                <span>Aa</span>
+                {preset.label}
+              </button>
+            ))}
+          </div>
+        </div>
+        <SliderField
+          label="Opacidade"
+          value={toCssNumber(styleValue('opacity') || 1)}
+          onChange={(value) => setStyle('opacity', value)}
+          min={0}
+          max={1}
+          step={0.05}
+          unit=""
+        />
+      </Section>
+
+      <Section title="Estados" icon={<Zap size={11} />} defaultOpen={false}>
+        <div className="grid grid-cols-4 gap-1 rounded-md border border-neutral-800 bg-neutral-950/60 p-0.5">
+          {[
+            { value: null, label: 'Normal' },
+            { value: 'hover' as const, label: 'Hover' },
+            { value: 'active' as const, label: 'Pressionado' },
+            { value: 'focus' as const, label: 'Foco' },
+          ].map((state) => {
+            const active = editingPseudo === state.value;
+            return (
+              <button
+                key={state.label}
+                type="button"
+                onClick={() => setEditingPseudo(state.value)}
+                className={`h-8 rounded text-[10px] font-medium uppercase tracking-[0.12em] transition ${
+                  active ? 'bg-emerald-400/15 text-emerald-200' : 'text-neutral-500 hover:bg-neutral-800 hover:text-neutral-200'
+                }`}
+              >
+                {state.label}
+              </button>
+            );
+          })}
+        </div>
+        <p className="text-[10px] leading-3 text-neutral-500">
+          Estados diferentes do elemento ao interagir. As mudanças de cor e fundo são as mais comuns.
+        </p>
+        {editingPseudo && (
+          <div className="grid gap-3 rounded-md border border-emerald-400/20 bg-emerald-400/[0.04] p-2.5">
+            <div className="text-[10px] font-semibold uppercase tracking-[0.14em] text-emerald-300">
+              Estilo de :{editingPseudo}
+            </div>
+            <BackgroundField
+              value={String(node.pseudo?.[editingPseudo]?.base?.background ?? '')}
+              onChange={(value) => updatePageNodePseudoStyle(node.id, editingPseudo, { background: value } as Partial<PageStyle>, 'base')}
+            />
+            <ColorField
+              label="Cor do texto"
+              value={String(node.pseudo?.[editingPseudo]?.base?.color ?? '')}
+              onChange={(value) => updatePageNodePseudoStyle(node.id, editingPseudo, { color: value } as Partial<PageStyle>, 'base')}
+            />
+            <SliderField
+              label="Escala"
+              value={toCssNumber(node.pseudo?.[editingPseudo]?.base?.transform?.toString().match(/scale\(([^)]+)\)/)?.[1] ?? 1) || 1}
+              onChange={(value) => updatePageNodePseudoStyle(node.id, editingPseudo, { transform: `scale(${value})` } as Partial<PageStyle>, 'base')}
+              min={0.5}
+              max={2}
+              step={0.05}
+              unit="x"
+            />
+          </div>
+        )}
+      </Section>
+
+      <div className="px-2 pt-1">
+        <button
+          type="button"
+          onClick={() => setShowAdvanced(!showAdvanced)}
+          className="flex w-full items-center gap-2 rounded-md border border-neutral-800 bg-neutral-950/30 px-2.5 py-1.5 text-[10px] font-semibold uppercase tracking-[0.14em] text-neutral-400 transition hover:border-neutral-700 hover:text-neutral-200"
+        >
+          <Code2 size={11} />
+          {showAdvanced ? 'Ocultar opções avançadas' : 'Opções avançadas (CSS)'}
+          <ChevronDown size={11} className={`ml-auto transition ${showAdvanced ? 'rotate-180' : ''}`} />
+        </button>
+      </div>
+
+      {showAdvanced && (
+        <Section title="Avançado" icon={<Code2 size={11} />} defaultOpen={true}>
+          <p className="text-[10px] leading-3 text-neutral-500">
+            Acesso direto às propriedades CSS para usuários avançados.
+          </p>
+          <Field label="Background (CSS)">
+            <input
+              value={String(styleValue('background'))}
+              onChange={(event) => setStyle('background', event.target.value)}
+              placeholder="rgba, gradient, url…"
+              className={`${inputClass} font-mono`}
+            />
+          </Field>
+          <Field label="Background image">
+            <input
+              value={String(styleValue('backgroundImage'))}
+              onChange={(event) => setStyle('backgroundImage', event.target.value)}
+              placeholder="url(…)"
+              className={`${inputClass} font-mono`}
+            />
+          </Field>
+          <Field label="Colunas do grid">
+            <input
+              value={String(styleValue('gridTemplateColumns'))}
+              onChange={(event) => setStyle('gridTemplateColumns', event.target.value)}
+              placeholder="1fr 1fr 1fr"
+              className={`${inputClass} font-mono`}
+            />
+          </Field>
+          <Field label="Transform">
+            <input
+              value={String(styleValue('transform'))}
+              onChange={(event) => setStyle('transform', event.target.value)}
+              placeholder="rotate(15deg) scale(1.1)"
+              className={`${inputClass} font-mono`}
+            />
+          </Field>
+          <Field label="Transição">
+            <input
+              value={String(styleValue('transition'))}
+              onChange={(event) => setStyle('transition', event.target.value)}
+              placeholder="all 0.2s ease"
+              className={`${inputClass} font-mono`}
+            />
+          </Field>
+          <div className="grid grid-cols-2 gap-2">
+            <Field label="Top">
+              <input value={String(styleValue('top'))} onChange={(event) => setStyle('top', event.target.value)} placeholder="auto" className={`${inputClass} font-mono`} />
+            </Field>
+            <Field label="Right">
+              <input value={String(styleValue('right'))} onChange={(event) => setStyle('right', event.target.value)} placeholder="auto" className={`${inputClass} font-mono`} />
+            </Field>
+            <Field label="Bottom">
+              <input value={String(styleValue('bottom'))} onChange={(event) => setStyle('bottom', event.target.value)} placeholder="auto" className={`${inputClass} font-mono`} />
+            </Field>
+            <Field label="Left">
+              <input value={String(styleValue('left'))} onChange={(event) => setStyle('left', event.target.value)} placeholder="auto" className={`${inputClass} font-mono`} />
+            </Field>
+          </div>
+          <SliderField
+            label="Camada (z-index)"
+            value={toCssNumber(styleValue('zIndex'))}
+            onChange={(value) => setStyle('zIndex', value)}
+            min={-10}
+            max={50}
+            hint="Camada de empilhamento. Maior = fica por cima."
+          />
           <SelectField
             label="Overflow"
             value={String(styleValue('overflow') || 'visible')}
-            options={['visible', 'hidden', 'auto', 'clip'].map((value) => ({ value, label: value }))}
+            options={[
+              { value: 'visible', label: 'Visível' },
+              { value: 'hidden', label: 'Oculto' },
+              { value: 'auto', label: 'Auto (scroll)' },
+              { value: 'clip', label: 'Recortado' },
+            ].map((value) => ({ value: value.value, label: value.label }))}
             onChange={(value) => setStyle('overflow', value)}
           />
-          <SelectField
-            label="Object fit"
-            value={String(styleValue('objectFit') || 'cover')}
-            options={['cover', 'contain', 'fill'].map((value) => ({ value, label: value }))}
-            onChange={(value) => setStyle('objectFit', value)}
-          />
-        </div>
-        <TextField label="Sombra" value={String(styleValue('boxShadow'))} onChange={(value) => setStyle('boxShadow', value)} />
-        <TextField label="Transition" value={String(styleValue('transition'))} onChange={(value) => setStyle('transition', value)} />
-      </Section>
-
-      <Section title="Estados" icon={<MousePointer2 size={11} />}>
-        <div className="flex gap-1 rounded-md bg-neutral-950/70 p-1">
-          {([null, 'hover', 'active', 'focus'] as const).map((pseudo) => (
-            <button
-              key={pseudo ?? 'none'}
-              type="button"
-              onClick={() => {
-                setEditingPseudo(pseudo);
-                setPreviewPseudo(pseudo);
-              }}
-              className={`h-7 flex-1 rounded text-[10px] font-medium uppercase tracking-[0.12em] transition ${
-                editingPseudo === pseudo
-                  ? 'bg-emerald-400/12 text-emerald-200'
-                  : 'text-neutral-500 hover:bg-neutral-800 hover:text-neutral-200'
-              }`}
-            >
-              {pseudo ? ':' + pseudo : 'Normal'}
-            </button>
-          ))}
-        </div>
-        {editingPseudo && node.pseudo?.[editingPseudo] && (
-          <div className="rounded-md border border-neutral-800 bg-neutral-950/30 p-2 text-[10px] text-neutral-400">
-            Estilos de {editingPseudo ? ':' + editingPseudo : ''} definidos
-          </div>
-        )}
-        <PseudoField
-          label="Fundo"
-          placeholder="Ex: #34d399"
-          node={node}
-          pseudo={editingPseudo}
-          bp={styleBreakpoint}
-          prop="background"
-          onChange={(v) => {
-            if (editingPseudo) updatePageNodePseudoStyle(node.id, editingPseudo, { background: v } as Partial<PageStyle>, styleBreakpoint);
-          }}
-        />
-        <PseudoField
-          label="Cor"
-          placeholder="Ex: #f5f5f4"
-          node={node}
-          pseudo={editingPseudo}
-          bp={styleBreakpoint}
-          prop="color"
-          onChange={(v) => {
-            if (editingPseudo) updatePageNodePseudoStyle(node.id, editingPseudo, { color: v } as Partial<PageStyle>, styleBreakpoint);
-          }}
-        />
-        <PseudoField
-          label="Sombra"
-          placeholder="box-shadow"
-          node={node}
-          pseudo={editingPseudo}
-          bp={styleBreakpoint}
-          prop="boxShadow"
-          onChange={(v) => {
-            if (editingPseudo) updatePageNodePseudoStyle(node.id, editingPseudo, { boxShadow: v } as Partial<PageStyle>, styleBreakpoint);
-          }}
-        />
-        <PseudoField
-          label="Transform"
-          placeholder="transform"
-          node={node}
-          pseudo={editingPseudo}
-          bp={styleBreakpoint}
-          prop="transform"
-          onChange={(v) => {
-            if (editingPseudo) updatePageNodePseudoStyle(node.id, editingPseudo, { transform: v } as Partial<PageStyle>, styleBreakpoint);
-          }}
-        />
-      </Section>
-
-      <Section title="Responsivo" icon={<Eye size={11} />}>
-        {[{ name: 'base', width: 0 } as const, ...breakpointDefs.filter((bp) => bp.name !== 'base')].map((bp) => {
-          const visible = node.responsive?.[bp.name]?.visible !== false;
-          return (
-            <ToggleRow
-              key={bp.name}
-              label={bp.name}
-              enabled={visible}
-              onChange={() => updatePageNode(node.id, {
-                responsive: {
-                  ...(node.responsive ?? {}),
-                  [bp.name]: { visible: !visible },
-                },
-              })}
+          {(node.type === 'image' || node.type === 'video') && (
+            <SelectField
+              label="Ajuste da imagem"
+              value={String(styleValue('objectFit') || 'cover')}
+              options={[
+                { value: 'cover', label: 'Cobrir (cover)' },
+                { value: 'contain', label: 'Conter' },
+                { value: 'fill', label: 'Preencher' },
+              ]}
+              onChange={(value) => setStyle('objectFit', value as 'cover' | 'contain' | 'fill')}
             />
-          );
-        })}
-      </Section>
-
-      <Section title="Breakpoints" icon={<Settings size={11} />}>
-        <div className="grid gap-2">
-          {breakpointDefs.filter((bp) => bp.name !== 'base').map((bp) => (
-            <div key={bp.name} className="flex items-center gap-2 rounded-md border border-neutral-800 bg-neutral-950/40 p-2">
-              <input
-                value={bp.name}
-                onChange={(e) => renameBreakpoint(bp.name, e.target.value)}
-                className="h-7 min-w-0 flex-1 rounded border border-neutral-700/60 bg-[#0d0f10] px-2 text-[11px] text-neutral-200 outline-none transition focus:border-emerald-400"
-              />
-              <div className="flex items-center gap-1 text-[10px] text-neutral-500">
-                <span>{bp.width}px</span>
-                <input
-                  type="range"
-                  min={320}
-                  max={1920}
-                  step={10}
-                  value={bp.width}
-                  onChange={(e) => updateBreakpointWidth(bp.name, Number(e.target.value))}
-                  className="h-4 w-16 accent-emerald-400"
-                />
-              </div>
-              <button
-                type="button"
-                onClick={() => {
-                  if (window.confirm(`Remover breakpoint "${bp.name}"?`)) {
-                    if (styleBreakpoint === bp.name) setStyleBreakpoint('base');
-                    removeBreakpoint(bp.name);
-                  }
-                }}
-                className="grid h-7 w-7 place-items-center rounded text-neutral-600 transition hover:bg-red-500/15 hover:text-red-200"
-                title="Remover breakpoint"
-              >
-                <Trash2 size={12} />
-              </button>
-            </div>
-          ))}
-          {breakpointDefs.filter((bp) => bp.name !== 'base').length === 0 && (
-            <div className="text-[11px] text-neutral-500">Nenhum breakpoint customizado. Clique em + na aba Layout para adicionar.</div>
           )}
-        </div>
-      </Section>
-        </>
+        </Section>
       )}
+
+      <div className="px-2 pb-3">
+        <p className="text-center text-[10px] text-neutral-600">
+          💡 Dica: clique e arraste elementos no canvas para mover
+        </p>
+      </div>
     </div>
   );
 }
+
+function renderContentEditor(
+  type: string,
+  props: Record<string, unknown>,
+  setProp: (key: string, value: unknown) => void,
+) {
+  const text = (key: string, label: string, multiline = false) => (
+    <Field key={key} label={label}>
+      <textarea
+        value={String(props[key] ?? '')}
+        onChange={(event) => setProp(key, event.target.value)}
+        rows={multiline ? 3 : 1}
+        className={`${inputClass} font-sans ${multiline ? 'min-h-[60px] resize-y py-1.5' : ''}`}
+      />
+    </Field>
+  );
+
+  if (type === 'text') {
+    return (
+      <>
+        {text('text', 'Texto', true)}
+        <Field label="Tamanho do texto">
+          <SegmentedIcons
+            value={String(props.as ?? 'p')}
+            onChange={(value) => setProp('as', value)}
+            options={[
+              { value: 'h1', label: 'Título grande', icon: <span className="text-[14px] font-black">H1</span> },
+              { value: 'h2', label: 'Título', icon: <span className="text-[12px] font-black">H2</span> },
+              { value: 'h3', label: 'Subtítulo', icon: <span className="text-[11px] font-bold">H3</span> },
+              { value: 'p', label: 'Parágrafo', icon: <span className="text-[11px]">P</span> },
+            ]}
+          />
+        </Field>
+      </>
+    );
+  }
+
+  if (type === 'button') {
+    return (
+      <>
+        {text('label', 'Texto do botão')}
+        <Field label="Link (URL)">
+          <input
+            value={String(props.href ?? '')}
+            onChange={(event) => setProp('href', event.target.value)}
+            placeholder="https://…"
+            className={inputClass}
+          />
+        </Field>
+      </>
+    );
+  }
+
+  if (type === 'card') {
+    return (
+      <>
+        {text('title', 'Título do cartão')}
+        {text('body', 'Descrição', true)}
+      </>
+    );
+  }
+
+  if (type === 'navbar') {
+    return <>{text('brand', 'Nome da marca')}</>;
+  }
+
+  if (type === 'footer') {
+    return <>{text('text', 'Texto do rodapé')}</>;
+  }
+
+  if (type === 'label') {
+    return (
+      <>
+        {text('text', 'Texto do rótulo')}
+        <Field label="Vinculado ao campo">
+          <input
+            value={String(props.htmlFor ?? '')}
+            onChange={(event) => setProp('htmlFor', event.target.value)}
+            placeholder="id do campo"
+            className={inputClass}
+          />
+        </Field>
+      </>
+    );
+  }
+
+  if (type === 'menuitem') {
+    return (
+      <>
+        {text('label', 'Texto do item')}
+        <Field label="Link (URL)">
+          <input
+            value={String(props.href ?? '')}
+            onChange={(event) => setProp('href', event.target.value)}
+            placeholder="https://…"
+            className={inputClass}
+          />
+        </Field>
+      </>
+    );
+  }
+
+  if (type === 'modal') {
+    return (
+      <>
+        {text('title', 'Título do modal')}
+        <ToggleRow label="Pode ser fechado" enabled={Boolean(props.closable)} onChange={() => setProp('closable', !props.closable)} />
+        <ToggleRow label="Aparecer aberto" enabled={Boolean(props.open)} onChange={() => setProp('open', !props.open)} />
+      </>
+    );
+  }
+
+  if (type === 'image') {
+    return (
+      <>
+        <Field label="Endereço da imagem (URL)">
+          <input
+            value={String(props.src ?? '')}
+            onChange={(event) => setProp('src', event.target.value)}
+            placeholder="https://…"
+            className={inputClass}
+          />
+        </Field>
+        {text('alt', 'Texto alternativo (acessibilidade)')}
+      </>
+    );
+  }
+
+  if (type === 'video') {
+    return (
+      <>
+        <Field label="Endereço do vídeo (URL)">
+          <input
+            value={String(props.src ?? '')}
+            onChange={(event) => setProp('src', event.target.value)}
+            placeholder="https://…"
+            className={inputClass}
+          />
+        </Field>
+        {text('poster', 'Imagem de capa (URL)')}
+        <ToggleRow label="Mostrar controles" enabled={props.controls !== false} onChange={() => setProp('controls', props.controls === false)} />
+      </>
+    );
+  }
+
+  if (type === 'form') {
+    return (
+      <>
+        {text('name', 'Nome do formulário')}
+        <Field label="Para onde enviar">
+          <input
+            value={String(props.action ?? '#')}
+            onChange={(event) => setProp('action', event.target.value)}
+            placeholder="https://…"
+            className={inputClass}
+          />
+        </Field>
+      </>
+    );
+  }
+
+  if (type === 'input') {
+    return (
+      <>
+        {text('label', 'Rótulo do campo')}
+        {text('placeholder', 'Exemplo (placeholder)')}
+        <Field label="Tipo do campo">
+          <SegmentedIcons
+            value={String(props.type ?? 'text')}
+            onChange={(value) => setProp('type', value)}
+            options={[
+              { value: 'text', label: 'Texto', icon: <Type size={12} /> },
+              { value: 'email', label: 'Email', icon: <span className="text-[10px]">@</span> },
+              { value: 'number', label: 'Número', icon: <span className="text-[10px]">#</span> },
+              { value: 'tel', label: 'Telefone', icon: <span className="text-[10px]">☎</span> },
+            ]}
+          />
+        </Field>
+        <ToggleRow label="Campo obrigatório" enabled={Boolean(props.required)} onChange={() => setProp('required', !props.required)} />
+      </>
+    );
+  }
+
+  if (type === 'textarea') {
+    return (
+      <>
+        {text('label', 'Rótulo do campo')}
+        {text('placeholder', 'Exemplo (placeholder)')}
+        <SliderField
+          label="Quantidade de linhas"
+          value={Number(props.rows ?? 4)}
+          onChange={(value) => setProp('rows', value)}
+          min={2}
+          max={20}
+        />
+      </>
+    );
+  }
+
+  if (type === 'select') {
+    return (
+      <>
+        {text('label', 'Rótulo do campo')}
+        {text('placeholder', 'Texto inicial')}
+        <Field label="Opções (uma por linha)">
+          <textarea
+            value={String((props.options as string[] | undefined)?.join('\n') ?? '')}
+            onChange={(event) => setProp('options', event.target.value.split('\n').map((s) => s.trim()).filter(Boolean))}
+            rows={4}
+            className={`${inputClass} font-sans min-h-[80px] resize-y py-1.5`}
+            placeholder="Opção 1&#10;Opção 2&#10;Opção 3"
+          />
+        </Field>
+      </>
+    );
+  }
+
+  if (type === 'sceneCanvas') {
+    return (
+      <div className="rounded-md border border-sky-400/20 bg-sky-400/[0.05] p-3 text-[11px] text-sky-100">
+        <div className="mb-1 flex items-center gap-2 font-semibold">
+          <Zap size={12} className="text-sky-300" />
+          Cena 3D
+        </div>
+        <p className="text-sky-200/80">
+          Mostra a cena 3D atual do projeto. Edite a cena no modo Cena (canto superior).
+        </p>
+        <ToggleRow label="Interativa (responde ao mouse)" enabled={Boolean(props.interactive)} onChange={() => setProp('interactive', !props.interactive)} />
+      </div>
+    );
+  }
+
+  return (
+    <div className="rounded-md border border-neutral-800 bg-neutral-950/30 p-3 text-[11px] text-neutral-400">
+      Este elemento não tem propriedades de conteúdo para editar.
+    </div>
+  );
+}
+
 
 function InteractionProperties() {
   const page = useExperienceStore((state) => state.page);
@@ -1010,3 +1882,4 @@ export default function ExperienceProperties() {
     </aside>
   );
 }
+

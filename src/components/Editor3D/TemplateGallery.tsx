@@ -4,6 +4,7 @@ import { useMemo, useState } from 'react';
 import { Check, Cpu, Gauge, Sparkles, X, Zap } from 'lucide-react';
 import { EXPERIENCE_TEMPLATES, type ExperienceTemplate, type ExperienceTemplateId, type TemplateCategory } from '@/lib/template-engine/templates';
 import { getVisualPreset, VISUAL_PRESETS, type VisualPresetId } from '@/lib/template-engine/presets';
+import type { PageNode } from '@/lib/page-builder/types';
 import { useExperienceStore } from '@/store/experienceStore';
 
 const CATEGORY_LABELS: Record<TemplateCategory | 'all', string> = {
@@ -31,6 +32,32 @@ const PERFORMANCE_META: Record<string, { label: string; color: string; icon: typ
   high: { label: 'Pesado', color: 'text-rose-300 border-rose-400/30 bg-rose-400/8', icon: Zap },
 };
 
+const TYPE_LABELS: Record<string, string> = {
+  sceneCanvas: '3D',
+  form: 'Form',
+  input: 'Input',
+  textarea: 'Texto',
+  image: 'Imagem',
+  video: 'Vídeo',
+  card: 'Cards',
+  button: 'CTA',
+  navbar: 'Nav',
+  footer: 'Footer',
+};
+
+const PREVIEW_WIDTHS = [86, 64, 78, 92, 58, 74, 68, 84];
+
+const countNodes = (nodes: PageNode[]): number =>
+  nodes.reduce((total, node) => total + 1 + countNodes(node.children ?? []), 0);
+
+const collectTypes = (nodes: PageNode[], set = new Set<string>()): Set<string> => {
+  for (const node of nodes) {
+    if (TYPE_LABELS[node.type]) set.add(node.type);
+    collectTypes(node.children ?? [], set);
+  }
+  return set;
+};
+
 function TemplateCard({
   template,
   onApply,
@@ -41,6 +68,20 @@ function TemplateCard({
   const preset = getVisualPreset(template.presetId);
   const perf = PERFORMANCE_META[template.performance] ?? PERFORMANCE_META.medium;
   const PerfIcon = perf.icon;
+  const preview = useMemo(() => {
+    const page = template.createPage();
+    const types = Array.from(collectTypes(page.children)).slice(0, 4);
+
+    return {
+      sections: page.children.slice(0, 8).map((node, index) => ({
+        type: node.type,
+        width: PREVIEW_WIDTHS[index % PREVIEW_WIDTHS.length],
+      })),
+      sectionCount: page.children.length,
+      nodeCount: countNodes(page.children),
+      types,
+    };
+  }, [template]);
 
   return (
     <button
@@ -50,14 +91,27 @@ function TemplateCard({
       style={{ background: `linear-gradient(160deg, ${preset.palette.surfaceAlt}55, ${preset.palette.background})` }}
     >
       <div
-        className="relative h-28 w-full overflow-hidden rounded-lg border border-neutral-800"
+        className="relative h-32 w-full overflow-hidden rounded-lg border border-neutral-800"
         style={{ background: preset.background }}
       >
-        <div className="absolute inset-0 flex items-end gap-1.5 p-3">
+        <div className="absolute inset-x-3 top-8 grid gap-1.5">
+          {preview.sections.map((section, index) => (
+            <span
+              key={`${section.type}-${index}`}
+              className="h-2 rounded-full border border-white/10"
+              style={{
+                width: `${section.width}%`,
+                background: index % 2 === 0 ? `${preset.palette.primary}55` : `${preset.palette.surfaceAlt}aa`,
+                boxShadow: index === 0 ? `0 0 18px ${template.accent}55` : undefined,
+              }}
+            />
+          ))}
+        </div>
+        <div className="absolute inset-x-3 bottom-3 flex items-end gap-1.5">
           {preset.swatch.map((color, i) => (
             <span
               key={i}
-              className="h-8 w-8 rounded-md border border-white/10 shadow-lg"
+              className="h-6 w-6 rounded-md border border-white/10 shadow-lg"
               style={{ background: color, transform: `translateY(${i * 2}px)` }}
             />
           ))}
@@ -76,6 +130,19 @@ function TemplateCard({
           <h3 className="text-xs font-semibold text-neutral-100">{template.name}</h3>
         </div>
         <p className="text-[11px] leading-4 text-neutral-400">{template.description}</p>
+        <div className="mt-1 flex flex-wrap gap-1">
+          <span className="rounded border border-neutral-800 bg-black/10 px-1.5 py-0.5 text-[9px] text-neutral-500">
+            {preview.sectionCount} seções
+          </span>
+          <span className="rounded border border-neutral-800 bg-black/10 px-1.5 py-0.5 text-[9px] text-neutral-500">
+            {preview.nodeCount} componentes
+          </span>
+          {preview.types.map((type) => (
+            <span key={type} className="rounded border border-neutral-800 bg-black/10 px-1.5 py-0.5 text-[9px] text-neutral-500">
+              {TYPE_LABELS[type]}
+            </span>
+          ))}
+        </div>
         <div className="mt-1 flex items-center justify-between">
           <span className="rounded border border-neutral-800 px-1.5 py-0.5 text-[9px] uppercase tracking-wider text-neutral-500">
             {CATEGORY_LABELS[template.category]}

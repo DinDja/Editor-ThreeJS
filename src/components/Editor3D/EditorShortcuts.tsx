@@ -4,8 +4,10 @@ import { useEffect, useRef } from 'react';
 import { sampleObjectTransform } from '@/lib/animation';
 import { createPrimitiveEditableMesh, deleteFace, extrudeFace } from '@/lib/meshOps';
 import { useEditorStore } from '@/store/editorStore';
+import { useExperienceStore } from '@/store/experienceStore';
 import { useHistoryStore } from '@/store/historyStore';
 import { useMaterialStore } from '@/store/materialStore';
+import { usePageHistoryStore } from '@/store/pageHistoryStore';
 import { useSceneStore } from '@/store/sceneStore';
 import { useTimelineStore } from '@/store/timelineStore';
 import { cloneEditableMesh, type EditorMaterial, type SceneObject } from '@/store/types';
@@ -114,13 +116,23 @@ export default function EditorShortcuts() {
 
       if (meta && key === 'z' && !event.shiftKey) {
         event.preventDefault();
-        history.undo();
+        const activeMode = useExperienceStore.getState().activeMode;
+        if (activeMode === 'scene') {
+          history.undo();
+        } else {
+          usePageHistoryStore.getState().undo();
+        }
         return;
       }
 
       if ((meta && key === 'y') || (meta && event.shiftKey && key === 'z')) {
         event.preventDefault();
-        history.redo();
+        const activeMode = useExperienceStore.getState().activeMode;
+        if (activeMode === 'scene') {
+          history.redo();
+        } else {
+          usePageHistoryStore.getState().redo();
+        }
         return;
       }
 

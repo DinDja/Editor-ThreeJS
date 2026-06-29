@@ -4,6 +4,8 @@ import { useEffect, useRef, useState } from 'react';
 import type { CSSProperties, JSX } from 'react';
 import type { PageEffect } from '@/lib/effects-system/types';
 import type { PerformanceProfile } from '@/lib/performance/device';
+import Cursorly from 'cursorly.js';
+import type { CursorlyInstance } from 'cursorly.js';
 
 const prop = (effect: PageEffect, key: string, fallback: unknown): unknown =>
   effect.props[key] ?? fallback;
@@ -386,181 +388,69 @@ export function ParallaxLayer({ effect, profile }: { effect: PageEffect; profile
   return null;
 }
 
-/* -------------------------------- Custom Cursor -------------------------------- */
-
-const CURSOR_SVGS: Record<string, string> = {
-  neoGlow: `<svg viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg"><circle cx="16" cy="16" r="10" stroke="currentColor" stroke-width="1.5" fill="none"/><circle cx="16" cy="16" r="4" fill="currentColor" opacity="0.8"/><circle cx="16" cy="16" r="14" stroke="currentColor" stroke-width="0.5" opacity="0.3"/></svg>`,
-  crosshair: `<svg viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg"><circle cx="16" cy="16" r="8" stroke="currentColor" stroke-width="1.5"/><line x1="16" y1="2" x2="16" y2="10" stroke="currentColor" stroke-width="1.5"/><line x1="16" y1="22" x2="16" y2="30" stroke="currentColor" stroke-width="1.5"/><line x1="2" y1="16" x2="10" y2="16" stroke="currentColor" stroke-width="1.5"/><line x1="22" y1="16" x2="30" y2="16" stroke="currentColor" stroke-width="1.5"/></svg>`,
-  cosmic: `<svg viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M16 2L20 12L30 16L20 20L16 30L12 20L2 16L12 12Z" fill="currentColor" opacity="0.6"/><circle cx="16" cy="16" r="4" fill="currentColor"/></svg>`,
-  nature: `<svg viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M16 2C16 2 8 10 8 16C8 20.4183 11.5817 24 16 24C20.4183 24 24 20.4183 24 16C24 10 16 2 16 2Z" fill="currentColor" opacity="0.5"/><circle cx="16" cy="16" r="3" fill="currentColor"/></svg>`,
-  luxury: `<svg viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg"><rect x="6" y="6" width="20" height="20" rx="3" stroke="currentColor" stroke-width="1.5" fill="none"/><path d="M16 6L18 12L24 14L18 16L16 22L14 16L8 14L14 12Z" fill="currentColor" opacity="0.5"/></svg>`,
-  tech: `<svg viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg"><rect x="8" y="8" width="16" height="16" rx="2" stroke="currentColor" stroke-width="1.5" fill="none"/><circle cx="16" cy="16" r="4" fill="currentColor"/><path d="M16 4V8M16 24V28M4 16H8M24 16H28" stroke="currentColor" stroke-width="1" opacity="0.5"/></svg>`,
-  game: `<svg viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg"><polygon points="16,4 28,28 16,22 4,28" fill="currentColor" opacity="0.7"/><circle cx="16" cy="16" r="3" fill="currentColor"/></svg>`,
-  glass: `<svg viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg"><circle cx="16" cy="16" r="10" stroke="currentColor" stroke-width="1" opacity="0.6"/><circle cx="16" cy="16" r="6" stroke="currentColor" stroke-width="0.5" opacity="0.4"/><circle cx="16" cy="16" r="2" fill="currentColor" opacity="0.8"/></svg>`,
-  editorial: `<svg viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg"><line x1="4" y1="16" x2="28" y2="16" stroke="currentColor" stroke-width="1.5"/><line x1="16" y1="4" x2="16" y2="28" stroke="currentColor" stroke-width="1.5"/><circle cx="16" cy="16" r="3" fill="currentColor"/></svg>`,
-};
+/* -------------------------------- Custom Cursor (Cursorly.js) -------------------------------- */
 
 export function CustomCursor({ effect, profile }: { effect: PageEffect; profile: PerformanceProfile }) {
-  const cursorStyle = str(effect, 'cursorStyle', 'default');
-  const cursorColor = str(effect, 'cursorColor', '#ffffff');
-  const cursorSize = num(effect, 'cursorSize', 28);
-  const showTrail = bool(effect, 'showTrail', true);
-  const trailLength = Math.round(num(effect, 'trailLength', 8));
-  const showLight = bool(effect, 'showLight', false);
-  const lightColor = str(effect, 'lightColor', '#00f0ff');
-  const lightIntensity = num(effect, 'lightIntensity', 5);
-  const lightRadius = num(effect, 'lightRadius', 8);
-
-  const cursorRef = useRef<HTMLDivElement>(null);
-  const trailRefs = useRef<HTMLDivElement[]>([]);
-  const target = useRef({ x: 0, y: 0 });
-  const current = useRef({ x: 0, y: 0 });
-  const trailPositions = useRef<Array<{ x: number; y: number }>>([]);
-
-  // Inject global cursor style
-  useEffect(() => {
-    const styleId = 'effect-cursor-style';
-    let style = document.getElementById(styleId) as HTMLStyleElement;
-    if (!style) {
-      style = document.createElement('style');
-      style.id = styleId;
-      document.head.appendChild(style);
-    }
-    style.textContent = `
-      body *, body *:hover {
-        cursor: none !important;
-      }
-    `;
-    return () => {
-      if (style.parentElement) style.remove();
-    };
-  }, []);
+  const cursorRef = useRef<CursorlyInstance | null>(null);
 
   useEffect(() => {
     if (profile.reducedMotion) return;
-    let raf = 0;
 
-    // Initialize trail positions
-    trailPositions.current = Array.from({ length: trailLength }, () => ({ x: 0, y: 0 }));
+    const iconIndex = Math.round(num(effect, 'iconIndex', 0));
+    const effectName = str(effect, 'effect', 'trail');
+    const effectColor = str(effect, 'effectColor', '#ffffff');
+    const cursorSize = num(effect, 'cursorSize', 32);
 
-    const onMove = (e: PointerEvent) => {
-      target.current.x = e.clientX;
-      target.current.y = e.clientY;
-    };
+    const cursor = Cursorly.init({
+      cursor: Math.max(0, Math.min(iconIndex, 41)),
+      cursorSize,
+      effect: {
+        name: effectName === 'none' ? 'none' : effectName,
+        color: effectColor,
+      },
+    });
 
-    const tick = () => {
-      current.current.x += (target.current.x - current.current.x) * 0.14;
-      current.current.y += (target.current.y - current.current.y) * 0.14;
-
-      // Update trail
-      trailPositions.current.unshift({ x: current.current.x, y: current.current.y });
-      trailPositions.current = trailPositions.current.slice(0, trailLength);
-
-      if (cursorRef.current) {
-        cursorRef.current.style.transform = `translate3d(${current.current.x - cursorSize / 2}px, ${current.current.y - cursorSize / 2}px, 0)`;
-      }
-
-      // Update trail dots
-      if (showTrail) {
-        trailRefs.current.forEach((dot, i) => {
-          if (dot && trailPositions.current[i]) {
-            const pos = trailPositions.current[i];
-            const alpha = 1 - i / trailLength;
-            const scale = 1 - i / trailLength * 0.6;
-            dot.style.transform = `translate3d(${pos.x - (cursorSize * 0.15 * scale) / 2}px, ${pos.y - (cursorSize * 0.15 * scale) / 2}px, 0) scale(${scale})`;
-            dot.style.opacity = String(alpha * 0.6);
-          }
-        });
-      }
-
-      raf = requestAnimationFrame(tick);
-    };
-
-    window.addEventListener('pointermove', onMove);
-    raf = requestAnimationFrame(tick);
+    cursorRef.current = cursor;
 
     return () => {
-      window.removeEventListener('pointermove', onMove);
-      cancelAnimationFrame(raf);
+      cursor.disable();
+      const canvases = document.querySelectorAll('canvas');
+      canvases.forEach((c) => {
+        if (c.style.zIndex === '9999' || c.style.zIndex === '99999') c.remove();
+      });
+      cursorRef.current = null;
     };
-  }, [cursorSize, showTrail, trailLength, profile.reducedMotion]);
+  }, [effect.id, profile.reducedMotion]);
 
-  // Create light source in 3D canvas if showLight is enabled
   useEffect(() => {
-    if (!showLight || profile.reducedMotion) return;
+    const cursor = cursorRef.current;
+    if (!cursor) return;
 
-    const lightId = 'effect-cursor-light';
-    let lightContainer = document.getElementById(lightId) as HTMLDivElement;
-    if (!lightContainer) {
-      lightContainer = document.createElement('div');
-      lightContainer.id = lightId;
-      lightContainer.style.cssText = 'position:fixed;inset:0;pointer-events:none;z-index:44;';
-      document.body.appendChild(lightContainer);
+    const iconIndex = Math.round(num(effect, 'iconIndex', 0));
+    const effectName = str(effect, 'effect', 'trail');
+    const effectColor = str(effect, 'effectColor', '#ffffff');
+    const cursorSize = num(effect, 'cursorSize', 32);
+
+    cursor.setIcon(Math.max(0, Math.min(iconIndex, 41)));
+    if (cursorSize > 0) {
+      cursor.options.cursorSize = cursorSize;
+      if (cursor.cursorImage) {
+        cursor.cursorImage.style.width = `${cursorSize}px`;
+        cursor.cursorImage.style.height = `${cursorSize}px`;
+      }
     }
 
-    // Create a radial gradient light following cursor
-    const glow = document.createElement('div');
-    glow.style.cssText = `
-      position: absolute;
-      width: ${lightRadius * 2}px;
-      height: ${lightRadius * 2}px;
-      border-radius: 50%;
-      background: radial-gradient(circle, ${lightColor}33 0%, ${lightColor}11 40%, transparent 70%);
-      pointer-events: none;
-      transform: translate(-50%, -50%);
-      mix-blend-mode: screen;
-    `;
-    lightContainer.appendChild(glow);
-
-    const moveGlow = (e: PointerEvent) => {
-      glow.style.left = `${e.clientX}px`;
-      glow.style.top = `${e.clientY}px`;
-    };
-    window.addEventListener('pointermove', moveGlow);
-
-    return () => {
-      window.removeEventListener('pointermove', moveGlow);
-      if (lightContainer.parentElement) lightContainer.remove();
-    };
-  }, [showLight, lightColor, lightRadius, profile.reducedMotion]);
+    if (effectName === 'none') {
+      cursor.disableEffect();
+    } else {
+      cursor.setEffect({ name: effectName, color: effectColor });
+      cursor.enableEffect();
+    }
+  }, [effect.props]);
 
   if (profile.reducedMotion) return null;
 
-  // Default cursor type: just hide the cursor and show nothing custom
-  if (cursorStyle === 'default') {
-    return (
-      <style>{`body *, body *:hover { cursor: none !important; }`}</style>
-    );
-  }
-
-  const svgContent = CURSOR_SVGS[cursorStyle] || CURSOR_SVGS.neoGlow;
-  const encodedSvg = encodeURIComponent(svgContent.replace(/currentColor/g, cursorColor));
-  const cursorUrl = `url("data:image/svg+xml;utf8,${encodedSvg}") ${cursorSize / 2} ${cursorSize / 2}, auto`;
-
-  return (
-    <>
-      <style>{`body *, body *:hover { cursor: ${cursorUrl} !important; }`}</style>
-      {showTrail && (
-        <div aria-hidden className="pointer-events-none fixed" style={{ zIndex: 46 }}>
-          {Array.from({ length: trailLength }).map((_, i) => (
-            <div
-              key={i}
-              ref={(el) => { if (el) trailRefs.current[i] = el; }}
-              className="absolute"
-              style={{
-                width: cursorSize * 0.15,
-                height: cursorSize * 0.15,
-                borderRadius: '50%',
-                background: cursorColor,
-                opacity: 0,
-                transition: 'opacity 0.1s ease',
-              }}
-            />
-          ))}
-        </div>
-      )}
-    </>
-  );
+  return null;
 }
 
 export const CSS_EFFECT_COMPONENTS: Record<string, (props: { effect: PageEffect; profile: PerformanceProfile }) => JSX.Element | null> = {

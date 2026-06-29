@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import * as THREE from 'three';
 import { Boxes, Clock, PanelRight } from 'lucide-react';
+import { useEditorPreferences } from '@/lib/preferences/useEditorPreferences';
 import Canvas3D from './Canvas3D';
 import DataModelPanel from './DataModel/DataModelPanel';
 import EditorModeBar from './EditorModeBar';
@@ -179,6 +180,23 @@ function ExperienceRightPanel() {
   return selectedObjectIds.length > 0 ? <Properties /> : <ExperienceProperties />;
 }
 
+function AutoTourLauncher({ onLaunch }: { onLaunch: (scope: 'scene' | 'page-system') => void }) {
+  const activeMode = useExperienceStore((state) => state.activeMode);
+  const { preferences, markTourSeen } = useEditorPreferences();
+  const firedRef = useRef(false);
+
+  useEffect(() => {
+    if (firedRef.current) return;
+    if (activeMode !== 'page') return;
+    if (preferences.hasSeenTour) return;
+    firedRef.current = true;
+    markTourSeen();
+    onLaunch('page-system');
+  }, [activeMode, preferences.hasSeenTour, markTourSeen, onLaunch]);
+
+  return null;
+}
+
 export default function Editor3D() {
   const sceneRootRef = useRef<THREE.Group | null>(null);
   const [tutorialOpen, setTutorialOpen] = useState(false);
@@ -332,6 +350,10 @@ export default function Editor3D() {
       )}
 
       <MobileTabBar />
+      <AutoTourLauncher onLaunch={(scope) => {
+        setTutorialScope(scope);
+        setTutorialOpen(true);
+      }} />
       <TutorialSpotlight open={tutorialOpen} scope={tutorialScope} onClose={() => setTutorialOpen(false)} />
       <ImageTo3DModal />
     </main>

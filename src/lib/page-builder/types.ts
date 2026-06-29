@@ -140,6 +140,10 @@ export type PageNode = {
   componentId?: string;
   /** Per-child overrides keyed by the child's original definition-node ID */
   instanceOverrides?: Record<string, ComponentOverride>;
+  /** When true, the element cannot be selected, dragged or edited in the builder */
+  locked?: boolean;
+  /** When true, the element is omitted from the rendered canvas (kept in tree) */
+  hidden?: boolean;
 };
 
 export type PageDocument = {

@@ -1,6 +1,7 @@
 'use client';
 
-import { type ChangeEvent, useRef, useState } from 'react';
+import { type ChangeEvent, useEffect, useRef, useState } from 'react';
+import { useEditorPreferences } from '@/lib/preferences/useEditorPreferences';
 import {
   Box,
   Boxes,
@@ -128,6 +129,7 @@ export default function ExperienceToolbar({ onOpenTutorial }: ExperienceToolbarP
   const addInteraction = useExperienceStore((state) => state.addInteraction);
   const setActiveBreakpoint = useExperienceStore((state) => state.setActiveBreakpoint);
   const setExportTarget = useExperienceStore((state) => state.setExportTarget);
+  const { preferences, setActiveBreakpoint: persistBreakpoint } = useEditorPreferences();
   const objects = useSceneStore((state) => state.objects);
   const layers = useSceneStore((state) => state.layers);
   const referenceImages = useSceneStore((state) => state.referenceImages);
@@ -136,6 +138,20 @@ export default function ExperienceToolbar({ onOpenTutorial }: ExperienceToolbarP
   const dataSchema = useDataModelStore((state) => state.schema);
   const addCollection = useDataModelStore((state) => state.addCollection);
   const variables = useVariableStore((state) => state.document);
+
+  useEffect(() => {
+    const saved = preferences.activeBreakpoint;
+    if (saved && saved !== activeBreakpoint) {
+      setActiveBreakpoint(saved);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [preferences.activeBreakpoint]);
+
+  useEffect(() => {
+    if (activeBreakpoint && activeBreakpoint !== preferences.activeBreakpoint) {
+      persistBreakpoint(activeBreakpoint);
+    }
+  }, [activeBreakpoint, preferences.activeBreakpoint, persistBreakpoint]);
 
   const saveProject = () => {
     const scene = createSceneDocument({
@@ -301,6 +317,8 @@ export default function ExperienceToolbar({ onOpenTutorial }: ExperienceToolbarP
                           icon={item.icon}
                           label={item.label}
                           hint={item.hint}
+                          draggable
+                          dragPayload={JSON.stringify({ kind: 'new', type: item.type })}
                           onClick={() => {
                             addPageNode(item.type);
                             close();

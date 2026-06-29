@@ -73,10 +73,9 @@ export type PresetAnimation = {
 export type PresetSpacing = 'compact' | 'normal' | 'relaxed';
 
 export type CursorConfig = {
-  style: string;
+  iconIndex: number;
+  effect: string;
   color: string;
-  showLight: boolean;
-  lightColor: string;
 };
 
 export type VisualPreset = {
@@ -141,7 +140,7 @@ export const VISUAL_PRESETS: VisualPreset[] = [
     effectIntensity: 'high',
     animations: { easing: 'cubic-bezier(0.16,1,0.3,1)', durationMs: 600, hoverLift: true, scrollReveal: true },
     spacing: 'normal',
-    cursor: { style: 'neoGlow', color: '#00f0ff', showLight: true, lightColor: '#00f0ff' },
+    cursor: { iconIndex: 0, effect: 'neonGlow', color: '#00f0ff' },
     suggestedEffects: [
       { type: 'particleField', intensity: 0.9 },
       { type: 'gridFloor3D', intensity: 0.7 },
@@ -190,7 +189,7 @@ export const VISUAL_PRESETS: VisualPreset[] = [
     effectIntensity: 'medium',
     animations: { easing: 'cubic-bezier(0.22,1,0.36,1)', durationMs: 700, hoverLift: true, scrollReveal: true },
     spacing: 'relaxed',
-    cursor: { style: 'luxury', color: '#c9a227', showLight: true, lightColor: '#c9a227' },
+    cursor: { iconIndex: 0, effect: 'sparkle', color: '#c9a227' },
     suggestedEffects: [
       { type: 'floatingOrbs', intensity: 0.6 },
       { type: 'noiseOverlay', intensity: 0.3 },
@@ -238,7 +237,7 @@ export const VISUAL_PRESETS: VisualPreset[] = [
     effectIntensity: 'medium',
     animations: { easing: 'cubic-bezier(0.33,1,0.68,1)', durationMs: 650, hoverLift: true, scrollReveal: true },
     spacing: 'normal',
-    cursor: { style: 'glass', color: '#7dd3fc', showLight: false, lightColor: '#7dd3fc' },
+    cursor: { iconIndex: 0, effect: 'aura', color: '#7dd3fc' },
     suggestedEffects: [
       { type: 'auroraBackground', intensity: 0.8 },
       { type: 'glassCard', intensity: 0.7 },
@@ -287,7 +286,7 @@ export const VISUAL_PRESETS: VisualPreset[] = [
     effectIntensity: 'low',
     animations: { easing: 'cubic-bezier(0.22,1,0.36,1)', durationMs: 800, hoverLift: false, scrollReveal: true },
     spacing: 'relaxed',
-    cursor: { style: 'editorial', color: '#111111', showLight: false, lightColor: '#111111' },
+    cursor: { iconIndex: 0, effect: 'none', color: '#111111' },
     suggestedEffects: [
       { type: 'scrollReveal', intensity: 0.7 },
       { type: 'parallaxLayer', intensity: 0.4 },
@@ -335,7 +334,7 @@ export const VISUAL_PRESETS: VisualPreset[] = [
     effectIntensity: 'medium',
     animations: { easing: 'cubic-bezier(0.16,1,0.3,1)', durationMs: 600, hoverLift: true, scrollReveal: true },
     spacing: 'normal',
-    cursor: { style: 'tech', color: '#22d3ee', showLight: true, lightColor: '#22d3ee' },
+    cursor: { iconIndex: 0, effect: 'trail', color: '#22d3ee' },
     suggestedEffects: [
       { type: 'webglHeroScene', intensity: 0.8 },
       { type: 'gridFloor3D', intensity: 0.6 },
@@ -384,7 +383,7 @@ export const VISUAL_PRESETS: VisualPreset[] = [
     effectIntensity: 'medium',
     animations: { easing: 'cubic-bezier(0.33,1,0.68,1)', durationMs: 700, hoverLift: true, scrollReveal: true },
     spacing: 'normal',
-    cursor: { style: 'nature', color: '#34d399', showLight: false, lightColor: '#34d399' },
+    cursor: { iconIndex: 0, effect: 'snowfall', color: '#34d399' },
     suggestedEffects: [
       { type: 'floatingOrbs', intensity: 0.7 },
       { type: 'particleField', intensity: 0.4 },
@@ -432,7 +431,7 @@ export const VISUAL_PRESETS: VisualPreset[] = [
     effectIntensity: 'medium',
     animations: { easing: 'cubic-bezier(0.16,1,0.3,1)', durationMs: 550, hoverLift: true, scrollReveal: true },
     spacing: 'normal',
-    cursor: { style: 'crosshair', color: '#38bdf8', showLight: false, lightColor: '#38bdf8' },
+    cursor: { iconIndex: 0, effect: 'trail', color: '#38bdf8' },
     suggestedEffects: [
       { type: 'gridFloor3D', intensity: 0.5 },
       { type: 'animatedStars', intensity: 0.5 },
@@ -480,7 +479,7 @@ export const VISUAL_PRESETS: VisualPreset[] = [
     effectIntensity: 'medium',
     animations: { easing: 'cubic-bezier(0.22,1,0.36,1)', durationMs: 750, hoverLift: true, scrollReveal: true },
     spacing: 'relaxed',
-    cursor: { style: 'luxury', color: '#d4af37', showLight: true, lightColor: '#d4af37' },
+    cursor: { iconIndex: 0, effect: 'sparkle', color: '#d4af37' },
     suggestedEffects: [
       { type: 'webglHeroScene', intensity: 0.9 },
       { type: 'lightBeams', intensity: 0.5 },
@@ -528,7 +527,7 @@ export const VISUAL_PRESETS: VisualPreset[] = [
     effectIntensity: 'high',
     animations: { easing: 'cubic-bezier(0.16,1,0.3,1)', durationMs: 550, hoverLift: true, scrollReveal: true },
     spacing: 'normal',
-    cursor: { style: 'game', color: '#f43f5e', showLight: true, lightColor: '#f43f5e' },
+    cursor: { iconIndex: 0, effect: 'fireworks', color: '#f43f5e' },
     suggestedEffects: [
       { type: 'particleField', intensity: 1 },
       { type: 'lightBeams', intensity: 0.7 },
@@ -577,7 +576,7 @@ export const VISUAL_PRESETS: VisualPreset[] = [
     effectIntensity: 'high',
     animations: { easing: 'cubic-bezier(0.16,1,0.3,1)', durationMs: 600, hoverLift: true, scrollReveal: true },
     spacing: 'normal',
-    cursor: { style: 'neoGlow', color: '#f472b6', showLight: true, lightColor: '#f472b6' },
+    cursor: { iconIndex: 0, effect: 'neonGlow', color: '#f472b6' },
     suggestedEffects: [
       { type: 'shaderBackground', intensity: 0.9 },
       { type: 'particleField', intensity: 0.7 },
@@ -626,7 +625,7 @@ export const VISUAL_PRESETS: VisualPreset[] = [
     effectIntensity: 'low',
     animations: { easing: 'cubic-bezier(0.22,1,0.36,1)', durationMs: 700, hoverLift: true, scrollReveal: true },
     spacing: 'normal',
-    cursor: { style: 'tech', color: '#3b82f6', showLight: false, lightColor: '#3b82f6' },
+    cursor: { iconIndex: 0, effect: 'trail', color: '#3b82f6' },
     suggestedEffects: [
       { type: 'gradientMesh', intensity: 0.4 },
       { type: 'scrollReveal', intensity: 0.7 },
@@ -674,7 +673,7 @@ export const VISUAL_PRESETS: VisualPreset[] = [
     effectIntensity: 'medium',
     animations: { easing: 'cubic-bezier(0.22,1,0.36,1)', durationMs: 700, hoverLift: true, scrollReveal: true },
     spacing: 'normal',
-    cursor: { style: 'editorial', color: '#ffffff', showLight: false, lightColor: '#ffffff' },
+    cursor: { iconIndex: 0, effect: 'none', color: '#ffffff' },
     suggestedEffects: [
       { type: 'shaderBackground', intensity: 0.6 },
       { type: 'scrollReveal', intensity: 0.5 },
@@ -722,7 +721,7 @@ export const VISUAL_PRESETS: VisualPreset[] = [
     effectIntensity: 'medium',
     animations: { easing: 'cubic-bezier(0.33,1,0.68,1)', durationMs: 800, hoverLift: true, scrollReveal: true },
     spacing: 'relaxed',
-    cursor: { style: 'luxury', color: '#d97706', showLight: true, lightColor: '#d97706' },
+    cursor: { iconIndex: 0, effect: 'sparkle', color: '#d97706' },
     suggestedEffects: [
       { type: 'parallaxLayer', intensity: 0.6 },
       { type: 'scrollReveal', intensity: 0.7 },
@@ -771,7 +770,7 @@ export const VISUAL_PRESETS: VisualPreset[] = [
     effectIntensity: 'low',
     animations: { easing: 'cubic-bezier(0.22,1,0.36,1)', durationMs: 600, hoverLift: true, scrollReveal: true },
     spacing: 'normal',
-    cursor: { style: 'tech', color: '#2563eb', showLight: false, lightColor: '#2563eb' },
+    cursor: { iconIndex: 0, effect: 'trail', color: '#2563eb' },
     suggestedEffects: [
       { type: 'shaderBackground', intensity: 0.4 },
       { type: 'scrollReveal', intensity: 0.6 },

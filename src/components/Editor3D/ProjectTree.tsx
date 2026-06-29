@@ -196,13 +196,16 @@ function PagesPanel() {
 
 function PageRow({ item }: { item: { node: PageNode; depth: number; parentId: string | null } }) {
   const selectedPageNodeId = useExperienceStore((state) => state.selectedPageNodeId);
+  const selectedPageNodeIds = useExperienceStore((state) => state.selectedPageNodeIds);
   const setSelectedPageNode = useExperienceStore((state) => state.setSelectedPageNode);
+  const toggleSelectedPageNode = useExperienceStore((state) => state.toggleSelectedPageNode);
   const movePageNode = useExperienceStore((state) => state.movePageNode);
   const reparentPageNode = useExperienceStore((state) => state.reparentPageNode);
   const removePageNode = useExperienceStore((state) => state.removePageNode);
   const detachComponentInstance = useExperienceStore((state) => state.detachComponentInstance);
   const clearSelectedObjects = useEditorStore((state) => state.clearSelectedObjects);
   const selected = selectedPageNodeId === item.node.id;
+  const isMulti = !selected && selectedPageNodeIds.includes(item.node.id);
   const [dropPosition, setDropPosition] = useState<'before' | 'after' | 'inside' | null>(null);
 
   const computeDropPosition = (event: React.DragEvent<HTMLElement>): 'before' | 'after' | 'inside' => {
@@ -275,7 +278,9 @@ function PageRow({ item }: { item: { node: PageNode; depth: number; parentId: st
       className={`group relative flex items-center gap-1.5 rounded-md py-1.5 pr-1 text-sm transition ${
         selected
           ? 'bg-emerald-400/10 text-emerald-100 outline outline-1 outline-emerald-400/35'
-          : 'text-neutral-300 hover:bg-neutral-800/70'
+          : isMulti
+            ? 'bg-sky-400/10 text-sky-200 outline outline-1 outline-sky-400/35'
+            : 'text-neutral-300 hover:bg-neutral-800/70'
       } ${dropPosition === 'inside' ? 'ring-1 ring-sky-400/70' : ''}`}
       style={{ paddingLeft: 8 + item.depth * 14 }}
     >
@@ -286,9 +291,10 @@ function PageRow({ item }: { item: { node: PageNode; depth: number; parentId: st
       </div>
       <button
         type="button"
-        onClick={() => {
+        onClick={(event) => {
           clearSelectedObjects();
-          setSelectedPageNode(item.node.id);
+          if (event.shiftKey) toggleSelectedPageNode(item.node.id);
+          else setSelectedPageNode(item.node.id);
         }}
         className="min-w-0 flex-1 truncate text-left"
         title={item.node.name}
@@ -436,19 +442,29 @@ function ComponentRow({ component, onAdd, onSync, onRemove }: {
 
 function LayersRow({ node }: { node: PageNode }) {
   const selectedPageNodeId = useExperienceStore((state) => state.selectedPageNodeId);
+  const selectedPageNodeIds = useExperienceStore((state) => state.selectedPageNodeIds);
   const setSelectedPageNode = useExperienceStore((state) => state.setSelectedPageNode);
+  const toggleSelectedPageNode = useExperienceStore((state) => state.toggleSelectedPageNode);
   const updatePageNodeStyle = useExperienceStore((state) => state.updatePageNodeStyle);
   const zIndex = typeof node.styles.base.zIndex === 'number' ? node.styles.base.zIndex : 0;
   const isSelected = selectedPageNodeId === node.id;
+  const isMulti = !isSelected && selectedPageNodeIds.includes(node.id);
   const zPct = Math.min(100, Math.max(0, Math.round(((zIndex + 1) / 51) * 100)));
 
   return (
     <div
       className={`group flex items-center gap-1.5 rounded-md py-1 pr-1 text-[11px] transition ${
-        isSelected ? 'bg-emerald-400/10 text-emerald-100' : 'text-neutral-400 hover:bg-neutral-800/70'
+        isSelected
+          ? 'bg-emerald-400/10 text-emerald-100'
+          : isMulti
+            ? 'bg-sky-400/10 text-sky-200'
+            : 'text-neutral-400 hover:bg-neutral-800/70'
       }`}
       style={{ paddingLeft: 8, cursor: 'pointer' }}
-      onClick={() => setSelectedPageNode(node.id)}
+      onClick={(event) => {
+        if (event.shiftKey) toggleSelectedPageNode(node.id);
+        else setSelectedPageNode(node.id);
+      }}
     >
       <span className="flex w-6 justify-center text-[10px] text-neutral-600">{zIndex}</span>
       <div className="h-1 w-full rounded-full bg-neutral-800">

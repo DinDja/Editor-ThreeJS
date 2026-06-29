@@ -67,7 +67,7 @@ const cloneDuplicateMaterials = (
   });
 };
 
-type MenuItem = {
+export type MenuItem = {
   label?: string;
   icon?: React.ComponentType<{ size?: number; className?: string }>;
   danger?: boolean;
@@ -76,7 +76,7 @@ type MenuItem = {
   onClick: () => void;
 };
 
-function MenuPanel({ items, onClose, x, y }: { items: MenuItem[]; onClose: () => void; x: number; y: number }) {
+export function MenuPanel({ items, onClose, x, y }: { items: MenuItem[]; onClose: () => void; x: number; y: number }) {
   const menuRef = useRef<HTMLDivElement>(null);
   const [style, setStyle] = useState<React.CSSProperties>({ left: x, top: y });
 

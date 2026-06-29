@@ -244,8 +244,35 @@ const buildFAQ = (preset: VisualPreset): PageNode => {
   });
 };
 
-const buildGallery = (preset: VisualPreset): PageNode =>
-  createPageNode('section', {
+const buildGallery = (preset: VisualPreset): PageNode => {
+  const images = [
+    {
+      src: 'https://images.unsplash.com/photo-1497366754035-f200968a6e72?auto=format&fit=crop&w=900&q=80',
+      alt: 'Studio workspace with warm light',
+    },
+    {
+      src: 'https://images.unsplash.com/photo-1518005020951-eccb494ad742?auto=format&fit=crop&w=900&q=80',
+      alt: 'Architectural geometric facade',
+    },
+    {
+      src: 'https://images.unsplash.com/photo-1498050108023-c5249f4df085?auto=format&fit=crop&w=900&q=80',
+      alt: 'Interface design on laptop',
+    },
+    {
+      src: 'https://images.unsplash.com/photo-1500530855697-b586d89ba3ee?auto=format&fit=crop&w=900&q=80',
+      alt: 'Premium interior scene',
+    },
+    {
+      src: 'https://images.unsplash.com/photo-1486406146926-c627a92ad1ab?auto=format&fit=crop&w=900&q=80',
+      alt: 'Modern building exterior',
+    },
+    {
+      src: 'https://images.unsplash.com/photo-1500534314209-a25ddb2bd429?auto=format&fit=crop&w=900&q=80',
+      alt: 'Landscape with atmospheric depth',
+    },
+  ];
+
+  return createPageNode('section', {
     name: 'Gallery Section',
     styles: createResponsiveStyles({
       width: '100%',
@@ -276,10 +303,10 @@ const buildGallery = (preset: VisualPreset): PageNode =>
           gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 240px), 1fr))',
           gap: 16,
         }, { gridTemplateColumns: 'repeat(2, 1fr)' }),
-        children: Array.from({ length: 6 }).map((_, i) =>
+        children: images.map((image, i) =>
           createPageNode('image', {
             name: `Gallery Image ${i + 1}`,
-            props: { src: '', alt: `Imagem ${i + 1}` },
+            props: { src: image.src, alt: image.alt },
             styles: createResponsiveStyles({
               width: '100%',
               minHeight: 220,
@@ -294,6 +321,7 @@ const buildGallery = (preset: VisualPreset): PageNode =>
       }),
     ],
   });
+};
 
 const buildContactForm = (preset: VisualPreset): PageNode =>
   createPageNode('section', {
@@ -527,10 +555,10 @@ const buildLogosStrip = (preset: VisualPreset): PageNode =>
 
 const buildTeam = (preset: VisualPreset): PageNode => {
   const members = [
-    { name: 'Ana Souza', role: 'Design Lead' },
-    { name: 'Carlos Lima', role: 'Creative Director' },
-    { name: 'Júlia Reis', role: 'Engineer' },
-    { name: 'Bruno Andrade', role: 'Founder' },
+    { name: 'Ana Souza', role: 'Design Lead', avatar: 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?auto=format&fit=crop&w=320&q=80' },
+    { name: 'Carlos Lima', role: 'Creative Director', avatar: 'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?auto=format&fit=crop&w=320&q=80' },
+    { name: 'Júlia Reis', role: 'Engineer', avatar: 'https://images.unsplash.com/photo-1438761681033-6461ffad8d80?auto=format&fit=crop&w=320&q=80' },
+    { name: 'Bruno Andrade', role: 'Founder', avatar: 'https://images.unsplash.com/photo-1506794778202-cad84cf45f1d?auto=format&fit=crop&w=320&q=80' },
   ];
   return createPageNode('section', {
     name: 'Team Section',
@@ -576,7 +604,7 @@ const buildTeam = (preset: VisualPreset): PageNode => {
             children: [
               createPageNode('image', {
                 name: `${m.name} Avatar`,
-                props: { src: '', alt: m.name },
+                props: { src: m.avatar, alt: m.name },
                 styles: createResponsiveStyles({
                   width: 96,
                   height: 96,

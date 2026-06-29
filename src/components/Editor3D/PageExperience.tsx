@@ -11,6 +11,7 @@ import {
   useMemo,
   useState,
 } from 'react';
+import { EyeOff } from 'lucide-react';
 import ExperienceSceneCanvas from './ExperienceSceneCanvas';
 import { EffectsLayer } from '@/components/effects';
 import type { InteractionDocument } from '@/lib/interaction-engine/types';
@@ -30,14 +31,18 @@ type PageExperienceProps = {
   page: PageDocument;
   interactions: InteractionDocument[];
   selectedNodeId?: string | null;
+  selectedNodeIds?: string[];
   activeBreakpoint?: string;
   previewPseudo?: PseudoClass | null;
   mode?: 'edit' | 'preview';
-  onSelectNode?: (id: string) => void;
+  xrayMode?: boolean;
+  showOnlySelection?: boolean;
+  onSelectNode?: (id: string, additive?: boolean) => void;
   onSelectParentNode?: () => void;
   onUpdateNodeProps?: (id: string, patch: Record<string, unknown>) => void;
   onDuplicateNode?: (id: string) => void;
   onRemoveNode?: (id: string) => void;
+  onContextMenuNode?: (id: string, event: MouseEvent<HTMLElement>) => void;
 };
 
 const toCssProperties = (node: PageNode, activeBreakpoint: string, pseudoOverride?: PseudoClass | null): CSSProperties => {
@@ -211,9 +216,12 @@ function PageNodeView({
   node,
   interactions,
   selectedNodeId,
+  selectedNodeIds = [],
   activeBreakpoint = 'base',
   previewPseudo,
   mode,
+  xrayMode = false,
+  showOnlySelection = false,
   onSelectNode,
   onSelectParentNode,
   onUpdateNodeProps,
@@ -224,14 +232,18 @@ function PageNodeView({
   variables,
   recordsByCollection,
   onNavigateHref,
+  onContextMenuNode,
 }: {
   node: PageNode;
   interactions: InteractionDocument[];
   selectedNodeId: string | null;
+  selectedNodeIds?: string[];
   activeBreakpoint?: string;
   previewPseudo?: PseudoClass | null;
   mode: 'edit' | 'preview';
-  onSelectNode?: (id: string) => void;
+  xrayMode?: boolean;
+  showOnlySelection?: boolean;
+  onSelectNode?: (id: string, additive?: boolean) => void;
   onSelectParentNode?: () => void;
   onUpdateNodeProps?: (id: string, patch: Record<string, unknown>) => void;
   hasWebglBackground?: boolean;
@@ -241,10 +253,39 @@ function PageNodeView({
   variables: VariableDocument;
   recordsByCollection: Record<string, DataRecord[]>;
   onNavigateHref?: (href: string, event: MouseEvent<HTMLElement>) => boolean;
+  onContextMenuNode?: (id: string, event: MouseEvent<HTMLElement>) => void;
 }) {
   const showPseudoOverride = selectedNodeId === node.id && mode === 'edit';
   const style = toCssProperties(node, activeBreakpoint, showPseudoOverride ? previewPseudo : null);
   const nodeInteractions = interactions.filter((interaction) => interaction.sourceId === node.id);
+  const isSelected = mode === 'edit' && (selectedNodeId === node.id || selectedNodeIds.includes(node.id));
+  const isPrimary = mode === 'edit' && selectedNodeId === node.id;
+  if (xrayMode && mode === 'edit') {
+    style.background = 'transparent';
+    style.backgroundImage = 'none';
+    style.color = 'rgba(255,255,255,0.5)';
+  }
+
+  if (node.hidden && mode === 'preview') {
+    return null;
+  }
+
+  // Show-only-selection: hide nodes that aren't selected or ancestors of selection
+  if (showOnlySelection && mode === 'edit' && selectedNodeIds.length > 0) {
+    const isSelected = selectedNodeId === node.id || selectedNodeIds.includes(node.id);
+    if (!isSelected && node.id !== 'page') {
+      // Check if any selected node is a descendant
+      const hasSelectedDescendant = (n: PageNode): boolean => {
+        return (n.children ?? []).some((child) => {
+          if (selectedNodeIds.includes(child.id)) return true;
+          return hasSelectedDescendant(child);
+        });
+      };
+      if (!hasSelectedDescendant(node)) {
+        return null;
+      }
+    }
+  }
 
   // When page-level WebGL background effects exist, make sections
   // semi-transparent so particles/3D scenes show through.
@@ -263,18 +304,22 @@ function PageNodeView({
       style.backdropFilter = 'blur(6px)';
     }
   }
-  const selected = selectedNodeId === node.id && mode === 'edit';
   const editable = mode === 'edit' && Boolean(onUpdateNodeProps);
 
   const handleSelect = (event: MouseEvent<HTMLElement>) => {
     if (mode !== 'edit') return;
+    if (node.locked) {
+      event.preventDefault();
+      event.stopPropagation();
+      return;
+    }
     event.preventDefault();
     event.stopPropagation();
     if (event.altKey && parentId && onSelectParentNode) {
       onSelectParentNode();
       return;
     }
-    onSelectNode?.(node.id);
+    onSelectNode?.(node.id, event.shiftKey);
   };
 
   const handlers = {
@@ -287,6 +332,12 @@ function PageNodeView({
       if ((node.type === 'button' || node.type === 'menuitem') && typeof node.props.href === 'string') {
         onNavigateHref?.(node.props.href, event);
       }
+    },
+    onContextMenu: (event: MouseEvent<HTMLElement>) => {
+      if (mode !== 'edit') return;
+      event.preventDefault();
+      event.stopPropagation();
+      onContextMenuNode?.(node.id, event);
     },
     onDoubleClick: () => {
       if (mode !== 'preview') return;
@@ -308,11 +359,15 @@ function PageNodeView({
     },
   };
 
-  const className = selected
+  const className = isPrimary
     ? 'outline outline-2 outline-emerald-300 outline-offset-2'
-    : mode === 'edit'
-      ? 'outline outline-1 outline-transparent hover:outline-emerald-400/45 hover:bg-emerald-400/[0.02]'
-      : undefined;
+    : isSelected
+      ? 'outline outline-2 outline-emerald-300/60 outline-offset-2'
+      : node.locked && mode === 'edit'
+        ? 'outline outline-1 outline-amber-400/45'
+        : mode === 'edit'
+          ? 'outline outline-1 outline-transparent hover:outline-emerald-400/45 hover:bg-emerald-400/[0.02]'
+          : undefined;
 
   const sharedProps = {
     'data-experience-node': node.id,
@@ -320,6 +375,7 @@ function PageNodeView({
     'data-parent-id': parentId ?? '',
     style,
     className,
+    draggable: mode === 'edit' && !node.locked,
     tabIndex: nodeInteractions.some((interaction) => interaction.trigger === 'focus' || interaction.trigger === 'blur') ? 0 : undefined,
     ...handlers,
   };
@@ -545,13 +601,15 @@ function PageNodeView({
         {(node.children ?? []).map((child) => (
           <PageNodeView
             key={child.id} node={child} interactions={interactions}
-            selectedNodeId={selectedNodeId} activeBreakpoint={activeBreakpoint}
+            selectedNodeId={selectedNodeId} selectedNodeIds={selectedNodeIds}
+            activeBreakpoint={activeBreakpoint}
             previewPseudo={previewPseudo} mode={mode}
+            xrayMode={xrayMode} showOnlySelection={showOnlySelection}
             onSelectNode={onSelectNode} onSelectParentNode={onSelectParentNode}
             onUpdateNodeProps={onUpdateNodeProps}
             hasWebglBackground={hasWebglBackground} presetBgRgb={presetBgRgb} parentId={node.id}
             dataSchema={dataSchema} variables={variables} recordsByCollection={recordsByCollection}
-            onNavigateHref={onNavigateHref}
+            onNavigateHref={onNavigateHref} onContextMenuNode={onContextMenuNode}
           />
         ))}
       </form>
@@ -673,9 +731,12 @@ function PageNodeView({
         node={child}
         interactions={interactions}
         selectedNodeId={selectedNodeId}
+        selectedNodeIds={selectedNodeIds}
         activeBreakpoint={activeBreakpoint}
         previewPseudo={previewPseudo}
         mode={mode}
+        xrayMode={xrayMode}
+        showOnlySelection={showOnlySelection}
         onSelectNode={onSelectNode}
         onSelectParentNode={onSelectParentNode}
         onUpdateNodeProps={onUpdateNodeProps}
@@ -685,10 +746,28 @@ function PageNodeView({
         dataSchema={dataSchema}
         variables={variables}
         recordsByCollection={recordsByCollection}
-        onNavigateHref={onNavigateHref}
+        onNavigateHref={onNavigateHref} onContextMenuNode={onContextMenuNode}
       />
     )),
   );
+
+  if (node.hidden && mode === 'edit') {
+    children.push(
+      <div
+        key="__hidden_marker__"
+        data-hidden-marker={node.id}
+        className="grid w-full cursor-pointer place-items-center rounded border border-dashed border-amber-400/45 bg-amber-400/[0.04] px-3 py-2 text-[10px] font-semibold uppercase tracking-[0.16em] text-amber-300/80 transition hover:border-amber-300/70 hover:bg-amber-400/[0.08]"
+        style={{ minHeight: 32 }}
+        onClick={() => onSelectNode?.(node.id)}
+        title="Clique para selecionar o elemento oculto"
+      >
+        <span className="flex items-center gap-2">
+          <EyeOff size={10} />
+          Oculto - {node.name}
+        </span>
+      </div>,
+    );
+  }
 
   return createElement(tag, sharedProps, ...children);
 }
@@ -697,12 +776,16 @@ export default function PageExperience({
   page,
   interactions,
   selectedNodeId = null,
+  selectedNodeIds = [],
   activeBreakpoint = 'base',
   previewPseudo = null,
   mode = 'preview',
+  xrayMode = false,
+  showOnlySelection = false,
   onSelectNode,
   onSelectParentNode,
   onUpdateNodeProps,
+  onContextMenuNode,
 }: PageExperienceProps) {
   const effects = useMemo(() => page.effects?.items ?? [], [page.effects?.items]);
   const effectIntensity = page.effects?.intensity ?? 1;
@@ -802,9 +885,12 @@ export default function PageExperience({
             node={node}
             interactions={interactions}
             selectedNodeId={selectedNodeId}
+            selectedNodeIds={selectedNodeIds}
             activeBreakpoint={activeBreakpoint}
             previewPseudo={previewPseudo}
             mode={mode}
+            xrayMode={xrayMode}
+            showOnlySelection={showOnlySelection}
             onSelectNode={onSelectNode}
             onSelectParentNode={onSelectParentNode}
             onUpdateNodeProps={onUpdateNodeProps}
@@ -813,7 +899,7 @@ export default function PageExperience({
             dataSchema={dataSchema}
             variables={variables}
             recordsByCollection={recordsByCollection}
-            onNavigateHref={navigateHref}
+            onNavigateHref={navigateHref} onContextMenuNode={onContextMenuNode}
           />
         ))}
       </div>

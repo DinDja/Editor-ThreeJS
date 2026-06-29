@@ -550,21 +550,40 @@ export function MenuItem({
   hint,
   onClick,
   danger,
+  draggable: isDraggable,
+  dragPayload,
+  onDragStart,
 }: {
   icon?: ReactNode;
   label: string;
   hint?: string;
   onClick: () => void;
   danger?: boolean;
+  draggable?: boolean;
+  dragPayload?: string;
+  onDragStart?: (event: React.DragEvent<HTMLButtonElement>) => void;
 }) {
   return (
     <button
       type="button"
       onClick={onClick}
+      draggable={isDraggable}
+      onDragStart={isDraggable
+        ? (event) => {
+            if (dragPayload) {
+              event.dataTransfer.setData('application/x-page-builder', dragPayload);
+              event.dataTransfer.effectAllowed = 'copy';
+            }
+            onDragStart?.(event);
+          }
+        : undefined
+      }
       className={`flex w-full items-center gap-2.5 rounded-md px-2.5 py-2 text-left text-xs transition ${
         danger
           ? 'text-red-300 hover:bg-red-400/10'
-          : 'text-neutral-300 hover:bg-neutral-800 hover:text-emerald-200'
+          : isDraggable
+            ? 'cursor-grab text-neutral-300 hover:bg-neutral-800 hover:text-emerald-200 active:cursor-grabbing'
+            : 'text-neutral-300 hover:bg-neutral-800 hover:text-emerald-200'
       }`}
     >
       {icon && (

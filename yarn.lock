@@ -1749,6 +1749,11 @@ csstype@^3.2.2:
   resolved "https://registry.npmjs.org/csstype/-/csstype-3.2.3.tgz"
   integrity sha512-z1HGKcYy2xA8AGQfwrn0PAy+PB7X/GSj3UVJW9qKyn43xWa+gl5nXmU4qqLMRzWVLFC8KusUX8T/0kCiOYpAIQ==
 
+cursorly.js@^1.0.5:
+  version "1.0.5"
+  resolved "https://registry.npmjs.org/cursorly.js/-/cursorly.js-1.0.5.tgz"
+  integrity sha512-CoWgD7emwHj8LCZ336FZRgTIV+c65jfH11EFCOFVTyK0YuybbiROsI30LPymj55hGCtaSgtp+jG4f3Xg81tGRw==
+
 damerau-levenshtein@^1.0.8:
   version "1.0.8"
   resolved "https://registry.npmjs.org/damerau-levenshtein/-/damerau-levenshtein-1.0.8.tgz"

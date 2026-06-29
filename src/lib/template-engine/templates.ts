@@ -4,7 +4,8 @@ import { createDefaultPageDocument } from '@/lib/page-builder/defaults';
 import type { ExportTarget, PageDocument, PageNode } from '@/lib/page-builder/types';
 import { createDefaultEffect } from '@/lib/effects-system/registry';
 import type { EffectPerformanceTier, PageEffect } from '@/lib/effects-system/types';
-import { getVisualPreset, intensityToScale, type VisualPresetId } from './presets';
+import { getVisualPreset, intensityToScale, type VisualPreset, type VisualPresetId } from './presets';
+import { buildBlock } from './blockLibrary';
 import {
   buildCTA,
   buildDefaultProjectPage,
@@ -47,7 +48,13 @@ export type ExperienceTemplateId =
   | 'power-ai-landing'
   | 'taskly-landing'
   | 'vanguard-brand'
-  | 'lithos-geology';
+  | 'lithos-geology'
+  | 'ai-automation-suite'
+  | 'commerce-product-drop'
+  | 'agency-case-study'
+  | 'conference-launch'
+  | 'course-platform-pro'
+  | 'creator-media-kit';
 
 export type ExperienceTemplate = {
   id: ExperienceTemplateId;
@@ -95,18 +102,13 @@ const themedPage = (
   return doc;
 };
 
-/** Converts a preset's suggested effects into PageEffect instances. */
-const effectsFromPreset = (presetId: VisualPresetId): PageEffect[] => {
-  const preset = getVisualPreset(presetId);
-  return preset.suggestedEffects.map((suggested, index) =>
-    createDefaultEffect(suggested.type as PageEffect['type'], 'page', {
-      zIndex: index,
-    }),
-  );
-};
-
 const effect = (type: PageEffect['type'], zIndex: number, props?: Record<string, unknown>): PageEffect =>
   createDefaultEffect(type, 'page', { zIndex, ...(props ? { props: { ...createDefaultEffect(type).props, ...props } } : {}) });
+
+const templateBlock = (preset: VisualPreset, id: string): PageNode => buildBlock(id, preset);
+
+const templateBlocks = (preset: VisualPreset, ids: string[]): PageNode[] =>
+  ids.map((id) => templateBlock(preset, id));
 
 /* --------------------------------- Templates --------------------------------- */
 
@@ -134,6 +136,7 @@ const futuristicLanding = (): ExperienceTemplate => ({
         { title: 'Shaders vivos', body: 'Background procedural animado com noise orgânico.' },
         { title: 'Performance', body: 'Degradacao automática no mobile e fallback sem WebGL.' },
       ]),
+      ...templateBlocks(p, ['logos-strip', 'split-content', 'testimonials', 'pricing', 'faq', 'newsletter']),
       buildCTA(p, {
         title: 'Lance sua experiência',
         body: 'Exporte para Next, React, Vite ou HTML standalone.',
@@ -145,7 +148,7 @@ const futuristicLanding = (): ExperienceTemplate => ({
   createEffects: () => [
     effect('particleField', 0, { count: 2200, color: '#00f0ff', colorB: '#ff00e5', connectLines: true, mouseReact: true }),
     effect('gridFloor3D', 0, { color: '#00f0ff', speed: 0.7 }),
-    effect('customCursor', 46, { cursorStyle: 'neoGlow', cursorColor: '#00f0ff', showTrail: true, trailLength: 8, showLight: true, lightColor: '#00f0ff', lightIntensity: 6 }),
+    effect('customCursor', 46, { iconIndex: 0, effect: 'neonGlow', effectColor: '#00f0ff', cursorSize: 32 }),
     effect('noiseOverlay', 42, { opacity: 0.06 }),
   ],
   createInteractions: (page, sceneTargetId = 'current-scene') => {
@@ -183,6 +186,7 @@ const premiumInstitutional = (): ExperienceTemplate => ({
         { title: 'Atelier 3D', body: 'Visualização imersiva de cada projeto antes da execução.' },
         { title: 'Exclusivo', body: 'Peças únicas com curadoria editorial e apresentação premium.' },
       ]),
+      ...templateBlocks(p, ['logos-strip', 'gallery', 'testimonials', 'faq', 'contact-form']),
       buildCTA(p, {
         title: 'Agende uma apresentação privada',
         body: 'Conversamos sobre seu próximo projeto com exclusividade.',
@@ -193,7 +197,7 @@ const premiumInstitutional = (): ExperienceTemplate => ({
     ]),
   createEffects: () => [
     effect('floatingOrbs', 0, { count: 7, color: '#c9a227', colorB: '#e8d58a', opacity: 0.45 }),
-    effect('customCursor', 46, { cursorStyle: 'luxury', cursorColor: '#c9a227', showTrail: true, trailLength: 6, showLight: true, lightColor: '#c9a227', lightIntensity: 4 }),
+    effect('customCursor', 46, { iconIndex: 0, effect: 'sparkle', effectColor: '#c9a227', cursorSize: 32 }),
     effect('noiseOverlay', 42, { opacity: 0.05 }),
     effect('scrollReveal', 30, { once: true }),
   ],
@@ -228,6 +232,7 @@ const creativePortfolio = (): ExperienceTemplate => ({
         { title: 'Motion', body: 'Animações suaves guiadas por scroll e interação.' },
       ]),
       buildShowcase(p, { title: 'Trabalho em destaque', subtitle: 'Cena 3D interativa conectada ao portfólio.', height: 480 }),
+      ...templateBlocks(p, ['gallery', 'team', 'testimonials', 'contact-form']),
       buildFooter(p, '© 2026 Studio Lumen'),
     ]),
   createEffects: () => [
@@ -236,7 +241,7 @@ const creativePortfolio = (): ExperienceTemplate => ({
     effect('floatingOrbs', 1, { count: 6, color: '#7dd3fc', colorB: '#a78bfa', opacity: 0.4 }),
     effect('scrollReveal', 30, { once: true }),
     effect('magneticButton', 45, { strength: 0.35 }),
-    effect('customCursor', 46, { cursorStyle: 'glass', cursorColor: '#7dd3fc', showTrail: true, trailLength: 5, showLight: false }),
+    effect('customCursor', 46, { iconIndex: 0, effect: 'aura', effectColor: '#7dd3fc', cursorSize: 32 }),
   ],
   createInteractions: (page, sceneTargetId = 'current-scene') => {
     const card = firstCard(page);
@@ -273,6 +278,7 @@ const saasHeroMesh = (): ExperienceTemplate => ({
         { title: 'Edge ready', body: 'Runtime leve que roda em qualquer deploy.' },
         { title: 'Insights', body: 'Métricas reais de FPS, draw calls e assets.' },
       ]),
+      ...templateBlocks(p, ['logos-strip', 'split-content', 'testimonials', 'pricing', 'faq', 'newsletter']),
       buildCTA(p, {
         title: 'Suba seu primeiro MVP hoje',
         body: 'Trial gratuito, sem cartão.',
@@ -285,7 +291,7 @@ const saasHeroMesh = (): ExperienceTemplate => ({
     effect('webglHeroScene', 0, { shape: 'torusKnot', color: '#22d3ee', colorB: '#3b82f6', mouseReact: true }),
     effect('gridFloor3D', 0, { color: '#22d3ee', speed: 0.6 }),
     effect('scrollReveal', 30, { once: true }),
-    effect('customCursor', 46, { cursorStyle: 'tech', cursorColor: '#22d3ee', showTrail: true, trailLength: 8, showLight: true, lightColor: '#22d3ee', lightIntensity: 5 }),
+    effect('customCursor', 46, { iconIndex: 0, effect: 'trail', effectColor: '#22d3ee', cursorSize: 32 }),
   ],
   createInteractions: (page, sceneTargetId = 'current-scene') => {
     const scene = firstSceneCanvas(page);
@@ -315,6 +321,7 @@ const product3dScene = (): ExperienceTemplate => ({
         { title: 'Iluminação', body: 'Feixes de luz e luzes pontuais destacam o produto.' },
         { title: 'Exportação', body: 'Leve a vitrine 3D para qualquer site.' },
       ]),
+      ...templateBlocks(p, ['stats-row', 'gallery', 'testimonials', 'faq', 'contact-form']),
       buildCTA(p, {
         title: 'Encomende a edição limitada',
         body: 'Produção numerada com certificado de autenticidade.',
@@ -327,7 +334,7 @@ const product3dScene = (): ExperienceTemplate => ({
     effect('webglHeroScene', 0, { shape: 'icosahedron', color: '#d4af37', colorB: '#e5e4e2', metalness: 0.9, roughness: 0.15, mouseReact: true }),
     effect('lightBeams', 40, { color: '#d4af37', count: 2, opacity: 0.3 }),
     effect('noiseOverlay', 42, { opacity: 0.04 }),
-    effect('customCursor', 46, { cursorStyle: 'luxury', cursorColor: '#d4af37', showTrail: true, trailLength: 6, showLight: true, lightColor: '#d4af37', lightIntensity: 4 }),
+    effect('customCursor', 46, { iconIndex: 0, effect: 'sparkle', effectColor: '#d4af37', cursorSize: 32 }),
   ],
   createInteractions: (page, sceneTargetId = 'current-scene') => {
     const scene = firstSceneCanvas(page);
@@ -364,6 +371,7 @@ const eventLights = (): ExperienceTemplate => ({
         { title: 'Imersão', body: 'Estrelas e feixes de luz envolvem o público.' },
         { title: 'Experiência', body: 'Site do evento já é parte do show.' },
       ]),
+      ...templateBlocks(p, ['gallery', 'pricing', 'faq', 'newsletter']),
       buildCTA(p, {
         title: 'O line-up completo está aqui',
         body: 'Confirme presença antes que esgote.',
@@ -376,7 +384,7 @@ const eventLights = (): ExperienceTemplate => ({
     effect('particleField', 0, { count: 2600, color: '#f43f5e', colorB: '#8b5cf6', speed: 0.6, connectLines: true }),
     effect('animatedStars', 0, { count: 1500, color: '#fb7185', twinkle: true }),
     effect('lightBeams', 40, { color: '#f43f5e', count: 4, opacity: 0.4 }),
-    effect('customCursor', 46, { cursorStyle: 'game', cursorColor: '#f43f5e', showTrail: true, trailLength: 10, showLight: true, lightColor: '#f43f5e', lightIntensity: 7 }),
+    effect('customCursor', 46, { iconIndex: 0, effect: 'fireworks', effectColor: '#f43f5e', cursorSize: 32 }),
   ],
   createInteractions: (page, sceneTargetId = 'current-scene') => {
     const button = firstButton(page);
@@ -413,6 +421,7 @@ const interactiveEducation = (): ExperienceTemplate => ({
         { title: 'Trilhas', body: 'Caminhos guiados com revelação por scroll.' },
         { title: 'Quizzes', body: 'Interações de click conectadas à cena.' },
       ]),
+      ...templateBlocks(p, ['split-content', 'testimonials', 'pricing', 'faq', 'newsletter']),
       buildCTA(p, {
         title: 'Comece sua primeira trilha',
         body: 'Acesso gratuito aos módulos iniciais.',
@@ -452,12 +461,13 @@ const immersiveWebgl = (): ExperienceTemplate => ({
         ctaHref: '#enter',
       }),
       buildShowcase(p, { title: 'O interior do vazio', subtitle: 'Cena 3D navegável com partículas conectadas.', height: 600 }),
+      ...templateBlocks(p, ['features-grid', 'gallery', 'testimonials', 'newsletter']),
       buildFooter(p, '© 2026 VOID'),
     ]),
   createEffects: () => [
     effect('shaderBackground', 0, { color: '#05060a', colorB: '#00f0ff', colorC: '#7a00ff', scale: 2.6 }),
     effect('particleField', 1, { count: 2400, color: '#00f0ff', colorB: '#ff00e5', shape: 'sphere', depth: 7, connectLines: true }),
-    effect('customCursor', 46, { cursorStyle: 'cosmic', cursorColor: '#7a00ff', showTrail: true, trailLength: 12, showLight: true, lightColor: '#7a00ff', lightIntensity: 8 }),
+    effect('customCursor', 46, { iconIndex: 0, effect: 'comet', effectColor: '#7a00ff', cursorSize: 32 }),
   ],
   createInteractions: (page, sceneTargetId = 'current-scene') => {
     const scene = firstSceneCanvas(page);
@@ -489,6 +499,7 @@ const liquidSurfaceBackground = (): ExperienceTemplate => ({
         { title: 'Visual premium', body: 'Material PBR com metalness, roughness e reflexo suave.' },
         { title: 'Pronto para site', body: 'Template editável no Page Builder com efeitos e conteúdo web.' },
       ]),
+      ...templateBlocks(p, ['stats-row', 'gallery', 'testimonials', 'faq', 'newsletter']),
       buildCTA(p, {
         title: 'Transforme água em interface',
         body: 'Aplique o template e edite textos, cores, layout e intensidade do efeito.',
@@ -508,7 +519,7 @@ const liquidSurfaceBackground = (): ExperienceTemplate => ({
       sizeY: 9,
       opacity: 0.96,
     }),
-    effect('customCursor', 46, { cursorStyle: 'nature', cursorColor: '#2dd4bf', showTrail: true, trailLength: 7, showLight: true, lightColor: '#2dd4bf', lightIntensity: 5 }),
+    effect('customCursor', 46, { iconIndex: 0, effect: 'aura', effectColor: '#2dd4bf', cursorSize: 32 }),
     effect('noiseOverlay', 42, { opacity: 0.045 }),
     effect('scrollReveal', 30, { once: true }),
   ],
@@ -542,6 +553,7 @@ const editorialSmooth = (): ExperienceTemplate => ({
         { title: 'Arquivo', body: 'Navegação limpa por temas e anos.' },
         { title: 'Sobre', body: 'Uma casa para ideias que merecem espaço.' },
       ]),
+      ...templateBlocks(p, ['gallery', 'testimonials', 'faq', 'newsletter']),
       buildCTA(p, {
         title: 'Receba o novo ensaio toda semana',
         body: 'Newsletter sem ruído, só escrita.',
@@ -586,6 +598,7 @@ const techStartupLanding = (): ExperienceTemplate => ({
         { title: 'Rápido', body: 'Edge network global com cache inteligente.' },
         { title: 'Seguro', body: 'Criptografia em trânsito e repouso.' },
       ]),
+      ...templateBlocks(p, ['logos-strip', 'split-content', 'testimonials', 'pricing', 'faq', 'newsletter']),
       buildCTA(p, {
         title: 'Suba para produção com confiança',
         body: 'Comece com créditos grátis.',
@@ -622,6 +635,7 @@ const glbShowcase = (): ExperienceTemplate => ({
         { title: 'Interação', body: 'Gire e aproxime com controles suaves.' },
         { title: 'Exportação', body: 'Publique a vitrine em qualquer stack.' },
       ]),
+      ...templateBlocks(p, ['stats-row', 'gallery', 'faq', 'contact-form']),
       buildFooter(p, '© 2026 GLB Studio'),
     ]),
   createEffects: () => [
@@ -658,11 +672,12 @@ const particleShowcase = (): ExperienceTemplate => ({
         { title: 'Conexões', body: 'Linhas dinâmicas entre partículas próximas.' },
         { title: 'Mouse', body: 'As partículas reagem ao cursor com profundidade 3D.' },
       ]),
+      ...templateBlocks(p, ['showcase', 'testimonials', 'faq', 'newsletter']),
       buildFooter(p, '© 2026 PULSAR'),
     ]),
   createEffects: () => [
     effect('particleField', 0, { count: 2000, color: '#34d399', colorB: '#a3e635', shape: 'cloud', depth: 7, connectLines: true, mouseReact: true }),
-    effect('customCursor', 46, { cursorStyle: 'nature', cursorColor: '#34d399', showTrail: true, trailLength: 8, showLight: true, lightColor: '#34d399', lightIntensity: 5 }),
+    effect('customCursor', 46, { iconIndex: 0, effect: 'snowfall', effectColor: '#34d399', cursorSize: 32 }),
   ],
   createInteractions: (page, sceneTargetId = 'current-scene') => {
     const scene = firstSceneCanvas(page);
@@ -699,6 +714,7 @@ const powerAiLanding = (): ExperienceTemplate => ({
         { title: 'Integração plug-and-play', body: 'API REST e SDKs para Python, Node e Go.' },
         { title: 'Segurança enterprise', body: 'Criptografia ponta a ponta e conformidade SOC2.' },
       ]),
+      ...templateBlocks(p, ['logos-strip', 'split-content', 'testimonials', 'pricing', 'faq', 'newsletter']),
       buildCTA(p, {
         title: 'Acelere sua empresa com IA',
         body: 'Teste grátis por 14 dias, sem compromisso.',
@@ -710,7 +726,7 @@ const powerAiLanding = (): ExperienceTemplate => ({
   createEffects: () => [
     effect('shaderBackground', 0, { color: '#05060a', colorB: '#f472b6', colorC: '#a855f7', speed: 0.25, opacity: 0.7 }),
     effect('particleField', 1, { count: 1800, color: '#f472b6', colorB: '#a855f7', shape: 'cloud', depth: 6, connectLines: true }),
-    effect('customCursor', 46, { cursorStyle: 'neoGlow', cursorColor: '#f472b6', showTrail: true, trailLength: 8, showLight: true, lightColor: '#f472b6', lightIntensity: 6 }),
+    effect('customCursor', 46, { iconIndex: 0, effect: 'neonGlow', effectColor: '#f472b6', cursorSize: 32 }),
     effect('noiseOverlay', 42, { opacity: 0.05 }),
   ],
   createInteractions: (page) => {
@@ -748,6 +764,7 @@ const tasklyLanding = (): ExperienceTemplate => ({
         { title: 'Colaboração real', body: 'Comentários, menções e notificações em tempo real.' },
         { title: 'Integrações', body: 'Slack, GitHub, Figma e 40+ ferramentas.' },
       ]),
+      ...templateBlocks(p, ['logos-strip', 'split-content', 'testimonials', 'pricing', 'faq', 'newsletter']),
       buildCTA(p, {
         title: 'Produtividade que seu time merece',
         body: 'Plano gratuito para até 10 membros.',
@@ -759,7 +776,7 @@ const tasklyLanding = (): ExperienceTemplate => ({
   createEffects: () => [
     effect('gradientMesh', 0, { color: '#3b82f6', colorB: '#6366f1', colorC: '#a78bfa', blur: 60, opacity: 0.25, speed: 0.3 }),
     effect('scrollReveal', 30, { once: true }),
-    effect('customCursor', 46, { cursorStyle: 'tech', cursorColor: '#3b82f6', showTrail: true, trailLength: 5, showLight: false }),
+    effect('customCursor', 46, { iconIndex: 0, effect: 'trail', effectColor: '#3b82f6', cursorSize: 32 }),
   ],
   createInteractions: () => [],
 });
@@ -793,6 +810,7 @@ const vanguardBrand = (): ExperienceTemplate => ({
         { title: 'Visual Identity', body: 'Sistemas de identidade completos com diretrizes e assets.' },
         { title: 'Digital Presence', body: 'Sites, motion e experiências interativas premium.' },
       ]),
+      ...templateBlocks(p, ['logos-strip', 'gallery', 'team', 'testimonials', 'contact-form']),
       buildCTA(p, {
         title: 'Vamos construir algo marcante',
         body: 'Agende uma conversa sem compromisso com nosso estúdio.',
@@ -804,7 +822,7 @@ const vanguardBrand = (): ExperienceTemplate => ({
   createEffects: () => [
     effect('shaderBackground', 0, { color: '#000000', colorB: '#1a1a2e', colorC: '#0d0d0d', speed: 0.15, opacity: 0.5 }),
     effect('scrollReveal', 30, { distance: 64, duration: 800, once: true }),
-    effect('customCursor', 46, { cursorStyle: 'editorial', cursorColor: '#ffffff', showTrail: true, trailLength: 6, showLight: false }),
+    effect('customCursor', 46, { iconIndex: 0, effect: 'none', effectColor: '#ffffff', cursorSize: 32 }),
   ],
   createInteractions: () => [],
 });
@@ -833,6 +851,7 @@ const lithosGeology = (): ExperienceTemplate => ({
         { title: 'Fósseis', body: 'Registros de vida ancestral preservados na matriz sedimentar.' },
         { title: 'Minerais', body: 'Cristalizações e formações que contam a história química da terra.' },
       ]),
+      ...templateBlocks(p, ['gallery', 'testimonials', 'faq', 'newsletter']),
       buildCTA(p, {
         title: 'Descubra o que a terra guarda',
         body: 'Exposição imersiva com curadoria científica.',
@@ -844,7 +863,7 @@ const lithosGeology = (): ExperienceTemplate => ({
   createEffects: () => [
     effect('parallaxLayer', 30, { strength: 0.25 }),
     effect('scrollReveal', 30, { distance: 56, duration: 800, once: true }),
-    effect('customCursor', 46, { cursorStyle: 'luxury', cursorColor: '#d97706', showTrail: true, trailLength: 6, showLight: true, lightColor: '#d97706', lightIntensity: 4 }),
+    effect('customCursor', 46, { iconIndex: 0, effect: 'sparkle', effectColor: '#d97706', cursorSize: 32 }),
     effect('noiseOverlay', 42, { opacity: 0.06 }),
   ],
   createInteractions: () => [],
@@ -875,6 +894,7 @@ const indieGamePage = (): ExperienceTemplate => ({
         { title: 'Trilhas', body: '12 pistas com ilumização neon única.' },
         { title: 'Online', body: 'Multiplayer local e remoto.' },
       ]),
+      ...templateBlocks(p, ['gallery', 'pricing', 'faq', 'newsletter']),
       buildCTA(p, {
         title: 'Coloque no wishlist',
         body: 'Lançamento em breve com demo aberta.',
@@ -892,6 +912,309 @@ const indieGamePage = (): ExperienceTemplate => ({
     const button = firstButton(page);
     return button ? [createDefaultInteraction(button.id, sceneTargetId, 'click', 'startAnimation')] : [];
   },
+});
+
+const aiAutomationSuite = (): ExperienceTemplate => ({
+  id: 'ai-automation-suite',
+  name: 'AI Automation Suite',
+  description: 'SaaS de IA completo com social proof, pricing, FAQ, newsletter e demo 3D.',
+  category: 'saas',
+  exportTarget: 'next',
+  presetId: 'power-ai',
+  performance: 'medium',
+  accent: '#f472b6',
+  createPage: () =>
+    themedPage('power-ai', 'AI Automation Suite', (p) => [
+      buildNavbar(p, 'FlowMind', 'Produto,Automations,Preços,Contato'.split(',')),
+      buildHero(p, {
+        variant: 'split',
+        title: 'Automatize operações com agentes de IA',
+        subtitle: 'Orquestre prompts, dados e ações de negócio em uma interface visual pronta para times modernos.',
+        cta: 'Ver demo',
+        ctaHref: '#demo',
+      }),
+      ...templateBlocks(p, ['logos-strip']),
+      buildStatsRow(p, [
+        { value: '42%', label: 'Menos retrabalho' },
+        { value: '8h', label: 'Economia semanal' },
+        { value: '120+', label: 'Automações' },
+        { value: 'SOC2', label: 'Pronto enterprise' },
+      ]),
+      buildFeaturesGrid(p, [
+        { title: 'Agentes por workflow', body: 'Crie fluxos para vendas, suporte, jurídico, financeiro e produto.' },
+        { title: 'Governança', body: 'Logs, permissões, aprovações e histórico de execução em cada tarefa.' },
+        { title: 'Dados conectados', body: 'Integre CRM, planilhas, documentos e APIs internas em minutos.' },
+      ]),
+      ...templateBlocks(p, ['split-content']),
+      buildShowcase(p, { title: 'Demo do agente em 3D', subtitle: 'Use a cena para representar pipeline, rede neural ou produto.', height: 520 }),
+      ...templateBlocks(p, ['testimonials', 'pricing', 'faq', 'newsletter']),
+      buildCTA(p, {
+        title: 'Transforme processos repetitivos em produto',
+        body: 'Aplique o template, troque a copy e publique uma landing de IA pronta para captar leads.',
+        cta: 'Começar agora',
+        ctaHref: '#start',
+      }),
+      buildFooter(p, '© 2026 FlowMind'),
+    ]),
+  createEffects: () => [
+    effect('shaderBackground', 0, { color: '#05060a', colorB: '#f472b6', colorC: '#a855f7', opacity: 0.72, speed: 0.2 }),
+    effect('particleField', 1, { count: 1800, color: '#f472b6', colorB: '#a855f7', shape: 'cloud', depth: 6, connectLines: true }),
+    effect('scrollReveal', 30, { once: true }),
+    effect('customCursor', 46, { iconIndex: 0, effect: 'neonGlow', effectColor: '#f472b6', cursorSize: 32 }),
+  ],
+  createInteractions: (page, sceneTargetId = 'current-scene') => {
+    const scene = firstSceneCanvas(page);
+    return scene ? [createDefaultInteraction(scene.id, sceneTargetId, 'mouseMove', 'rotateObject3D')] : [];
+  },
+});
+
+const commerceProductDrop = (): ExperienceTemplate => ({
+  id: 'commerce-product-drop',
+  name: 'Product Drop Premium',
+  description: 'Lançamento de produto com vitrine 3D, galeria, prova social e captura.',
+  category: 'product',
+  exportTarget: 'next',
+  presetId: 'luxury-product',
+  performance: 'medium',
+  accent: '#d4af37',
+  createPage: () =>
+    themedPage('luxury-product', 'Product Drop Premium', (p) => [
+      buildNavbar(p, 'ORO', 'Coleção,Detalhes,Reserva'.split(',')),
+      buildHero(p, {
+        variant: 'split',
+        title: 'Uma edição limitada com presença digital',
+        subtitle: 'Apresente joias, gadgets, perfumes, móveis ou peças autorais com cena 3D e narrativa de compra.',
+        cta: 'Reservar peça',
+        ctaHref: '#reserva',
+      }),
+      buildShowcase(p, { title: 'Explore cada ângulo', subtitle: 'Cena 3D interativa para destacar acabamento, escala e material.', height: 560 }),
+      buildStatsRow(p, [
+        { value: '300', label: 'Unidades' },
+        { value: '48h', label: 'Pré-venda' },
+        { value: '4.9', label: 'Avaliação' },
+      ]),
+      buildFeaturesGrid(p, [
+        { title: 'Storytelling', body: 'Blocos para origem, materiais, processo e diferenciais.' },
+        { title: 'Conversão', body: 'CTA, FAQ, formulário e prova social já encaixados no fluxo.' },
+        { title: 'Showcase visual', body: 'Galeria e canvas 3D trabalham juntos para vender textura e forma.' },
+      ]),
+      ...templateBlocks(p, ['gallery', 'testimonials', 'pricing', 'faq', 'contact-form']),
+      buildCTA(p, {
+        title: 'Abra a lista de espera hoje',
+        body: 'Use como base para drops limitados, pré-venda ou página de produto premium.',
+        cta: 'Entrar na lista',
+        ctaHref: '#waitlist',
+      }),
+      buildFooter(p, '© 2026 ORO'),
+    ]),
+  createEffects: () => [
+    effect('webglHeroScene', 0, { shape: 'icosahedron', color: '#d4af37', colorB: '#e5e4e2', metalness: 0.85, roughness: 0.18, mouseReact: true }),
+    effect('lightBeams', 40, { color: '#d4af37', count: 2, opacity: 0.28 }),
+    effect('noiseOverlay', 42, { opacity: 0.04 }),
+    effect('scrollReveal', 30, { once: true }),
+  ],
+  createInteractions: (page, sceneTargetId = 'current-scene') => {
+    const scene = firstSceneCanvas(page);
+    return scene ? [createDefaultInteraction(scene.id, sceneTargetId, 'mouseMove', 'rotateObject3D')] : [];
+  },
+});
+
+const agencyCaseStudy = (): ExperienceTemplate => ({
+  id: 'agency-case-study',
+  name: 'Agency Case Study',
+  description: 'Template de estúdio/agência com cases, time, depoimentos e contato.',
+  category: 'portfolio',
+  exportTarget: 'react',
+  presetId: 'soft-glass',
+  performance: 'medium',
+  accent: '#7dd3fc',
+  createPage: () =>
+    themedPage('soft-glass', 'Agency Case Study', (p) => [
+      buildNavbar(p, 'Lumen Works', 'Cases,Serviços,Equipe,Contato'.split(',')),
+      buildHero(p, {
+        variant: 'centered',
+        title: 'Cases digitais com profundidade e movimento',
+        subtitle: 'Um template completo para agências, freelancers, estúdios criativos e portfolios premium.',
+        cta: 'Ver cases',
+        ctaHref: '#cases',
+      }),
+      ...templateBlocks(p, ['logos-strip']),
+      buildStatsRow(p, [
+        { value: '86', label: 'Cases' },
+        { value: '14', label: 'Setores' },
+        { value: '7', label: 'Prêmios' },
+      ]),
+      buildFeaturesGrid(p, [
+        { title: 'Estratégia', body: 'Blocos para explicar posicionamento, abordagem e escopo.' },
+        { title: 'Produção', body: 'Galeria e showcase para mostrar páginas, renders e bastidores.' },
+        { title: 'Relacionamento', body: 'Depoimentos, equipe e contato fecham a narrativa comercial.' },
+      ]),
+      ...templateBlocks(p, ['gallery', 'team', 'testimonials', 'faq', 'contact-form']),
+      buildCTA(p, {
+        title: 'Transforme seu próximo case em proposta',
+        body: 'Aplique o template e troque conteúdo, imagens e nomes da equipe.',
+        cta: 'Planejar projeto',
+        ctaHref: '#contato',
+      }),
+      buildFooter(p, '© 2026 Lumen Works'),
+    ]),
+  createEffects: () => [
+    effect('auroraBackground', 0, { color: '#7dd3fc', colorB: '#a78bfa', colorC: '#34d399', opacity: 0.5 }),
+    effect('glassCard', 30, { blur: 16, opacity: 0.6 }),
+    effect('floatingOrbs', 1, { count: 6, color: '#7dd3fc', colorB: '#a78bfa', opacity: 0.36 }),
+    effect('scrollReveal', 30, { once: true }),
+  ],
+  createInteractions: (page, sceneTargetId = 'current-scene') => {
+    const card = firstCard(page);
+    return card ? [createDefaultInteraction(card.id, sceneTargetId, 'hover', 'scaleObject3D')] : [];
+  },
+});
+
+const conferenceLaunch = (): ExperienceTemplate => ({
+  id: 'conference-launch',
+  name: 'Conference Launch',
+  description: 'Evento completo com line-up visual, ingressos, FAQ, newsletter e energia neon.',
+  category: 'event',
+  exportTarget: 'vite',
+  presetId: 'game-landing',
+  performance: 'high',
+  accent: '#f43f5e',
+  createPage: () =>
+    themedPage('game-landing', 'Conference Launch', (p) => [
+      buildNavbar(p, 'SYNTH CONF', 'Agenda,Speakers,Ingressos,Local'.split(',')),
+      buildHero(p, {
+        variant: 'background',
+        title: 'A conferência onde tecnologia vira espetáculo',
+        subtitle: 'Landing completa para conferências, festivais, meetups premium e experiências imersivas.',
+        cta: 'Comprar ingresso',
+        ctaHref: '#tickets',
+      }),
+      buildStatsRow(p, [
+        { value: '2 dias', label: 'Evento' },
+        { value: '48', label: 'Speakers' },
+        { value: '6', label: 'Trilhas' },
+        { value: '5k', label: 'Participantes' },
+      ]),
+      buildFeaturesGrid(p, [
+        { title: 'Programação', body: 'Destaque trilhas, workshops, talks e experiências paralelas.' },
+        { title: 'Atmosfera', body: 'Partículas, feixes de luz e galeria criam presença visual.' },
+        { title: 'Venda', body: 'Pricing, FAQ e newsletter já preparados para conversão.' },
+      ]),
+      ...templateBlocks(p, ['gallery', 'team', 'pricing', 'faq', 'newsletter']),
+      buildCTA(p, {
+        title: 'Garanta seu lugar na primeira fileira',
+        body: 'Use o template para publicar evento completo com poucos ajustes.',
+        cta: 'Ver ingressos',
+        ctaHref: '#tickets',
+      }),
+      buildFooter(p, '© 2026 SYNTH CONF'),
+    ]),
+  createEffects: () => [
+    effect('particleField', 0, { count: 2600, color: '#f43f5e', colorB: '#8b5cf6', speed: 0.55, connectLines: true }),
+    effect('animatedStars', 0, { count: 1200, color: '#fb7185', twinkle: true }),
+    effect('lightBeams', 40, { color: '#8b5cf6', count: 4, opacity: 0.35 }),
+    effect('customCursor', 46, { iconIndex: 0, effect: 'fireworks', effectColor: '#f43f5e', cursorSize: 32 }),
+  ],
+  createInteractions: (page, sceneTargetId = 'current-scene') => {
+    const button = firstButton(page);
+    return button ? [createDefaultInteraction(button.id, sceneTargetId, 'click', 'startAnimation')] : [];
+  },
+});
+
+const coursePlatformPro = (): ExperienceTemplate => ({
+  id: 'course-platform-pro',
+  name: 'Course Platform Pro',
+  description: 'Página de curso ou escola online com módulos, planos, FAQ e captura.',
+  category: 'education',
+  exportTarget: 'next',
+  presetId: 'education-lab',
+  performance: 'medium',
+  accent: '#38bdf8',
+  createPage: () =>
+    themedPage('education-lab', 'Course Platform Pro', (p) => [
+      buildNavbar(p, 'Orbit Academy', 'Cursos,Comunidade,Planos,Entrar'.split(',')),
+      buildHero(p, {
+        variant: 'split',
+        title: 'Ensine com módulos interativos e cenas 3D',
+        subtitle: 'Template para cursos, bootcamps, escolas online e experiências de aprendizado visual.',
+        cta: 'Ver currículo',
+        ctaHref: '#curriculo',
+      }),
+      buildStatsRow(p, [
+        { value: '9', label: 'Módulos' },
+        { value: '38h', label: 'Conteúdo' },
+        { value: '12k', label: 'Alunos' },
+        { value: '4.9', label: 'Avaliação' },
+      ]),
+      buildFeaturesGrid(p, [
+        { title: 'Currículo modular', body: 'Organize pilares, aulas e labs em uma narrativa clara.' },
+        { title: 'Aprendizado visual', body: 'Use canvas 3D para representar conceitos complexos.' },
+        { title: 'Comunidade', body: 'Blocos para prova social, planos e convite de inscrição.' },
+      ]),
+      ...templateBlocks(p, ['split-content', 'testimonials', 'pricing', 'faq', 'newsletter']),
+      buildCTA(p, {
+        title: 'Abra inscrições para sua próxima turma',
+        body: 'Uma base completa para curso pago, gratuito ou programa de mentoria.',
+        cta: 'Inscrever agora',
+        ctaHref: '#inscricao',
+      }),
+      buildFooter(p, '© 2026 Orbit Academy'),
+    ]),
+  createEffects: () => [
+    effect('gridFloor3D', 0, { color: '#38bdf8', speed: 0.45 }),
+    effect('animatedStars', 0, { count: 850, color: '#facc15', twinkle: true, opacity: 0.65 }),
+    effect('scrollReveal', 30, { once: true }),
+    effect('customCursor', 46, { iconIndex: 0, effect: 'trail', effectColor: '#38bdf8', cursorSize: 32 }),
+  ],
+  createInteractions: (page, sceneTargetId = 'current-scene') => {
+    const card = firstCard(page);
+    return card ? [createDefaultInteraction(card.id, sceneTargetId, 'click', 'changeMaterial')] : [];
+  },
+});
+
+const creatorMediaKit = (): ExperienceTemplate => ({
+  id: 'creator-media-kit',
+  name: 'Creator Media Kit',
+  description: 'Portfólio editorial para creator, newsletter, podcast ou comunidade.',
+  category: 'portfolio',
+  exportTarget: 'html',
+  presetId: 'editorial-clean',
+  performance: 'low',
+  accent: '#c2410c',
+  createPage: () =>
+    themedPage('editorial-clean', 'Creator Media Kit', (p) => [
+      buildNavbar(p, 'Maya Notes', 'Sobre,Episódios,Parcerias,Contato'.split(',')),
+      buildHero(p, {
+        variant: 'centered',
+        title: 'Uma casa elegante para ideias, mídia e comunidade',
+        subtitle: 'Template para creators, autores, podcasts, newsletters e perfis públicos com proposta comercial.',
+        cta: 'Baixar media kit',
+        ctaHref: '#media-kit',
+      }),
+      buildStatsRow(p, [
+        { value: '180k', label: 'Audiência' },
+        { value: '42%', label: 'Open rate' },
+        { value: '3.8M', label: 'Views' },
+      ]),
+      buildFeaturesGrid(p, [
+        { title: 'Editorial', body: 'Apresente temas, séries, formatos e posicionamento.' },
+        { title: 'Parcerias', body: 'Use métricas, depoimentos e contato para receber propostas.' },
+        { title: 'Comunidade', body: 'Newsletter, FAQ e galeria mostram consistência de conteúdo.' },
+      ]),
+      ...templateBlocks(p, ['gallery', 'testimonials', 'newsletter', 'faq', 'contact-form']),
+      buildCTA(p, {
+        title: 'Transforme audiência em parceria',
+        body: 'Edite números, fotos e blocos para publicar seu media kit em minutos.',
+        cta: 'Falar sobre parceria',
+        ctaHref: '#parcerias',
+      }),
+      buildFooter(p, '© 2026 Maya Notes'),
+    ]),
+  createEffects: () => [
+    effect('scrollReveal', 30, { distance: 56, duration: 800, once: true }),
+    effect('parallaxLayer', 30, { strength: 0.18 }),
+  ],
+  createInteractions: () => [],
 });
 
 export const EXPERIENCE_TEMPLATES: ExperienceTemplate[] = [
@@ -913,6 +1236,12 @@ export const EXPERIENCE_TEMPLATES: ExperienceTemplate[] = [
   tasklyLanding(),
   vanguardBrand(),
   lithosGeology(),
+  aiAutomationSuite(),
+  commerceProductDrop(),
+  agencyCaseStudy(),
+  conferenceLaunch(),
+  coursePlatformPro(),
+  creatorMediaKit(),
 ];
 
 export const getTemplate = (id: ExperienceTemplateId): ExperienceTemplate =>
