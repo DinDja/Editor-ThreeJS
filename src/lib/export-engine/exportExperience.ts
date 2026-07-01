@@ -1,7 +1,7 @@
 import type { InteractionDocument } from '@/lib/interaction-engine/types';
 import type { DataSchema } from '@/lib/data-model/types';
 import type { VariableDocument } from '@/lib/variables/types';
-import { type ProjectAsset, type ExportTarget, type PageDocument, type ProjectExperience, type ProjectSettings } from '@/lib/page-builder/types';
+import { type PageNode, type PageStyle, type ProjectAsset, type ExportTarget, type PageDocument, type ProjectExperience, type ProjectSettings } from '@/lib/page-builder/types';
 import { collectProjectAssets } from '@/lib/project-experience/persistence';
 import type { SceneDocument } from '@/lib/scene-engine/types';
 import { generateDatabaseSchema } from './generateSchema';
@@ -276,27 +276,329 @@ const reactFiles = (snapshot: ProjectExperience, target: 'react' | 'vite'): Expo
   ...dataFiles(snapshot, 'src/data'),
 ];
 
+const escapeHtml = (str: string) => str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+
+const camelToKebab = (str: string) => str.replace(/[A-Z]/g, (m) => `-${m.toLowerCase()}`);
+
+const unitlessProps = new Set(['zIndex', 'opacity', 'lineHeight', 'fontWeight', 'flex', 'flexGrow', 'flexShrink', 'order']);
+
+const stylePropToCss = (key: string, value: unknown): string | null => {
+  if (value === undefined || value === null || value === '') return null;
+  const prop = camelToKebab(key);
+  if (typeof value === 'number' && !unitlessProps.has(key)) return `${prop}: ${value}px`;
+  return `${prop}: ${value}`;
+};
+
+const styleBlockToCss = (style: PageStyle): string => {
+  const lines: string[] = [];
+  for (const [key, value] of Object.entries(style)) {
+    const decl = stylePropToCss(key, value);
+    if (decl) lines.push(`  ${decl};`);
+  }
+  return lines.join('\n');
+};
+
+const collectAllNodes = (nodes: PageNode[]): PageNode[] => {
+  const result: PageNode[] = [];
+  for (const node of nodes) {
+    result.push(node);
+    if (node.children) result.push(...collectAllNodes(node.children));
+  }
+  return result;
+};
+
+const resolveBindings = (value: string, variables?: VariableDocument): string => {
+  if (!value) return '';
+  return value.replace(/\{\{\s*([^}]+?)\s*\}\}/g, (_, key: string) => {
+    const k = key.trim();
+    if (k.startsWith('vars.') && variables?.variables) {
+      const v = variables.variables.find((v) => v.name === k.slice(5));
+      return v ? String(v.value) : '';
+    }
+    return '';
+  });
+};
+
+const sampleRecordsForExport = (collection: { fields?: { name: string; type: string; label: string; system?: boolean }[] } | undefined, count = 4) =>
+  Array.from({ length: count }, (_, i) =>
+    Object.fromEntries((collection?.fields || []).map((f) => [f.name, f.name === 'id' ? `rec_${i + 1}` : f.type === 'number' ? (i + 1) * 10 : `${f.label} ${i + 1}`])),
+  );
+
+const collectionForExport = (ref: string, dataSchema?: DataSchema) =>
+  dataSchema?.collections?.find((c) => c.id === ref || c.name === ref) || dataSchema?.collections?.[0];
+
+const displayValue = (value: unknown) =>
+  value === undefined || value === null ? '' : typeof value === 'object' ? JSON.stringify(value) : String(value);
+
+const tagForNode = (node: PageNode): string => {
+  switch (node.type) {
+    case 'navbar': return 'nav';
+    case 'footer': return 'footer';
+    case 'menu': return 'nav';
+    case 'menuitem': return 'a';
+    case 'button': return 'a';
+    case 'text': return String(node.props.as || 'p');
+    case 'image': return 'img';
+    case 'video': return 'video';
+    case 'input': return 'div';
+    case 'select': return 'div';
+    case 'textarea': return 'div';
+    case 'label': return 'label';
+    case 'form': return 'form';
+    case 'dataForm': return 'form';
+    case 'sceneCanvas': return 'div';
+    case 'card': return 'article';
+    case 'dataTable': return 'div';
+    case 'dataList': return 'div';
+    case 'dataChart': return 'div';
+    case 'dataStat': return 'div';
+    case 'modal': return 'div';
+    case 'container': return 'div';
+    default: return 'section';
+  }
+};
+
+const buildHtmlNode = (node: PageNode, snapshot: ProjectExperience): string => {
+  if (node.hidden) return '';
+  const tag = tagForNode(node);
+  const attrs: string[] = [`data-experience-node="${node.id}"`];
+  const responsive = node.responsive;
+  if (responsive?.tablet?.visible === false) attrs.push('data-hide-tablet');
+  if (responsive?.mobile?.visible === false) attrs.push('data-hide-mobile');
+
+  let inner = '';
+  const props = node.props;
+
+  switch (node.type) {
+    case 'button':
+      attrs.push(`href="${escapeHtml(String(props.href || '#'))}"`);
+      inner = escapeHtml(resolveBindings(String(props.label || 'Button'), snapshot.variables));
+      break;
+    case 'text':
+      inner = escapeHtml(resolveBindings(String(props.text || ''), snapshot.variables));
+      break;
+    case 'image':
+      attrs.push(`src="${escapeHtml(String(props.src || ''))}"`);
+      attrs.push(`alt="${escapeHtml(String(props.alt || ''))}"`);
+      attrs.push(`loading="lazy"`);
+      return `<${tag} ${attrs.join(' ')} />`;
+    case 'video':
+      attrs.push(`src="${escapeHtml(String(props.src || ''))}"`);
+      if (props.poster) attrs.push(`poster="${escapeHtml(String(props.poster))}"`);
+      if (props.controls !== false) attrs.push('controls');
+      if (props.autoplay) { attrs.push('autoplay'); attrs.push('muted'); attrs.push('playsinline'); }
+      return `<${tag} ${attrs.join(' ')}></${tag}>`;
+    case 'sceneCanvas':
+      attrs.push('class="scene-canvas"');
+      return `<${tag} ${attrs.join(' ')}></${tag}>`;
+    case 'input': {
+      if (props.label) inner += `<label>${escapeHtml(String(props.label))}</label>`;
+      const inpAttrs = [`name="${escapeHtml(String(props.name || ''))}"`, `type="${escapeHtml(String(props.type || 'text'))}"`];
+      if (props.placeholder) inpAttrs.push(`placeholder="${escapeHtml(String(props.placeholder))}"`);
+      if (props.required) inpAttrs.push('required');
+      inner += `<input ${inpAttrs.join(' ')} />`;
+      break;
+    }
+    case 'select': {
+      if (props.label) inner += `<label>${escapeHtml(String(props.label))}</label>`;
+      const opts = (props.options as string[] || []).map((o) => `<option value="${escapeHtml(o)}">${escapeHtml(o)}</option>`).join('');
+      inner += `<select name="${escapeHtml(String(props.name || ''))}">${opts}</select>`;
+      break;
+    }
+    case 'textarea': {
+      if (props.label) inner += `<label>${escapeHtml(String(props.label))}</label>`;
+      inner += `<textarea name="${escapeHtml(String(props.name || ''))}" placeholder="${escapeHtml(String(props.placeholder || ''))}" rows="${props.rows || 4}"></textarea>`;
+      break;
+    }
+    case 'label':
+      if (props.htmlFor) attrs.push(`for="${escapeHtml(String(props.htmlFor))}"`);
+      inner = escapeHtml(String(props.text || ''));
+      break;
+    case 'menuitem':
+      attrs.push(`href="${escapeHtml(String(props.href || '#'))}"`);
+      inner = escapeHtml(String(props.label || 'Item'));
+      break;
+    case 'form':
+      if (props.name) attrs.push(`name="${escapeHtml(String(props.name))}"`);
+      if (props.action) attrs.push(`action="${escapeHtml(String(props.action))}"`);
+      attrs.push(`method="${escapeHtml(String(props.method || 'POST'))}"`);
+      break;
+    case 'dataForm': {
+      attrs.push('method="POST"');
+      const collection = collectionForExport(String(props.collectionId), snapshot.dataSchema);
+      const fields = (collection?.fields || []).filter((f) => !f.system && f.type !== 'relation');
+      fields.forEach((f) => {
+        inner += `<label>${escapeHtml(f.label)}<input name="${escapeHtml(f.name)}"${f.required ? ' required' : ''} /></label>`;
+      });
+      inner += `<button type="submit">${escapeHtml(String(props.submitLabel || 'Salvar'))}</button>`;
+      break;
+    }
+    case 'dataTable': {
+      const collection = collectionForExport(String(props.collectionId), snapshot.dataSchema);
+      const fields = (collection?.fields || []).filter((f) => !f.system).slice(0, 6);
+      const rows = sampleRecordsForExport(collection, Number(props.limit) || 6);
+      inner += '<table><thead><tr>';
+      fields.forEach((f) => { inner += `<th>${escapeHtml(f.label)}</th>`; });
+      inner += '</tr></thead><tbody>';
+      rows.forEach((r) => {
+        inner += '<tr>';
+        fields.forEach((f) => { inner += `<td>${escapeHtml(displayValue(r[f.name]))}</td>`; });
+        inner += '</tr>';
+      });
+      inner += '</tbody></table>';
+      break;
+    }
+    case 'dataList': {
+      const collection = collectionForExport(String(props.collectionId), snapshot.dataSchema);
+      const records = sampleRecordsForExport(collection, Number(props.limit) || 6);
+      const titleField = String(props.titleField || 'name');
+      const bodyField = String(props.bodyField || 'message');
+      records.forEach((r) => {
+        inner += `<article><h3>${escapeHtml(displayValue(r[titleField]))}</h3><p>${escapeHtml(displayValue(r[bodyField]))}</p></article>`;
+      });
+      break;
+    }
+    case 'dataChart': {
+      const collection = collectionForExport(String(props.collectionId), snapshot.dataSchema);
+      const records = sampleRecordsForExport(collection, Number(props.limit) || 5);
+      records.forEach((_r, i) => {
+        inner += `<div class="chart-bar" style="flex:1;height:${(i + 1) * 18}%;background:#34d399;border-radius:6px"></div>`;
+      });
+      break;
+    }
+    case 'dataStat': {
+      const collection = collectionForExport(String(props.collectionId), snapshot.dataSchema);
+      inner += `<span>${escapeHtml(String(props.label || collection?.label || 'Total'))}</span>`;
+      inner += `<strong>${sampleRecordsForExport(collection).length}</strong>`;
+      break;
+    }
+    default:
+      if (props.brand) inner += `<strong>${escapeHtml(String(props.brand))}</strong>`;
+      if (props.title) inner += `<h3>${escapeHtml(String(props.title))}</h3>`;
+      if (props.body) inner += `<p>${escapeHtml(String(props.body))}</p>`;
+      break;
+  }
+
+  if (node.children) {
+    inner += node.children.map((child) => buildHtmlNode(child, snapshot)).join('');
+  }
+
+  return `<${tag} ${attrs.join(' ')}>\n${inner}\n</${tag}>`;
+};
+
+const buildHtmlTree = (nodes: PageNode[], snapshot: ProjectExperience): string =>
+  nodes.map((node) => buildHtmlNode(node, snapshot)).join('\n');
+
+const buildCssFromPage = (page: PageDocument): string => {
+  const allNodes = collectAllNodes(page.children);
+  const breakpoints = page.responsive || [
+    { name: 'desktop', width: 1280 },
+    { name: 'tablet', width: 820 },
+    { name: 'mobile', width: 390 },
+  ];
+  const tabletWidth = breakpoints.find((b) => b.name === 'tablet')?.width ?? 820;
+  const mobileWidth = breakpoints.find((b) => b.name === 'mobile')?.width ?? 390;
+
+  const lines: string[] = [
+    '/* Base Reset */',
+    '*, *::before, *::after { box-sizing: border-box; margin: 0; }',
+    'body { margin: 0; background: #101214; color: #f5f5f4; font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; -webkit-font-smoothing: antialiased; }',
+    'a { text-decoration: none; color: inherit; }',
+    'img, video { max-width: 100%; display: block; }',
+    'table { width: 100%; border-collapse: collapse; }',
+    'th, td { text-align: left; padding: 10px; }',
+    '',
+    '/* 3D Scene Canvas */',
+    '.scene-canvas { min-height: 360px; background: #0f1214; position: relative; }',
+    '.scene-canvas canvas { display: block; width: 100% !important; height: 100% !important; }',
+    '',
+    '/* Component Styles */',
+  ];
+
+  for (const node of allNodes) {
+    if (node.hidden) continue;
+    const baseCss = styleBlockToCss(node.styles.base);
+    if (baseCss) {
+      lines.push(`[data-experience-node="${node.id}"] {`);
+      lines.push(baseCss);
+      lines.push('}');
+    }
+  }
+
+  const tabletRules: string[] = [];
+  const mobileRules: string[] = [];
+  for (const node of allNodes) {
+    if (node.hidden) continue;
+    if (node.styles.tablet && Object.keys(node.styles.tablet).length > 0) {
+      const css = styleBlockToCss(node.styles.tablet);
+      if (css) tabletRules.push(`[data-experience-node="${node.id}"] {\n${css}\n}`);
+    }
+    if (node.styles.mobile && Object.keys(node.styles.mobile).length > 0) {
+      const css = styleBlockToCss(node.styles.mobile);
+      if (css) mobileRules.push(`[data-experience-node="${node.id}"] {\n${css}\n}`);
+    }
+  }
+
+  if (tabletRules.length > 0) {
+    lines.push('');
+    lines.push(`/* Tablet (max-width: ${tabletWidth}px) */`);
+    lines.push(`@media (max-width: ${tabletWidth}px) {`);
+    lines.push(tabletRules.join('\n'));
+    lines.push('}');
+  }
+
+  if (mobileRules.length > 0) {
+    lines.push('');
+    lines.push(`/* Mobile (max-width: ${mobileWidth}px) */`);
+    lines.push(`@media (max-width: ${mobileWidth}px) {`);
+    lines.push(mobileRules.join('\n'));
+    lines.push('}');
+  }
+
+  const hasHideTablet = allNodes.some((n) => n.responsive?.tablet?.visible === false);
+  const hasHideMobile = allNodes.some((n) => n.responsive?.mobile?.visible === false);
+
+  if (hasHideTablet) {
+    lines.push('');
+    lines.push(`@media (max-width: ${tabletWidth}px) {`);
+    lines.push('  [data-hide-tablet] { display: none !important; }');
+    lines.push('}');
+  }
+  if (hasHideMobile) {
+    lines.push('');
+    lines.push(`@media (max-width: ${mobileWidth}px) {`);
+    lines.push('  [data-hide-mobile] { display: none !important; }');
+    lines.push('}');
+  }
+
+  const pseudoRules: string[] = [];
+  for (const node of allNodes) {
+    if (node.hidden || !node.pseudo) continue;
+    for (const [pseudo, bpStyles] of Object.entries(node.pseudo)) {
+      const baseStyle = bpStyles?.base;
+      if (baseStyle && Object.keys(baseStyle).length > 0) {
+        const css = styleBlockToCss(baseStyle);
+        if (css) pseudoRules.push(`[data-experience-node="${node.id}"]:${pseudo} {\n${css}\n}`);
+      }
+    }
+  }
+  if (pseudoRules.length > 0) {
+    lines.push('');
+    lines.push('/* Pseudo-class Styles */');
+    lines.push(pseudoRules.join('\n'));
+  }
+
+  return lines.join('\n');
+};
+
 const STANDALONE_RUNTIME = `
 import * as THREE from 'https://cdn.jsdelivr.net/npm/three@0.184.0/build/three.module.js';
 import { OrbitControls } from 'https://cdn.jsdelivr.net/npm/three@0.184.0/examples/jsm/controls/OrbitControls.js';
 import { GLTFLoader } from 'https://cdn.jsdelivr.net/npm/three@0.184.0/examples/jsm/loaders/GLTFLoader.js';
 
 const sceneData = window.__SCENE_DATA__;
-const pageData = window.__PAGE_DATA__;
 const interactionsData = window.__INTERACTIONS_DATA__;
-const dataSchema = window.__DATA_SCHEMA__ || { collections: [] };
 const variablesData = window.__VARIABLES_DATA__ || { variables: [] };
-
-const variableValue = (name) => variablesData.variables?.find((v) => v.name === name)?.value ?? '';
-const bind = (value, record = {}) => String(value ?? '').replace(/\\{\\{\\s*([^}]+?)\\s*\\}\\}/g, (_, key) => {
-  const k = key.trim();
-  if (k.startsWith('record.')) return record[k.slice(7)] ?? '';
-  if (k.startsWith('vars.')) return variableValue(k.slice(5));
-  return variableValue(k) || record[k] || '';
-});
-const collectionFor = (ref) => dataSchema.collections?.find((c) => c.id === ref || c.name === ref) || dataSchema.collections?.[0];
-const sampleRecords = (collection, count = 4) => Array.from({ length: count }, (_, index) => Object.fromEntries((collection?.fields || []).map((field) => [field.name, field.name === 'id' ? 'rec_' + (index + 1) : field.type === 'number' ? (index + 1) * 10 : field.label + ' ' + (index + 1)])));
-const display = (value) => value === undefined || value === null ? '' : typeof value === 'object' ? JSON.stringify(value) : String(value);
 
 ${ANIMATION_RUNTIME}
 
@@ -513,73 +815,17 @@ function wireInteractions() {
   });
 }
 
-function renderPage() {
-  const root = document.getElementById('experience-root');
-  const applyStyle = (el, styles = {}) => { for (const [k, v] of Object.entries(styles)) el.style[k] = typeof v === 'number' ? v + 'px' : v; };
-  const build = (node) => {
-    const tag = node.type === 'navbar' ? 'nav' : node.type === 'footer' ? 'footer' : node.type === 'button' ? 'a' : node.type === 'text' ? (node.props.as || 'p') : node.type === 'input' || node.type === 'select' || node.type === 'textarea' ? 'div' : node.type === 'label' ? 'label' : node.type === 'menuitem' ? 'a' : node.type === 'form' || node.type === 'dataForm' ? 'form' : node.type === 'menu' ? 'nav' : 'section';
-    const el = document.createElement(tag);
-    el.dataset.experienceNode = node.id;
-    applyStyle(el, node.styles?.base || {});
-    if (node.type === 'sceneCanvas') { el.className = 'scene-canvas'; mountScene(el); }
-    else if (node.type === 'button') { el.href = node.props.href || '#'; el.textContent = node.props.label || 'Button'; }
-    else if (node.type === 'text') el.textContent = bind(node.props.text || '');
-    else if (node.type === 'dataTable') {
-      const collection = collectionFor(node.props.collectionId);
-      const fields = (collection?.fields || []).filter((f) => !f.system).slice(0, 6);
-      const rows = sampleRecords(collection, node.props.limit || 6);
-      const table = document.createElement('table'); table.style.width = '100%'; table.style.borderCollapse = 'collapse';
-      const head = document.createElement('thead'); const trh = document.createElement('tr');
-      fields.forEach((f) => { const th = document.createElement('th'); th.textContent = f.label; th.style.textAlign = 'left'; th.style.padding = '10px'; trh.appendChild(th); });
-      head.appendChild(trh); table.appendChild(head);
-      const body = document.createElement('tbody');
-      rows.forEach((r) => { const tr = document.createElement('tr'); fields.forEach((f) => { const td = document.createElement('td'); td.textContent = display(r[f.name]); td.style.padding = '10px'; tr.appendChild(td); }); body.appendChild(tr); });
-      table.appendChild(body); el.appendChild(table);
-    }
-    else if (node.type === 'dataList') {
-      const collection = collectionFor(node.props.collectionId);
-      sampleRecords(collection, node.props.limit || 6).forEach((r) => { const article = document.createElement('article'); const h = document.createElement('h3'); h.textContent = display(r[node.props.titleField || 'name']); const p = document.createElement('p'); p.textContent = display(r[node.props.bodyField || 'message']); article.appendChild(h); article.appendChild(p); el.appendChild(article); });
-    }
-    else if (node.type === 'dataStat') {
-      const collection = collectionFor(node.props.collectionId); const s = document.createElement('span'); s.textContent = node.props.label || collection?.label || 'Total'; const strong = document.createElement('strong'); strong.textContent = String(sampleRecords(collection).length); el.appendChild(s); el.appendChild(strong);
-    }
-    else if (node.type === 'dataChart') {
-      const collection = collectionFor(node.props.collectionId); sampleRecords(collection, node.props.limit || 5).forEach((_r, i) => { const bar = document.createElement('div'); bar.style.flex = '1'; bar.style.height = ((i + 1) * 18) + '%'; bar.style.background = '#34d399'; bar.style.borderRadius = '6px'; el.appendChild(bar); });
-    }
-    else if (node.type === 'dataForm') {
-      const collection = collectionFor(node.props.collectionId);
-      (collection?.fields || []).filter((f) => !f.system && f.type !== 'relation').forEach((f) => { const label = document.createElement('label'); label.textContent = f.label; const input = document.createElement('input'); input.name = f.name; input.required = Boolean(f.required); label.appendChild(input); el.appendChild(label); });
-      const button = document.createElement('button'); button.type = 'submit'; button.textContent = node.props.submitLabel || 'Salvar'; el.appendChild(button); el.addEventListener('submit', (event) => { event.preventDefault(); alert(node.props.successMessage || 'Registro salvo'); });
-    }
-    else if (node.type === 'image') { const img = document.createElement('img'); img.src = node.props.src || ''; img.alt = node.props.alt || ''; img.style.width = '100%'; el.appendChild(img); }
-    else if (node.type === 'video') { const v = document.createElement('video'); v.src = node.props.src || ''; v.controls = node.props.controls !== false; v.muted = true; el.appendChild(v); }
-    else if (node.type === 'input') { if (node.props.label) { const lb = document.createElement('label'); lb.textContent = node.props.label; el.appendChild(lb); } const inp = document.createElement('input'); inp.name = node.props.name || ''; inp.type = node.props.type || 'text'; inp.placeholder = node.props.placeholder || ''; inp.required = Boolean(node.props.required); el.appendChild(inp); }
-    else if (node.type === 'select') { if (node.props.label) { const lb = document.createElement('label'); lb.textContent = node.props.label; el.appendChild(lb); } const sel = document.createElement('select'); sel.name = node.props.name || ''; (node.props.options || []).forEach((o) => { const opt = document.createElement('option'); opt.value = o; opt.textContent = o; sel.appendChild(opt); }); el.appendChild(sel); }
-    else if (node.type === 'textarea') { if (node.props.label) { const lb = document.createElement('label'); lb.textContent = node.props.label; el.appendChild(lb); } const ta = document.createElement('textarea'); ta.name = node.props.name || ''; ta.placeholder = node.props.placeholder || ''; ta.rows = node.props.rows || 4; el.appendChild(ta); }
-    else if (node.type === 'label') { el.htmlFor = node.props.htmlFor || ''; el.textContent = node.props.text || ''; }
-    else if (node.type === 'menuitem') { el.href = node.props.href || '#'; el.textContent = node.props.label || 'Item'; }
-    else if (node.type === 'form') { el.name = node.props.name || ''; el.action = node.props.action || '#'; el.method = node.props.method || 'POST'; }
-    else {
-      if (node.props.brand) { const b = document.createElement('strong'); b.textContent = node.props.brand; el.appendChild(b); }
-      if (node.props.title) { const t = document.createElement('h3'); t.textContent = node.props.title; el.appendChild(t); }
-      if (node.props.body) { const p = document.createElement('p'); p.textContent = node.props.body; el.appendChild(p); }
-      (node.children || []).forEach((c) => el.appendChild(build(c)));
-    }
-    return el;
-  };
-  pageData.children.forEach((node) => root.appendChild(build(node)));
-}
-
-renderPage();
+document.querySelectorAll('.scene-canvas').forEach((el) => mountScene(el));
 wireInteractions();
 `;
 
 const htmlFiles = (snapshot: ProjectExperience): ExportFile[] => {
   const sceneJson = asJson(snapshot.scene);
-  const pageJson = asJson(snapshot.page);
   const interactionsJson = asJson(snapshot.interactions);
   const dataSchemaJson = asJson(snapshot.dataSchema ?? null);
   const variablesJson = asJson(snapshot.variables ?? null);
+  const htmlBody = buildHtmlTree(snapshot.page.children, snapshot);
+  const cssContent = buildCssFromPage(snapshot.page);
   return [
     {
       path: 'index.html',
@@ -589,18 +835,20 @@ const htmlFiles = (snapshot: ProjectExperience): ExportFile[] => {
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>${snapshot.name}</title>
+    <title>${escapeHtml(snapshot.name)}</title>
+    <meta name="description" content="${escapeHtml(snapshot.page.description || '')}" />
     <link rel="stylesheet" href="./style.css" />
     <script>
       window.__SCENE_DATA__ = ${sceneJson};
-      window.__PAGE_DATA__ = ${pageJson};
       window.__INTERACTIONS_DATA__ = ${interactionsJson};
       window.__DATA_SCHEMA__ = ${dataSchemaJson};
       window.__VARIABLES_DATA__ = ${variablesJson};
     </script>
   </head>
   <body>
-    <main id="experience-root"></main>
+    <main>
+${htmlBody}
+    </main>
     <script type="module" src="./main.js"></script>
   </body>
 </html>
@@ -609,12 +857,7 @@ const htmlFiles = (snapshot: ProjectExperience): ExportFile[] => {
     {
       path: 'style.css',
       language: 'css',
-      content: `* { box-sizing: border-box; }
-body { margin: 0; background: #101214; color: #f5f5f4; font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; }
-a { text-decoration: none; }
-.scene-canvas { min-height: 360px; background: #0f1214; position: relative; }
-.scene-canvas canvas { display: block; width: 100% !important; height: 100% !important; }
-`,
+      content: cssContent,
     },
     {
       path: 'main.js',

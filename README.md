@@ -1,38 +1,74 @@
 <div align="center">
 
-# Editor ThreeJS
+<br/>
 
-**Editor 3D experimental — Next.js + React Three Fiber + Electron**
+<h1>✦ Editor ThreeJS</h1>
 
-Editor de cena e modelagem 3D com viewport interativo, primitivas, import/export GLB/GLTF, materiais PBR com texturas, modelagem poligonal (Draw Polygon, Knife, Edge Loop/Ring, Bridge, Fill, Inset), edit mode (vertices/arestas/faces), sculpt com 10 modos e fallback de pressao para mouse, fisica Rapier3D, timeline com keyframes, behaviors procedurais, efeitos de particulas, fluid, scripts JavaScript por objeto, geracao de malhas via IA (NVIDIA NIM), layers, imagens de referencia, asset browser (Poly Haven), atalhos de produtividade e app desktop Windows.
+**Editor 3D experimental & Construtor visual de sites 3D interativos**
 
-[![Tutorial](https://img.shields.io/badge/Abrir-Tutorial-10b981?style=for-the-badge)](./TUTORIAL.md)
-[![Download Desktop](https://img.shields.io/badge/Baixar-Desktop_Windows-0078D4?style=for-the-badge&logo=windows&logoColor=white)](#desktop)
-[![Demo Online](https://img.shields.io/badge/Demo-Online-ff4785?style=for-the-badge&logo=vercel&logoColor=white)](https://editor-threejs.vercel.app)
+*Next.js · React Three Fiber · Electron · Rapier3D · NVIDIA NIM*
+
+<br/>
+
+[![Tutorial](https://img.shields.io/badge/Abrir_Tutorial-10b981?style=for-the-badge)](./TUTORIAL.md)
+[![Download Desktop](https://img.shields.io/badge/Baixar_Desktop-0078D4?style=for-the-badge&logo=windows&logoColor=white)](#desktop)
+[![Demo Online](https://img.shields.io/badge/Demo_Online-ff4785?style=for-the-badge&logo=vercel&logoColor=white)](https://editor-threejs.vercel.app)
+
+<br/>
+
+<p align="center">
+  <img src="https://img.shields.io/badge/Modelagem-Poligonal-6366f1?style=flat-square" alt="Modelagem" />
+  <img src="https://img.shields.io/badge/Sculpt-10_Modos-8b5cf6?style=flat-square" alt="Sculpt" />
+  <img src="https://img.shields.io/badge/Physics-Rapier3D-0055ff?style=flat-square" alt="Physics" />
+  <img src="https://img.shields.io/badge/IA-NVIDIA_NIM-76b900?style=flat-square" alt="IA" />
+  <img src="https://img.shields.io/badge/Export-GLB%20%7C%20ZIP%20%7C%20HTML-10b981?style=flat-square" alt="Export" />
+</p>
 
 </div>
+
+> **Editor de cena e modelagem 3D** com viewport interativo, primitivas, import/export GLB/GLTF, materiais PBR com texturas, modelagem poligonal (Draw Polygon, Knife, Edge Loop/Ring, Bridge, Fill, Inset), edit mode (vertices/arestas/faces), sculpt com 10 modos e fallback de pressao para mouse, fisica Rapier3D, timeline com keyframes, behaviors procedurais, efeitos de particulas, fluid, scripts JavaScript por objeto, geracao de malhas via IA (NVIDIA NIM), layers, imagens de referencia, asset browser (Poly Haven), atalhos de produtividade e app desktop Windows.
+
+> **Construtor visual de sites 3D interativos** com Page Builder drag-and-drop, Modo Dados (System Builder), Interaction Engine, Preview com metricas reais e Export Engine (Next/React/Vite/HTML standalone com Three.js CDN).
+
+---
+
+## Destaques
+
+| 3D Editor | Construtor Web 3D |
+| --- | --- |
+| Viewport interativo com orbita | Page Builder drag-and-drop |
+| Modelagem poligonal completa | System Builder visual (dados) |
+| Sculpt com 10 modos | Interaction Engine (triggers + actions) |
+| Fisica Rapier3D em tempo real | Preview com metricas reais (FPS, draw calls, heap) |
+| Timeline com keyframes exportaveis | Export: Next / React / Vite / HTML standalone |
+| Materiais PBR + texturas | Multi-pagina com rotas editaveis |
+| IA gera malhas via prompt (NVIDIA NIM) | ZIP com assets reais organizados |
+| Scripts JS por objeto | Breakpoints responsivos (base/tablet/mobile) |
 
 ---
 
 ## Badges
 
-![Version](https://img.shields.io/badge/version-1.0.0-blue)
-![Status](https://img.shields.io/badge/status-em%20desenvolvimento-orange)
-![Next.js](https://img.shields.io/badge/Next.js-16-000000?logo=next.js&logoColor=white)
-![React](https://img.shields.io/badge/React-19-61dafb?logo=react&logoColor=black)
-![Three.js](https://img.shields.io/badge/Three.js-r184-000000?logo=three.js&logoColor=white)
-![TypeScript](https://img.shields.io/badge/TypeScript-5-3178c6?logo=typescript&logoColor=white)
-![Tailwind](https://img.shields.io/badge/Tailwind-4-38bdf8?logo=tailwindcss&logoColor=black)
-![Electron](https://img.shields.io/badge/Electron-35-47848f?logo=electron&logoColor=white)
-![Rapier](https://img.shields.io/badge/Physics-Rapier3D-0055ff)
-![Zustand](https://img.shields.io/badge/State-Zustand-brown)
-![License](https://img.shields.io/badge/license-MIT-green)
-![PRs](https://img.shields.io/badge/PRs-bem--vindos-brightgreen)
+<p align="center">
+  <img src="https://img.shields.io/badge/version-1.0.0-blue?style=flat-square" alt="Version" />
+  <img src="https://img.shields.io/badge/status-em%20desenvolvimento-orange?style=flat-square" alt="Status" />
+  <img src="https://img.shields.io/badge/Next.js-16-000000?logo=next.js&logoColor=white&style=flat-square" alt="Next.js" />
+  <img src="https://img.shields.io/badge/React-19-61dafb?logo=react&logoColor=black&style=flat-square" alt="React" />
+  <img src="https://img.shields.io/badge/Three.js-r184-000000?logo=three.js&logoColor=white&style=flat-square" alt="Three.js" />
+  <img src="https://img.shields.io/badge/TypeScript-5-3178c6?logo=typescript&logoColor=white&style=flat-square" alt="TypeScript" />
+  <img src="https://img.shields.io/badge/Tailwind-4-38bdf8?logo=tailwindcss&logoColor=black&style=flat-square" alt="Tailwind" />
+  <img src="https://img.shields.io/badge/Electron-35-47848f?logo=electron&logoColor=white&style=flat-square" alt="Electron" />
+  <img src="https://img.shields.io/badge/Physics-Rapier3D-0055ff?style=flat-square" alt="Rapier" />
+  <img src="https://img.shields.io/badge/State-Zustand-brown?style=flat-square" alt="Zustand" />
+  <img src="https://img.shields.io/badge/license-MIT-green?style=flat-square" alt="License" />
+  <img src="https://img.shields.io/badge/PRs-bem--vindos-brightgreen?style=flat-square" alt="PRs" />
+</p>
 
 ---
 
 ## Sumario
 
+- [Destaques](#destaques)
 - [Recursos](#recursos)
 - [Virada para Construtor Web 3D](#virada-para-construtor-web-3d)
 - [Analise para Editor Profissional](#analise-para-editor-profissional)
@@ -54,6 +90,7 @@ Editor de cena e modelagem 3D com viewport interativo, primitivas, import/export
 - [Atalhos](#atalhos)
 - [Modelos](#modelos)
 - [Agente IA (NVIDIA NIM)](#agente-ia-nvidia-nim)
+- [FAQ](#faq)
 - [Troubleshooting](#troubleshooting)
 - [Roadmap](#roadmap)
 - [Contribuindo](#contribuindo)
@@ -64,50 +101,50 @@ Editor de cena e modelagem 3D com viewport interativo, primitivas, import/export
 
 ### Cena e Interface
 
-- Projeto inicia em branco, sem objetos pre-carregados.
-- Viewport 3D com `@react-three/fiber`, `@react-three/drei` e controles de orbita.
-- Scene Graph para selecionar, ocultar, bloquear e remover objetos.
-- Painel de propriedades com nome, tipo, visibilidade, posicao, rotacao e escala.
-- Context menu no Scene Graph para acoes rapidas.
-- Layout responsivo para desktop, tablet e mobile.
-- Tutorial integrado com spotlight guiado.
-- Modos de viewport: texturizado, solido, wireframe, vertices, poligonos e primitiva.
-- Layers com visibilidade, bloqueio e cor.
-- Imagens de referencia para modelagem.
+- Projeto inicia em branco, sem objetos pre-carregados
+- Viewport 3D com `@react-three/fiber`, `@react-three/drei` e controles de orbita
+- Scene Graph para selecionar, ocultar, bloquear e remover objetos
+- Painel de propriedades com nome, tipo, visibilidade, posicao, rotacao e escala
+- Context menu no Scene Graph para acoes rapidas
+- Layout responsivo para desktop, tablet e mobile
+- Tutorial integrado com spotlight guiado
+- Modos de viewport: texturizado, solido, wireframe, vertices, poligonos e primitiva
+- Layers com visibilidade, bloqueio e cor
+- Imagens de referencia para modelagem
 
 ### Objetos e Ferramentas
 
-- Ferramentas: Select, Mover, Girar, Escalar, Editar, Sculpt, Draw Polygon e Knife.
-- Gizmo com `TransformControls` para transforms e selecoes de malha.
-- Primitivas: cubo, esfera, cilindro, cone, toro e plano.
-- Texto 3D com depth e bevel.
-- Importacao de SVG com extrusao.
-- Modelagem de primitivas com dimensoes e segmentos configuraveis.
-- Conversao de primitivas e modelos importados para malha editavel.
-- Importacao de modelos `.glb` e `.gltf`.
-- Exportacao da cena editada em `.glb`.
-- Asset Browser integrado (Poly Haven).
-- Undo/Redo por snapshots.
-- Copiar, colar, duplicar e apagar objetos por atalhos.
+- Ferramentas: Select, Mover, Girar, Escalar, Editar, Sculpt, Draw Polygon e Knife
+- Gizmo com `TransformControls` para transforms e selecoes de malha
+- Primitivas: cubo, esfera, cilindro, cone, toro e plano
+- Texto 3D com depth e bevel
+- Importacao de SVG com extrusao
+- Modelagem de primitivas com dimensoes e segmentos configuraveis
+- Conversao de primitivas e modelos importados para malha editavel
+- Importacao de modelos `.glb` e `.gltf`
+- Exportacao da cena editada em `.glb`
+- Asset Browser integrado (Poly Haven)
+- Undo/Redo por snapshots
+- Copiar, colar, duplicar e apagar objetos por atalhos
 
 ### Materiais
 
-- Editor de material com cor, emissive, metalness, roughness e opacidade.
-- Textura difusa, normal map, roughness map e displacement map.
-- Texturas carregadas no viewport e preservadas no export GLB.
-- Repeticao, offset e rotacao de textura.
-- Multi-materiais por face.
+- Editor de material com cor, emissive, metalness, roughness e opacidade
+- Textura difusa, normal map, roughness map e displacement map
+- Texturas carregadas no viewport e preservadas no export GLB
+- Repeticao, offset e rotacao de textura
+- Multi-materiais por face
 
 ### Edit Mode
 
-- Selecao e movimento de vertices, arestas e faces (multipla para vertices/faces).
-- Modos de selecao: Click, Box (caixa arrastavel) e Lasso (laco livre), com preview visual em tela.
-- Hover preview de vertices, arestas e faces antes de clicar.
-- Operacoes: extrudar face, subdividir face, apagar face, soldar vertices, bevel de aresta, loop cut, booleanos (union/subtract/intersect), bridge edges, fill face, inset face, flip normals, recalculate outward normals, smooth/flat shading, merge by distance, edge loop select e edge ring select.
-- Snap to vertex/edge/face durante transform de sub-elemento.
-- Multi-materiais por face em lote (selecao multi-face + atribuicao).
-- Estrutura interna `PolygonMesh` com vertices/edges/faces explicitos (IDs + adjacencia) para operacoes topologicas.
-- Conversao bidirecional entre `PolygonMesh` e `EditableMesh` (Three.js BufferGeometry).
+- Selecao e movimento de vertices, arestas e faces (multipla para vertices/faces)
+- Modos de selecao: Click, Box (caixa arrastavel) e Lasso (laco livre), com preview visual em tela
+- Hover preview de vertices, arestas e faces antes de clicar
+- Operacoes: extrudar face, subdividir face, apagar face, soldar vertices, bevel de aresta, loop cut, booleanos (union/subtract/intersect), bridge edges, fill face, inset face, flip normals, recalculate outward normals, smooth/flat shading, merge by distance, edge loop select e edge ring select
+- Snap to vertex/edge/face durante transform de sub-elemento
+- Multi-materiais por face em lote (selecao multi-face + atribuicao)
+- Estrutura interna `PolygonMesh` com vertices/edges/faces explicitos (IDs + adjacencia) para operacoes topologicas
+- Conversao bidirecional entre `PolygonMesh` e `EditableMesh` (Three.js BufferGeometry)
 
 ### Sculpt
 
@@ -522,36 +559,39 @@ O editor possui uma base solida para manipulacao 3D, mas para atingir o nivel de
 | Multi-user Editing | Edicao colaborativa | Trabalho em equipe |
 
 ### Comparativo com Editores Profissionais
+
 | Recurso | Este Editor | Blender | Unity | Unreal |
-| --- | --- | --- | --- | --- |
-| Modelagem poligonal | Sim | Sim | Basico | Basico |
-| Sculpt | Sim | Sim | Nao | Nao |
-| Node Materials | Nao | Sim | Sim | Sim |
-| Rigging/Animation | Basico | Sim | Sim | Sim |
-| UV Editor | Nao | Sim | Sim | Sim |
-| Physics | Sim | Sim | Sim | Sim |
-| Particle System | Basico | Sim | Sim | Sim |
-| Terrain | Nao | Sim | Sim | Sim |
-| Post-Processing | Nao | Sim | Sim | Sim |
-| Scripting | Sim | Sim | Sim | Sim |
-| VR/AR | Nao | Nao | Sim | Sim |
+| --- | :---: | :---: | :---: | :---: |
+| Modelagem poligonal | ✅ | ✅ | ⬜ | ⬜ |
+| Sculpt | ✅ | ✅ | ❌ | ❌ |
+| Node Materials | ❌ | ✅ | ✅ | ✅ |
+| Rigging/Animation | Basico | ✅ | ✅ | ✅ |
+| UV Editor | ❌ | ✅ | ✅ | ✅ |
+| Physics | ✅ | ✅ | ✅ | ✅ |
+| Particle System | Basico | ✅ | ✅ | ✅ |
+| Terrain | ❌ | ✅ | ✅ | ✅ |
+| Post-Processing | ❌ | ✅ | ✅ | ✅ |
+| Scripting | ✅ | ✅ | ✅ | ✅ |
+| VR/AR | ❌ | ❌ | ✅ | ✅ |
+| Web Builder 3D | ✅ | ❌ | ❌ | ❌ |
+| Export HTML Standalone | ✅ | ❌ | ❌ | ❌ |
 
 ---
 
 ## Stack
 
-| Camada | Tecnologia |
+| Stack | Tecnologia |
 | --- | --- |
-| Framework | Next.js 16 |
-| UI | React 19, Tailwind CSS 4 |
-| Linguagem | TypeScript |
-| 3D | Three.js, React Three Fiber, Drei |
-| Fisica | Rapier3D (`@dimforge/rapier3d-compat`) |
-| Estado | Zustand |
-| Icones | Lucide React |
-| Performance | three-mesh-bvh |
-| Desktop | Electron 35, electron-builder |
-| IA | NVIDIA NIM (nvidia/llama-3.1-nemotron-70b-instruct, meta/llama-3.1-8b-instruct) |
+| **Framework** | Next.js 16 |
+| **UI** | React 19 · Tailwind CSS 4 |
+| **Linguagem** | TypeScript 5 |
+| **3D** | Three.js r184 · React Three Fiber · Drei |
+| **Fisica** | Rapier3D (`@dimforge/rapier3d-compat`) |
+| **Estado** | Zustand |
+| **Icones** | Lucide React |
+| **Performance** | three-mesh-bvh |
+| **Desktop** | Electron 35 · electron-builder |
+| **IA** | NVIDIA NIM (nemotron-70b · llama-3.1-8b) |
 
 ---
 
@@ -571,7 +611,7 @@ npm run dev
 
 Abra no navegador:
 
-```text
+```
 http://localhost:3000
 ```
 
@@ -622,7 +662,7 @@ O botao Desktop na toolbar dispara o download pela rota `/api/download/desktop`.
 
 ## Scripts
 
-| Script | Descricao |
+| Comando | Descricao |
 | --- | --- |
 | `npm run dev` | Inicia o app em modo desenvolvimento |
 | `npm run build` | Gera a build de producao |
@@ -740,27 +780,27 @@ src/
 
 ### Fluxo Cena 3D
 
-```text
- Add / Importar GLB / Gerar IA
-         |
-         v
+```
+ Add / Import GLB / Gerar IA
+         │
+         ▼
   Selecionar objeto (viewport ou Scene Graph)
-         |
-         v
-  Transformar (Mover / Girar / Escalar)
-         |
-         v
+         │
+         ▼
+  Transformar ── Mover · Girar · Escalar
+         │
+         ▼
   Editar Properties (transforms, material, modelagem)
-         |
-         +---> Edit Mode (vertices / arestas / faces)
-         +---> Draw Polygon (desenhar poligonos do zero)
-         +---> Knife (cortar faces interativamente)
-         +---> Sculpt (pincel)
-         +---> Fisica / Behaviors / Scripts / Efeitos
-         +---> Animar (Timeline + keyframes)
-         |
-         v
-  Exportar cena -> .glb
+         │
+         ├──▶ Edit Mode (vertices / arestas / faces)
+         ├──▶ Draw Polygon (desenhar poligonos do zero)
+         ├──▶ Knife (cortar faces interativamente)
+         ├──▶ Sculpt (pincel)
+         ├──▶ Fisica / Behaviors / Scripts / Efeitos
+         └──▶ Animar (Timeline + keyframes)
+         │
+         ▼
+  Exportar cena → .glb
 ```
 
 1. Use `Add` para inserir uma primitiva, `Importar` para carregar `.glb`/`.gltf`, ou `Gerar IA` para criar malhas via prompt.
@@ -777,38 +817,38 @@ src/
 
 ### Fluxo Site 3D Interativo
 
-```text
+```
   Modo Cena
-      |
-      v
+      │
+      ▼
   Criar/importar cena 3D
-      |
-      v
+      │
+      ▼
   Modo Pagina
-      |
-      v
-  Criar hero/sections/cards/textos/botoes
-      |
-      v
+      │
+      ▼
+  Criar hero · sections · cards · textos · botoes
+      │
+      ▼
   Inserir Scene Canvas na pagina
-      |
-      v
+      │
+      ▼
   Modo Interacoes
-      |
-      v
-  Conectar HTML -> objeto/luz/camera 3D
-      |
-      v
+      │
+      ▼
+  Conectar HTML → objeto / luz / camera 3D
+      │
+      ▼
   Modo Preview
-      |
-      v
-  Testar desktop/tablet/mobile
-      |
-      v
+      │
+      ▼
+  Testar desktop · tablet · mobile
+      │
+      ▼
   Modo Exportar
-      |
-      v
-  Gerar estrutura React/Next/Vite/HTML + JSON
+      │
+      ▼
+  Gerar React / Next / Vite / HTML + JSON
 ```
 
 1. Monte a cena no `Modo Cena`.
@@ -1094,12 +1134,12 @@ Tipos de luz suportados:
 
 | Luz | Props |
 | --- | --- |
-| Spot | angulo, penumbra, target, sombra |
-| Point | distancia, decay, sombra |
-| Directional | direcao, sombra |
-| Ambient | intensidade global |
+| **Spot** | angulo, penumbra, target, sombra |
+| **Point** | distancia, decay, sombra |
+| **Directional** | direcao, sombra |
+| **Ambient** | intensidade global |
 
-Props comuns: cor, intensidade, `castShadow`, `shadowBias`, `shadowRadius`.
+Props comuns: cor, intensidade, `castShadow`, `shadowBias`, `shadowRadius`
 
 ---
 
@@ -1217,6 +1257,45 @@ Se a primeira geracao ficar simples demais (<40 vertices totais ou <3 objetos), 
 </details>
 
 Na toolbar, use o botao `Gerar IA` (icone sparkles fucsia), descreva a cena e o app cria automaticamente as malhas com materiais.
+
+---
+
+## FAQ
+
+<details>
+<summary><b>Preciso de placa de video dedicada?</b></summary>
+
+Nao. O editor usa WebGL via Three.js, que roda em qualquer GPU com suporte a WebGL 2.0 (integrada ou dedicada).
+
+</details>
+
+<details>
+<summary><b>Funciona no celular?</b></summary>
+
+Sim, o layout e responsivo. O Preview tem modos desktop, tablet e mobile para testar a experiencia exportada.
+
+</details>
+
+<details>
+<summary><b>Preciso de conta NVIDIA para usar a IA?</b></summary>
+
+Sim. Voce precisa de uma API key do NVIDIA NIM. Configure `NVIDIA_NIM_API_KEY` no `.env`.
+
+</details>
+
+<details>
+<summary><b>Posso exportar sem backend?</b></summary>
+
+Sim. O Export gera HTML/CSS/JS standalone com Three.js via CDN, sem necessidade de servidor.
+
+</details>
+
+<details>
+<summary><b>Qual a diferenca entre Modo Cena e Modo Pagina?</b></summary>
+
+O Modo Cena e o editor 3D puro (modelagem, sculpt, materiais). O Modo Pagina monta a experiencia web usand a cena 3D dentro de elementos HTML (heroes, sections, cards).
+
+</details>
 
 ---
 
@@ -1404,31 +1483,52 @@ Confira se existe algum objeto na cena e tente novamente em um navegador moderno
 
 ## Contribuindo
 
-1. Fork o repositorio.
-2. Crie uma branch: `git checkout -b feat/minha-feature`.
-3. Commit: `git commit -m "feat: minha feature"`.
-4. Push: `git push origin feat/minha-feature`.
-5. Abra um Pull Request.
+Contribuicoes sao bem-vindas! Siga o fluxo:
 
-PRs sao bem-vindas. Para bugs, abra uma [Issue](https://github.com/DinDja/Editor-ThreeJS/issues).
+1. **Fork** o repositorio
+2. **Branch**: `git checkout -b feat/minha-feature`
+3. **Commit**: `git commit -m "feat: minha feature"`
+4. **Push**: `git push origin feat/minha-feature`
+5. **Pull Request** com descricao clara
+
+Para bugs, abra uma [Issue](https://github.com/DinDja/Editor-ThreeJS/issues).
 
 ---
 
 ## Status
 
-Este projeto esta em desenvolvimento ativo. A base atual cobre cena, materiais, import/export, atalhos, edicao de malha, modelagem poligonal (Draw Polygon, Knife, Edge Loop/Ring), sculpt com suporte a mouse, fisica, animacao, behaviors, efeitos, scripts e geracao de malhas via IA.
+> **Em desenvolvimento ativo.**
 
-A camada de construtor visual de sites 3D interativos (Modo Pagina, Modo Dados, Modo Interacoes, Modo Preview, Modo Exportar) agora conta com paridade total com o renderer do Modo Cena, exportacao ZIP com assets reais organizados, runtime standalone em HTML/CSS/JS puro via Three.js CDN, autosave com historico de versoes, drag-and-drop e reparenting no Page Builder, alem de metricas reais de preview (draw calls, triangulos, resolucao de texturas, heap JS e FPS). O Edit Mode ganhou Box/Lasso select, hover preview, Flip/Recalculate Normals, Smooth/Flat Shading, multi-materiais por face em lote e snap de sub-elementos. A timeline agora exporta keyframes reais que rodam no runtime exportado.
+| Modulo | Status |
+| --- | --- |
+| Cena 3D + Modelagem + Sculpt | Funcional |
+| Fisica Rapier3D | Funcional |
+| Timeline + Keyframes | Funcional |
+| IA (NVIDIA NIM) | Funcional |
+| Page Builder | Funcional |
+| Interaction Engine | Funcional |
+| System Builder (Dados) | Fase 2 parcial |
+| Preview com metricas | Funcional |
+| Export Engine | Funcional (Next/React/Vite/HTML) |
+| Desktop Electron | Funcional (Windows) |
 
-O System Builder esta na Fase 2 inicial: ja existe modelo de dados visual com colecoes, campos, validacoes, relacoes e queries salvas, persistido no `.web3d.json`, no autosave/historico e no export como JSON/Prisma/Drizzle. A pagina agora tem componentes conectados a dados, variaveis com binding `{{var}}`, actions de dados/variaveis/toast/loading/error, geracao inicial de API routes CRUD para Next, multipage inicial com rotas editaveis e navegacao interna no Preview, alem de tutorial guiado com spotlight para Page Builder e Dados. Ainda faltam persistencia real em banco no runtime, formularios exportados chamando APIs, bindings avancados por registro, Workflow Engine, Formula Engine, Auth/guards reais, parametros dinamicos e export multipage completo.
+A camada de construtor visual de sites 3D interativos conta com paridade total com o renderer do Modo Cena, exportacao ZIP com assets reais organizados, runtime standalone em HTML/CSS/JS puro via Three.js CDN, autosave com historico de versoes, drag-and-drop e reparenting no Page Builder, alem de metricas reais de preview (draw calls, triangulos, resolucao de texturas, heap JS e FPS preciso). O Edit Mode possui Box/Lasso select, hover preview, Flip/Recalculate Normals, Smooth/Flat Shading, multi-materiais por face em lote e snap de sub-elementos. A timeline exporta keyframes reais que rodam no runtime exportado.
+
+O System Builder esta na Fase 2 inicial: modelo de dados visual com colecoes, campos, validacoes, relacoes e queries salvas, persistido no `.web3d.json`. A pagina tem componentes conectados a dados, variaveis com binding `{{var}}`, actions de dados/variaveis/toast/loading/error, geracao inicial de API routes CRUD para Next, multipage com rotas editaveis e navegacao interna no Preview.
 
 
 
 <div align="center">
 
+<br/>
+
 [![GitHub issues](https://img.shields.io/github/issues/DinDja/Editor-ThreeJS?style=flat-square)](https://github.com/DinDja/Editor-ThreeJS/issues)
 [![GitHub stars](https://img.shields.io/github/stars/DinDja/Editor-ThreeJS?style=flat-square)](https://github.com/DinDja/Editor-ThreeJS)
 [![GitHub forks](https://img.shields.io/github/forks/DinDja/Editor-ThreeJS?style=flat-square)](https://github.com/DinDja/Editor-ThreeJS)
 [![GitHub last commit](https://img.shields.io/github/last-commit/DinDja/Editor-ThreeJS?style=flat-square)](https://github.com/DinDja/Editor-ThreeJS)
+
+<br/>
+
+**Feito com Three.js e muito café ☕**
 
 </div>
