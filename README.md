@@ -70,6 +70,7 @@
 
 - [Destaques](#destaques)
 - [Recursos](#recursos)
+- [Aprender](#aprender)
 - [Virada para Construtor Web 3D](#virada-para-construtor-web-3d)
 - [Analise para Editor Profissional](#analise-para-editor-profissional)
 - [Stack](#stack)
@@ -188,10 +189,30 @@
 ### IA
 
 - Agente NVIDIA NIM para gerar malhas 3D (vertices + faces) via prompt.
+- Mestre IA no modo `Aprender`: aulas estruturadas, conversa contextual e feedback formativo.
+- Progresso da sessao salvo no autosave e no arquivo `.web3d.json`.
+- Demonstracoes autorizadas de geometria e gravidade que usam os stores reais do editor.
 - Decomposicao automatica em varias partes com hierarquia via parentName.
 - Retry automatico quando a cena fica simples demais.
 - Compactacao de layout para manter a composicao centralizada.
 - Subdivisao e suavizacao procedural das malhas geradas.
+
+---
+
+## Aprender
+
+O modo `Aprender` transforma o editor em um ambiente de estudo com o Mestre IA. O estudante pode escolher uma area, um nivel e um tema, ou apenas escrever o que deseja aprender. A resposta inicial cria um plano com objetivo, etapas, atividade e perguntas de verificacao.
+
+O painel permite conversar sobre a aula, pedir exemplos e enviar respostas para receber feedback e pistas. Etapas concluidas, respostas corretas, demonstracoes aplicadas e mensagens recentes ficam no projeto educacional e acompanham o autosave, o historico e o arquivo `.web3d.json`.
+
+Quando a aula sugere uma demonstracao disponivel, o estudante revisa a previa e confirma antes de alterar a cena. A primeira versao tem duas acoes reais:
+
+- **Geometria:** cria cubo, esfera, cilindro e cone coloridos na cena.
+- **Gravidade:** cria um piso estatico, esfera e cubo dinamicos e inicia a simulacao Rapier com gravidade.
+
+As demais areas podem receber aulas e atividades em texto; novas acoes visuais podem ser adicionadas ao catalogo fechado sem permitir que a IA execute codigo arbitrario. O seletor do Mestre IA oferece tres modelos NVIDIA Nemotron via API: Nemotron 3.5 Super VL 120B como opcao recomendada, Nemotron 3.5 Lightning 30B A3B para respostas rapidas e Nemotron 3 Ultra 550B A55B para raciocinio avancado. Kimi K3.1 Pro nao aparece entre as opcoes porque o NVIDIA Build ainda o publica apenas para uso no Playground, sem acesso programatico. Falhas transitorias do provedor acionam novas tentativas automaticas e transparentes, limitadas para evitar esperas indefinidas. O Mestre IA usa `NVIDIA_NIM_API_KEY` no servidor e aceita `NVIDIA_NIM_TEACHER_MODEL_PRIMARY` para escolher seu modelo inicial sem alterar o modelo do gerador de malhas. A chave nunca e enviada ao navegador.
+
+Para validar os schemas e a persistencia da camada educacional, execute `npm run test:learning`.
 
 ---
 
@@ -203,6 +224,7 @@ O produto deixou de ser somente um editor de cena/modelagem 3D e passou a ter um
 
 - Navegacao principal por modos:
   - `Cena`: mantem o editor 3D existente, sem recriar ou remover funcionalidades.
+  - `Aprender`: integra o Mestre IA, plano de aula, avaliacao formativa e demonstracoes educacionais autorizadas.
   - `Pagina`: monta uma pagina visual usando elementos web e a cena 3D atual, com drag-and-drop e reparenting.
   - `Dados`: inicia o System Builder com modelo de dados visual para colecoes, campos, validacoes e queries.
   - `Interacoes`: conecta elementos HTML da pagina com objetos/luzes/camera da cena.
@@ -668,6 +690,7 @@ O botao Desktop na toolbar dispara o download pela rota `/api/download/desktop`.
 | `npm run build` | Gera a build de producao |
 | `npm run start` | Serve a build de producao |
 | `npm run lint` | Executa o ESLint |
+| `npm run test:learning` | Executa testes de schema e persistencia educacional |
 | `npm run icons` | Gera icones do app |
 | `npm run electron` | Abre o app no Electron (requer build) |
 | `npm run electron:dev` | Next dev na porta 3456 para Electron |
@@ -689,6 +712,7 @@ src/
     globals.css
     api/
       ai/generate/route.ts
+      ai/teacher/route.ts
       assets/polyhaven/
       assets/proxy/
       download/desktop/route.ts
@@ -707,6 +731,7 @@ src/
       ExperienceProperties.tsx
       ExperienceSceneCanvas.tsx
       ExperienceToolbar.tsx
+      LearningWorkspace.tsx
       ExportWorkspace.tsx
       index.tsx
       InteractionsWorkspace.tsx
@@ -752,6 +777,9 @@ src/
       persistence.ts
       projectHistory.ts
       useProjectAutosave.ts
+    learning/
+      subjects.ts
+      types.ts
     scene-engine/
     scriptEngine.tsx
     template-engine/
@@ -760,6 +788,7 @@ src/
     contextMenuStore.ts
     editorStore.ts
     experienceStore.ts
+    learningStore.ts
     historyStore.ts
     initialScene.ts
     materialStore.ts
@@ -862,6 +891,15 @@ src/
 9. Teste no `Modo Preview`.
 10. Ajuste responsividade e performance.
 11. Gere os arquivos no `Modo Exportar`.
+
+### Fluxo de Aprendizagem
+
+1. Abra `Aprender` na barra de modos.
+2. Digite um tema ou escolha uma sugestao e o nivel desejado.
+3. Acompanhe a explicacao e as etapas do plano de aula.
+4. Marque etapas, converse com o professor e responda as perguntas para receber feedback.
+5. Quando houver uma demonstracao, confira a previa e confirme para criar os objetos ou iniciar o experimento na cena.
+6. Pause e retome a sessao quando quiser; o progresso educacional e salvo junto ao projeto.
 
 ---
 
@@ -1199,6 +1237,7 @@ Crie o arquivo `.env` (ou use `.env.local`) com:
 NVIDIA_NIM_API_KEY=your_nvidia_nim_api_key
 NVIDIA_NIM_MODEL_PRIMARY=nvidia/llama-3.1-nemotron-70b-instruct
 NVIDIA_NIM_MODEL_FALLBACK=meta/llama-3.1-8b-instruct
+NVIDIA_NIM_TEACHER_MODEL_PRIMARY=nvidia/nemotron-3.5-super-vl-120b-a12b
 NVIDIA_NIM_BASE_URL=https://integrate.api.nvidia.com/v1
 ```
 
@@ -1345,7 +1384,9 @@ Confira se existe algum objeto na cena e tente novamente em um navegador moderno
 - [x] Booleanos entre malhas
 - [x] Modelagem poligonal: Draw Polygon, Knife, Edge Loop/Ring, Bridge, Fill, Inset
 - [x] Sculpt com fallback de pressao para mouse
-- [x] Navegacao por modos: Cena, Pagina, Interacoes, Preview e Exportar
+- [x] Navegacao por modos: Cena, Aprender, Pagina, Interacoes, Preview e Exportar
+- [x] Modo Aprender inicial: Mestre IA NVIDIA NIM, plano de aula, conversa, avaliacao formativa e persistencia de sessao
+- [x] Acoes educacionais autorizadas para demonstracoes de geometria e gravidade com confirmacao do estudante
 - [x] Primeira versao do Page Builder
 - [x] Arvore de projeto hibrida Page + Scene
 - [x] Interaction Engine inicial

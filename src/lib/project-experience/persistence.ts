@@ -19,6 +19,7 @@ import type {
 } from '@/lib/page-builder/types';
 import type { SceneDocument } from '@/lib/scene-engine/types';
 import { createExperienceSnapshot } from '@/lib/export-engine/exportExperience';
+import { normalizeLearningProject, type LearningProjectState } from '@/lib/learning/types';
 
 export const PROJECT_EXPERIENCE_SCHEMA_VERSION = 1;
 export const PROJECT_EXPERIENCE_EDITOR_VERSION = 'brain-app-web3d-builder';
@@ -191,6 +192,7 @@ export const createProjectExperienceFile = ({
   components,
   dataSchema,
   variables,
+  learning,
 }: {
   page: PageDocument;
   pages?: PageDocument[];
@@ -203,6 +205,7 @@ export const createProjectExperienceFile = ({
   components?: ComponentDefinition[];
   dataSchema?: DataSchema;
   variables?: VariableDocument;
+  learning?: LearningProjectState;
 }): ProjectExperienceFile => {
   const snapshot = createExperienceSnapshot({ page, pages, activePageId, scene, interactions, settings, dataSchema, variables });
   const normalizedSeo = normalizeSeo(seo ?? {}, snapshot.name);
@@ -219,6 +222,7 @@ export const createProjectExperienceFile = ({
     components,
     dataSchema,
     variables,
+    learning: learning ? normalizeLearningProject(learning) : undefined,
   };
 };
 
@@ -278,6 +282,7 @@ export const parseProjectExperienceFile = (content: string): ProjectExperienceFi
     components: Array.isArray(parsed.components) ? (parsed.components as ComponentDefinition[]) : undefined,
     dataSchema: isRecord(parsed.dataSchema) ? (parsed.dataSchema as DataSchema) : undefined,
     variables: isRecord(parsed.variables) ? (parsed.variables as VariableDocument) : undefined,
+    learning: normalizeLearningProject(parsed.learning),
   };
 };
 

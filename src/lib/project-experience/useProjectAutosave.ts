@@ -10,6 +10,7 @@ import { useMaterialStore } from '@/store/materialStore';
 import { useSceneStore } from '@/store/sceneStore';
 import { useTimelineStore } from '@/store/timelineStore';
 import { useVariableStore } from '@/store/variableStore';
+import { useLearningStore } from '@/store/learningStore';
 
 const AUTOSAVE_DEBOUNCE_MS = 4000;
 
@@ -37,6 +38,7 @@ export function useProjectAutosave() {
         components: experience.components,
         dataSchema: useDataModelStore.getState().schema,
         variables: useVariableStore.getState().document,
+        learning: useLearningStore.getState().project,
       });
       const serialized = JSON.stringify(project);
       if (serialized === lastSerializedRef.current) return;
@@ -56,6 +58,7 @@ export function useProjectAutosave() {
       useExperienceStore.subscribe(schedule),
       useDataModelStore.subscribe(schedule),
       useVariableStore.subscribe(schedule),
+      useLearningStore.subscribe(schedule),
     ];
 
     return () => {

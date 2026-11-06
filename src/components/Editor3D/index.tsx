@@ -13,6 +13,7 @@ import ExperienceToolbar from './ExperienceToolbar';
 import ExportWorkspace from './ExportWorkspace';
 import ImageTo3DModal from './ImageTo3D/ImageTo3DModal';
 import InteractionsWorkspace from './InteractionsWorkspace';
+import LearningWorkspace from './LearningWorkspace';
 import PageBuilderWorkspace from './PageBuilderWorkspace';
 import PreviewWorkspace from './PreviewWorkspace';
 import Properties from './Properties';
@@ -306,6 +307,10 @@ export default function Editor3D() {
             </div>
           )}
         </section>
+      ) : activeMode === 'learning' ? (
+        <section className="relative min-h-0 flex-1 overflow-hidden">
+          <LearningWorkspace />
+        </section>
       ) : (
         <section className="relative min-h-0 flex-1 overflow-hidden">
           {activeMode === 'data' ? (
@@ -349,7 +354,7 @@ export default function Editor3D() {
         </section>
       )}
 
-      <MobileTabBar />
+      {activeMode !== 'learning' && <MobileTabBar />}
       <AutoTourLauncher onLaunch={(scope) => {
         setTutorialScope(scope);
         setTutorialOpen(true);

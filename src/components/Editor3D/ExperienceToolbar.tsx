@@ -43,6 +43,7 @@ import { useMaterialStore } from '@/store/materialStore';
 import { useSceneStore } from '@/store/sceneStore';
 import { useTimelineStore } from '@/store/timelineStore';
 import { useVariableStore } from '@/store/variableStore';
+import { useLearningStore } from '@/store/learningStore';
 import PageDocumentDiff from './PageDocumentDiff';
 import TemplateGallery from './TemplateGallery';
 import BlockLibrary from './BlockLibrary';
@@ -172,6 +173,7 @@ export default function ExperienceToolbar({ onOpenTutorial }: ExperienceToolbarP
       components,
       dataSchema,
       variables,
+      learning: useLearningStore.getState().project,
     });
 
     downloadProjectExperienceFile(project);
@@ -201,6 +203,7 @@ export default function ExperienceToolbar({ onOpenTutorial }: ExperienceToolbarP
     useTimelineStore.getState().setKeyframes(project.scene.animations ?? []);
     useDataModelStore.getState().loadSchema(project.dataSchema);
     useVariableStore.getState().loadVariables(project.variables);
+    useLearningStore.getState().loadLearningProject(project.learning);
     useExperienceStore.getState().loadExperience({
       page: project.page,
       pages: project.pages,

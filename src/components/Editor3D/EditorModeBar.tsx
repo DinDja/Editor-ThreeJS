@@ -1,11 +1,12 @@
 'use client';
 
-import { Boxes, Database, Download, Grid3X3, Monitor, MousePointer2 } from 'lucide-react';
+import { Boxes, Database, Download, GraduationCap, Grid3X3, Monitor, MousePointer2 } from 'lucide-react';
 import type { EditorMode } from '@/lib/page-builder/types';
 import { useExperienceStore } from '@/store/experienceStore';
 
 const modes: Array<{ id: EditorMode; label: string; icon: React.ReactNode }> = [
   { id: 'scene', label: 'Cena', icon: <Boxes size={14} /> },
+  { id: 'learning', label: 'Aprender', icon: <GraduationCap size={14} /> },
   { id: 'page', label: 'Página', icon: <Grid3X3 size={14} /> },
   { id: 'data', label: 'Dados', icon: <Database size={14} /> },
   { id: 'interactions', label: 'Interações', icon: <MousePointer2 size={14} /> },

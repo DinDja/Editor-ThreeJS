@@ -3,10 +3,11 @@ import type { PageEffectsConfig } from '@/lib/effects-system/types';
 import type { DataSchema } from '@/lib/data-model/types';
 import type { VariableDocument } from '@/lib/variables/types';
 import type { SceneDocument } from '@/lib/scene-engine/types';
+import type { LearningProjectState } from '@/lib/learning/types';
 
 export type { PageEffect, PageEffectsConfig } from '@/lib/effects-system/types';
 
-export type EditorMode = 'scene' | 'page' | 'data' | 'interactions' | 'preview' | 'export';
+export type EditorMode = 'scene' | 'page' | 'data' | 'interactions' | 'preview' | 'export' | 'learning';
 
 export type PreviewDevice = 'desktop' | 'tablet' | 'mobile';
 
@@ -221,4 +222,5 @@ export type ProjectExperience = {
   components?: ComponentDefinition[];
   dataSchema?: DataSchema;
   variables?: VariableDocument;
+  learning?: LearningProjectState;
 };

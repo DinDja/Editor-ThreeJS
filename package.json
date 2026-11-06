@@ -9,6 +9,7 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
+    "test:learning": "node --experimental-strip-types --test src/lib/learning/types.test.mjs",
     "icons": "node scripts/generate-icons.js",
     "electron:dev": "npx next dev -p 3456",
     "electron:start": "node -e \"const{spawn}=require('child_process');spawn('npx',['next','start','-p','3456'],{stdio:'inherit',shell:true})\"",
