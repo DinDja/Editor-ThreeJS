@@ -1,7 +1,7 @@
 'use client';
 
 import Image from 'next/image';
-import { type FormEvent, useEffect, useRef, useState } from 'react';
+import { type FormEvent, type PointerEvent as ReactPointerEvent, type ReactNode, useEffect, useRef, useState } from 'react';
 import {
   AlertTriangle,
   ArrowRight,
@@ -23,11 +23,16 @@ import {
   Languages,
   Lightbulb,
   LoaderCircle,
+  Maximize2,
   MessageCircle,
+  Minus,
+  Minimize2,
   Network,
   Palette,
   Pause,
   Play,
+  Plus,
+  RotateCcw,
   Search,
   Send,
   X,
@@ -49,8 +54,11 @@ import {
   type LearningProjectState,
   type LearningResource,
   type LearningSessionSummary,
+  type TeacherMindMapNode,
   type TeacherActionSuggestion,
   type TeacherApiResponse,
+  type TeacherLessonPlan,
+  type TeacherLessonUpdate,
   type TeacherQuestion,
   type TeacherRequest,
 } from '@/lib/learning/types';
@@ -358,6 +366,35 @@ const builtInActions = (subjectId: string, topic: string): TeacherActionSuggesti
   return [];
 };
 
+const applyLessonUpdate = (
+  lesson: TeacherLessonPlan,
+  update?: TeacherLessonUpdate,
+  research?: TeacherApiResponse['research'],
+): TeacherLessonPlan => {
+  const additions = update?.addQuestions ?? [];
+  const existingQuestionIds = new Set(lesson.questions.map((question) => question.id));
+  const newQuestions = additions.filter((question) => !existingQuestionIds.has(question.id));
+  const questions = [...lesson.questions, ...newQuestions].slice(0, 12);
+  const currentResources = lesson.resources ?? [];
+  const researchedResources = research?.resources.filter((resource) =>
+    resource.provider.toLocaleLowerCase('pt-BR').includes('youtube') || resource.kind === 'video',
+  ) ?? [];
+  const hasRealVideo = researchedResources.some((resource) => resource.kind === 'video');
+  const resourcesToAdd = hasRealVideo
+    ? researchedResources.filter((resource) => resource.kind !== 'search')
+    : researchedResources;
+  const resources = Array.from(new Map(
+    [...currentResources, ...resourcesToAdd].map((resource) => [resource.url, resource]),
+  ).values()).slice(0, 12);
+  return {
+    ...lesson,
+    ...(update?.explanation ? { explanation: update.explanation } : {}),
+    ...(newQuestions.length > 0 ? { questions } : {}),
+    ...(update?.mindMap ? { mindMap: update.mindMap } : {}),
+    ...(resources.length > 0 ? { resources } : {}),
+  };
+};
+
 const addPrimitive = (
   name: string,
   primitive: PrimitiveKind,
@@ -526,6 +563,324 @@ function LearningResourceCard({ resource }: { resource: LearningResource }) {
   );
 }
 
+const collectMindMapIds = (node: TeacherMindMapNode): string[] => [
+  node.id,
+  ...node.children.flatMap(collectMindMapIds),
+];
+
+const countMindMapNodes = (node: TeacherMindMapNode): number => 1 + node.children.reduce((total, child) => total + countMindMapNodes(child), 0);
+
+const mindMapNodeClasses = [
+  'border-fuchsia-300/50 bg-fuchsia-400/15 text-fuchsia-50 shadow-[0_0_32px_rgba(217,70,239,0.12)]',
+  'border-indigo-300/40 bg-indigo-400/15 text-indigo-50',
+  'border-cyan-300/35 bg-cyan-400/10 text-cyan-50',
+  'border-emerald-300/35 bg-emerald-400/10 text-emerald-50',
+];
+
+const MindMapPill = ({
+  node,
+  depth,
+  expandedIds,
+  onToggle,
+  onSelect,
+  selected,
+  query = '',
+  root = false,
+}: {
+  node: TeacherMindMapNode;
+  depth: number;
+  expandedIds: Set<string>;
+  onToggle: (id: string) => void;
+  onSelect: (node: TeacherMindMapNode) => void;
+  selected: boolean;
+  query?: string;
+  root?: boolean;
+}) => {
+  const hasChildren = node.children.length > 0;
+  const expanded = expandedIds.has(node.id);
+  const tone = mindMapNodeClasses[Math.min(depth, mindMapNodeClasses.length - 1)];
+  const matchesQuery = query.length > 0
+    && `${node.label} ${node.summary}`.toLocaleLowerCase('pt-BR').includes(query);
+  return (
+    <button
+      type="button"
+      title={node.summary}
+      onClick={() => {
+        onSelect(node);
+        if (hasChildren) onToggle(node.id);
+      }}
+      aria-expanded={hasChildren ? expanded : undefined}
+      className={`group flex max-w-[220px] items-center gap-2 rounded-lg border ${tone} ${root ? 'px-3.5 py-2.5 text-sm' : 'px-2.5 py-1.5 text-[10px]'} font-semibold leading-4 transition hover:-translate-y-0.5 hover:border-white/70 ${selected ? 'ring-2 ring-white/80 ring-offset-2 ring-offset-[#0e1119]' : ''} ${matchesQuery ? 'border-lime-200 bg-lime-300/20 text-lime-50' : ''} ${hasChildren ? 'cursor-pointer' : 'cursor-default'}`}
+    >
+      <span className="size-1.5 shrink-0 rounded-full bg-current opacity-80" aria-hidden="true" />
+      <span className="min-w-0 truncate text-left">{node.label}</span>
+      {hasChildren && <ChevronDown size={root ? 14 : 11} className={`ml-auto shrink-0 opacity-60 transition-transform ${expanded ? '' : '-rotate-90'}`} />}
+    </button>
+  );
+};
+
+const MindMapLeaf = ({
+  node,
+  depth,
+  expandedIds,
+  onToggle,
+  onSelect,
+  selectedNodeId,
+  query,
+}: {
+  node: TeacherMindMapNode;
+  depth: number;
+  expandedIds: Set<string>;
+  onToggle: (id: string) => void;
+  onSelect: (node: TeacherMindMapNode) => void;
+  selectedNodeId: string | null;
+  query: string;
+}) => (
+  <div className="relative pl-5">
+    <span className="absolute left-0 top-1/2 h-px w-5 bg-neutral-700" aria-hidden="true" />
+    <MindMapPill node={node} depth={depth} expandedIds={expandedIds} onToggle={onToggle} onSelect={onSelect} selected={selectedNodeId === node.id} query={query} />
+    {node.children.length > 0 && expandedIds.has(node.id) && (
+      <div className="relative ml-3 mt-2 space-y-2 border-l border-neutral-800 pl-3 animate-[mindmap-children-in_220ms_ease-out]">
+        {node.children.map((child) => <MindMapLeaf key={child.id} node={child} depth={depth + 1} expandedIds={expandedIds} onToggle={onToggle} onSelect={onSelect} selectedNodeId={selectedNodeId} query={query} />)}
+      </div>
+    )}
+  </div>
+);
+
+const MindMapCanvas = ({
+  root,
+  expandedIds,
+  onToggle,
+  onSelect,
+  selectedNodeId,
+  query,
+  zoom,
+  fullScreen = false,
+}: {
+  root: TeacherMindMapNode;
+  expandedIds: Set<string>;
+  onToggle: (id: string) => void;
+  onSelect: (node: TeacherMindMapNode) => void;
+  selectedNodeId: string | null;
+  query: string;
+  zoom: number;
+  fullScreen?: boolean;
+}) => {
+  const rootExpanded = expandedIds.has(root.id);
+  return (
+    <div className={`min-w-[980px] ${fullScreen ? 'min-h-[560px]' : 'min-h-[360px]'}`} style={{ transform: `scale(${zoom})`, transformOrigin: 'top left', width: `${100 / zoom}%` }}>
+      <div className="relative flex min-h-[inherit] items-center gap-14 px-8 py-10">
+        <div className="relative w-[220px] shrink-0">
+          <MindMapPill node={root} depth={0} expandedIds={expandedIds} onToggle={onToggle} onSelect={onSelect} selected={selectedNodeId === root.id} query={query} root />
+          <p className="mt-3 max-w-[210px] text-[11px] leading-4 text-neutral-500">{root.summary}</p>
+          {rootExpanded && root.children.length > 0 && <span className="absolute -right-7 top-5 h-px w-7 bg-neutral-700" aria-hidden="true" />}
+        </div>
+        {rootExpanded && root.children.length > 0 && (
+          <div className="relative flex flex-col gap-4 py-5">
+            <span className="absolute -left-7 top-8 bottom-8 border-l border-neutral-700" aria-hidden="true" />
+            {root.children.map((branch) => (
+              <div key={branch.id} className="relative flex items-start gap-8">
+                <span className="absolute -left-7 top-5 h-px w-7 bg-neutral-700" aria-hidden="true" />
+                <div className="relative w-[180px] shrink-0">
+                  <MindMapPill node={branch} depth={1} expandedIds={expandedIds} onToggle={onToggle} onSelect={onSelect} selected={selectedNodeId === branch.id} query={query} />
+                  <p className="mt-2 line-clamp-2 text-[10px] leading-4 text-neutral-600">{branch.summary}</p>
+                  {branch.children.length > 0 && <span className={`absolute -right-8 top-5 h-px w-8 bg-neutral-700 transition-opacity duration-200 ${expandedIds.has(branch.id) ? 'opacity-100' : 'opacity-0'}`} aria-hidden="true" />}
+                </div>
+                {branch.children.length > 0 && (
+                  <div className={`relative flex flex-col gap-2 overflow-hidden border-l border-neutral-800 pl-5 transition-[max-width,opacity,padding] duration-300 ease-out ${expandedIds.has(branch.id) ? 'max-w-[560px] opacity-100' : 'max-w-0 border-transparent pl-0 opacity-0 pointer-events-none'}`}>
+                    {branch.children.map((child) => <MindMapLeaf key={child.id} node={child} depth={2} expandedIds={expandedIds} onToggle={onToggle} onSelect={onSelect} selectedNodeId={selectedNodeId} query={query} />)}
+                  </div>
+                )}
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+};
+
+function MindMapViewport({ children, fullScreen = false }: { children: ReactNode; fullScreen?: boolean }) {
+  const viewportRef = useRef<HTMLDivElement | null>(null);
+  const dragRef = useRef<{ x: number; y: number; left: number; top: number } | null>(null);
+
+  const handlePointerDown = (event: ReactPointerEvent<HTMLDivElement>) => {
+    if (event.button !== 0 || (event.target instanceof HTMLElement && event.target.closest('button'))) return;
+    const viewport = viewportRef.current;
+    if (!viewport) return;
+    dragRef.current = { x: event.clientX, y: event.clientY, left: viewport.scrollLeft, top: viewport.scrollTop };
+    viewport.setPointerCapture(event.pointerId);
+  };
+
+  const handlePointerMove = (event: ReactPointerEvent<HTMLDivElement>) => {
+    const drag = dragRef.current;
+    const viewport = viewportRef.current;
+    if (!drag || !viewport) return;
+    viewport.scrollLeft = drag.left - (event.clientX - drag.x);
+    viewport.scrollTop = drag.top - (event.clientY - drag.y);
+  };
+
+  const stopDragging = (event: ReactPointerEvent<HTMLDivElement>) => {
+    dragRef.current = null;
+    if (viewportRef.current?.hasPointerCapture(event.pointerId)) viewportRef.current.releasePointerCapture(event.pointerId);
+  };
+
+  return (
+    <div
+      ref={viewportRef}
+      onPointerDown={handlePointerDown}
+      onPointerMove={handlePointerMove}
+      onPointerUp={stopDragging}
+      onPointerCancel={stopDragging}
+      className={`overflow-auto touch-none ${fullScreen ? 'h-full cursor-grab active:cursor-grabbing' : 'rounded-2xl cursor-grab active:cursor-grabbing'}`}
+    >
+      {children}
+    </div>
+  );
+}
+
+function MindMapControls({
+  query,
+  onQueryChange,
+  zoom,
+  onZoomChange,
+  onExpand,
+  onCollapse,
+}: {
+  query: string;
+  onQueryChange: (value: string) => void;
+  zoom: number;
+  onZoomChange: (value: number) => void;
+  onExpand: () => void;
+  onCollapse: () => void;
+}) {
+  return (
+    <div className="flex flex-wrap items-center justify-end gap-2">
+      <label className="relative flex min-w-40 items-center">
+        <Search size={12} className="pointer-events-none absolute left-2.5 text-neutral-500" />
+        <input value={query} onChange={(event) => onQueryChange(event.target.value)} placeholder="Buscar conceito" aria-label="Buscar conceito no mapa mental" className="h-8 w-full rounded-lg border border-neutral-700 bg-black/20 pl-7 pr-2 text-[10px] text-neutral-200 outline-none placeholder:text-neutral-600 focus:border-fuchsia-400/60" />
+      </label>
+      <div className="flex items-center rounded-lg border border-neutral-700 bg-black/20">
+        <button type="button" onClick={() => onZoomChange(Math.max(0.65, Number((zoom - 0.1).toFixed(2))))} aria-label="Reduzir zoom" className="flex size-8 items-center justify-center text-neutral-400 transition hover:text-fuchsia-100"><Minus size={13} /></button>
+        <span className="min-w-10 text-center text-[10px] font-semibold text-neutral-400">{Math.round(zoom * 100)}%</span>
+        <button type="button" onClick={() => onZoomChange(Math.min(1.6, Number((zoom + 0.1).toFixed(2))))} aria-label="Aumentar zoom" className="flex size-8 items-center justify-center text-neutral-400 transition hover:text-fuchsia-100"><Plus size={13} /></button>
+      </div>
+      <button type="button" onClick={() => onZoomChange(1)} aria-label="Restaurar zoom" className="flex size-8 items-center justify-center rounded-lg border border-neutral-700 bg-black/20 text-neutral-400 transition hover:text-fuchsia-100"><RotateCcw size={12} /></button>
+      <button type="button" onClick={onExpand} className="rounded-lg border border-neutral-700 px-2.5 py-1.5 text-[10px] font-semibold text-neutral-300 transition hover:border-fuchsia-500/50 hover:text-fuchsia-100">Expandir</button>
+      <button type="button" onClick={onCollapse} className="rounded-lg border border-neutral-700 px-2.5 py-1.5 text-[10px] font-semibold text-neutral-300 transition hover:border-fuchsia-500/50 hover:text-fuchsia-100">Recolher</button>
+    </div>
+  );
+}
+
+function LessonMindMap({ root }: { root: TeacherMindMapNode }) {
+  const allIds = collectMindMapIds(root);
+  const [expandedIds, setExpandedIds] = useState<Set<string>>(() => new Set(allIds));
+  const [isFullScreen, setIsFullScreen] = useState(false);
+  const [query, setQuery] = useState('');
+  const [zoom, setZoom] = useState(1);
+  const [selectedNode, setSelectedNode] = useState<TeacherMindMapNode | null>(null);
+  const normalizedQuery = query.trim().toLocaleLowerCase('pt-BR');
+
+  useEffect(() => {
+    if (!isFullScreen) return undefined;
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    const closeWithEscape = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') setIsFullScreen(false);
+    };
+    const syncNativeFullScreen = () => {
+      if (!document.fullscreenElement) setIsFullScreen(false);
+    };
+    window.addEventListener('keydown', closeWithEscape);
+    document.addEventListener('fullscreenchange', syncNativeFullScreen);
+    return () => {
+      document.body.style.overflow = previousOverflow;
+      window.removeEventListener('keydown', closeWithEscape);
+      document.removeEventListener('fullscreenchange', syncNativeFullScreen);
+    };
+  }, [isFullScreen]);
+
+  const toggle = (id: string) => {
+    setExpandedIds((current) => {
+      const next = new Set(current);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
+
+  const openFullScreen = () => {
+    setIsFullScreen(true);
+    if (document.documentElement.requestFullscreen) {
+      void document.documentElement.requestFullscreen().catch(() => undefined);
+    }
+  };
+
+  const closeFullScreen = () => {
+    setIsFullScreen(false);
+    if (document.fullscreenElement) void document.exitFullscreen().catch(() => undefined);
+  };
+
+  return (
+    <>
+      <section className="overflow-hidden rounded-2xl border border-fuchsia-900/40 bg-gradient-to-br from-[#20152c] via-[#15151f] to-[#111418] p-4 sm:p-5">
+      <div className="mb-4 flex flex-wrap items-start justify-between gap-3">
+        <div>
+          <h3 className="flex items-center gap-2 text-sm font-semibold text-fuchsia-100"><Network size={15} className="text-fuchsia-300" /> Mapa mental da aula</h3>
+          <p className="mt-1 max-w-xl text-[11px] leading-4 text-neutral-500">Uma visão conectada dos conceitos, relações e aplicações. Clique nos nós para explorar.</p>
+        </div>
+        <div className="flex flex-wrap items-center justify-end gap-2">
+          <span className="rounded-full border border-fuchsia-900/50 bg-fuchsia-950/30 px-2 py-1 text-[10px] text-fuchsia-200">{countMindMapNodes(root)} conceitos</span>
+          <MindMapControls query={query} onQueryChange={setQuery} zoom={zoom} onZoomChange={setZoom} onExpand={() => setExpandedIds(new Set(allIds))} onCollapse={() => setExpandedIds(new Set([root.id]))} />
+          <button type="button" onClick={openFullScreen} aria-label="Abrir mapa mental em tela cheia" className="flex items-center gap-1.5 rounded-lg border border-fuchsia-400/30 bg-fuchsia-400/10 px-2.5 py-1.5 text-[10px] font-semibold text-fuchsia-100 transition hover:bg-fuchsia-400/20"><Maximize2 size={12} /> Tela cheia</button>
+        </div>
+      </div>
+      <div className="overflow-x-auto rounded-2xl border border-white/5 bg-black/20">
+        <MindMapViewport>
+          <MindMapCanvas root={root} expandedIds={expandedIds} onToggle={toggle} onSelect={setSelectedNode} selectedNodeId={selectedNode?.id ?? null} query={normalizedQuery} zoom={zoom} />
+        </MindMapViewport>
+      </div>
+      {selectedNode && (
+        <div className="mt-3 flex items-start gap-3 rounded-xl border border-fuchsia-400/20 bg-fuchsia-400/5 px-3 py-2.5">
+          <span className="mt-1 size-2 shrink-0 rounded-full bg-fuchsia-300" aria-hidden="true" />
+          <div className="min-w-0 flex-1">
+            <p className="text-[9px] font-semibold uppercase tracking-[0.14em] text-fuchsia-300/80">Conceito selecionado</p>
+            <p className="mt-0.5 text-xs font-semibold text-fuchsia-50">{selectedNode.label}</p>
+            <p className="mt-1 text-[11px] leading-4 text-neutral-400">{selectedNode.summary}</p>
+          </div>
+          <button type="button" onClick={() => setSelectedNode(null)} aria-label="Limpar conceito selecionado" className="shrink-0 rounded-md p-1 text-neutral-500 transition hover:bg-white/10 hover:text-white"><X size={13} /></button>
+        </div>
+      )}
+      </section>
+      {isFullScreen && (
+        <div role="dialog" aria-modal="true" aria-label="Mapa mental em tela cheia" className="fixed inset-0 z-[220] flex flex-col bg-[#080a10] text-white">
+          <div className="flex shrink-0 items-center justify-between gap-4 border-b border-white/10 bg-[#0e1119] px-4 py-3 sm:px-6">
+            <div className="flex min-w-0 items-center gap-3">
+              <span className="flex size-8 items-center justify-center rounded-lg bg-fuchsia-400/15 text-fuchsia-200"><Network size={16} /></span>
+              <div className="min-w-0">
+                <p className="truncate text-sm font-semibold text-white">{root.label}</p>
+                <p className="text-[10px] uppercase tracking-[0.14em] text-neutral-500">Mapa mental da aula · {countMindMapNodes(root)} conceitos</p>
+              </div>
+            </div>
+            <div className="flex flex-wrap items-center justify-end gap-2">
+              <MindMapControls query={query} onQueryChange={setQuery} zoom={zoom} onZoomChange={setZoom} onExpand={() => setExpandedIds(new Set(allIds))} onCollapse={() => setExpandedIds(new Set([root.id]))} />
+              <button type="button" onClick={closeFullScreen} className="flex shrink-0 items-center gap-2 rounded-lg border border-neutral-700 bg-neutral-900 px-3 py-2 text-xs font-semibold text-neutral-200 transition hover:border-fuchsia-400/50 hover:text-fuchsia-100"><Minimize2 size={14} /> Sair da tela cheia</button>
+            </div>
+          </div>
+          {selectedNode && <div className="mx-4 mt-4 rounded-xl border border-fuchsia-400/20 bg-fuchsia-400/5 px-3 py-2 text-[11px] text-neutral-300 sm:mx-8"><strong className="text-fuchsia-100">{selectedNode.label}:</strong> {selectedNode.summary}</div>}
+          <div className="min-h-0 flex-1 overflow-auto p-4 sm:p-8">
+            <div className="mx-auto max-w-[1500px] rounded-2xl border border-white/10 bg-[#0e1119] shadow-2xl shadow-black/40">
+              <MindMapViewport fullScreen>
+                <MindMapCanvas root={root} expandedIds={expandedIds} onToggle={toggle} onSelect={setSelectedNode} selectedNodeId={selectedNode?.id ?? null} query={normalizedQuery} zoom={zoom} fullScreen />
+              </MindMapViewport>
+            </div>
+          </div>
+        </div>
+      )}
+    </>
+  );
+}
+
 function LessonDetails({
   onAskAssessment,
   busyQuestionId,
@@ -631,6 +986,8 @@ function LessonDetails({
           <LearningRichText className="text-sm leading-7 text-neutral-200">{lesson.explanation}</LearningRichText>
         </div>
       </section>
+
+      <LessonMindMap key={`${currentSession.id}:${lesson.mindMap.id}`} root={lesson.mindMap} />
 
       {researchResources.length > 0 && (
         <section className="rounded-2xl border border-violet-900/40 bg-gradient-to-br from-violet-950/20 to-[#15181b] p-4 sm:p-5">
@@ -1180,8 +1537,18 @@ export default function LearningWorkspace() {
         messages: teacherHistory(),
         prompt: trimmedPrompt,
         progress: learningProgress(current),
+        lessonContext: current.lesson ? {
+          ...current.lesson,
+          explanation: current.lesson.explanation.slice(0, 7000),
+          steps: current.lesson.steps.slice(0, 8),
+          questions: current.lesson.questions.slice(0, 12),
+          resources: current.lesson.resources?.slice(0, 12),
+        } : undefined,
         scene: getSceneContext(),
       }, controller.signal);
+      if (current.lesson && (response.lessonUpdate || response.research)) {
+        setLesson(applyLessonUpdate(current.lesson, response.lessonUpdate, response.research));
+      }
       addMessage({ role: 'teacher', content: response.reply, modelInfo: response.modelInfo });
       addActions(response.actions ?? []);
     } catch (requestError) {

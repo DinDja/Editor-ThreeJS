@@ -41,6 +41,8 @@ test('teacher response keeps only registered editor actions', () => {
   assert.equal(response.lesson?.actions.length, 1);
   assert.equal(response.lesson?.actions[0].type, 'geometry_demo');
   assert.match(response.lesson?.explanation ?? '', /três dimensões/);
+  assert.equal(response.lesson?.mindMap.label, 'Geometria espacial');
+  assert.ok((response.lesson?.mindMap.children.length ?? 0) > 0);
 });
 
 test('teacher response limits lesson content and rejects empty replies', () => {
@@ -78,6 +80,25 @@ test('teacher response keeps model and failover telemetry', () => {
   assert.equal(response.modelInfo?.respondedModelName, 'GLM-4.7-Flash');
   assert.equal(response.modelInfo?.didFailover, true);
   assert.equal(response.modelInfo?.failedAttempts[0].reasonCode, 'provider_timeout');
+});
+
+test('teacher response normalizes lesson updates for the right panel', () => {
+  const response = normalizeTeacherResponse({
+    reply: 'Atualizei a aula.',
+    lessonUpdate: {
+      explanation: 'Uma explicação ampliada com mais contexto, exemplos e relações entre os conceitos para apoiar o estudo.',
+      addQuestions: [{ id: 'new-question', prompt: 'Como você explicaria essa relação?', learningObjective: 'Conectar ideias.' }],
+      mindMap: {
+        id: 'mind-map-root',
+        label: 'Tema central',
+        summary: 'Visão geral.',
+        children: [{ id: 'branch-1', label: 'Ramo novo', summary: 'Detalhe.', children: [] }],
+      },
+    },
+  });
+
+  assert.equal(response.lessonUpdate?.addQuestions.length, 1);
+  assert.equal(response.lessonUpdate?.mindMap?.children[0].label, 'Ramo novo');
 });
 
 test('teacher lesson keeps safe researched resources for the lesson cards', () => {

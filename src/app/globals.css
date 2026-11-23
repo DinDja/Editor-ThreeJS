@@ -306,6 +306,11 @@ input:disabled {
   to { opacity: 1; transform: translateY(0); }
 }
 
+@keyframes mindmap-children-in {
+  from { opacity: 0; transform: translateX(-8px); }
+  to { opacity: 1; transform: translateX(0); }
+}
+
 /* Responsive: two columns on desktop */
 @media (min-width: 768px) {
   .subject-tree-branches {

@@ -75,6 +75,13 @@ export type TeacherActivity = {
   questionIds: string[];
 };
 
+export type TeacherMindMapNode = {
+  id: string;
+  label: string;
+  summary: string;
+  children: TeacherMindMapNode[];
+};
+
 export type TeacherLessonPlan = {
   title: string;
   subjectId: string;
@@ -89,7 +96,14 @@ export type TeacherLessonPlan = {
   activities: TeacherActivity[];
   questions: TeacherQuestion[];
   actions: TeacherActionSuggestion[];
+  mindMap: TeacherMindMapNode;
   resources?: LearningResource[];
+};
+
+export type TeacherLessonUpdate = {
+  explanation?: string;
+  addQuestions?: TeacherQuestion[];
+  mindMap?: TeacherMindMapNode;
 };
 
 export type TeacherAssessment = {
@@ -123,6 +137,7 @@ export type TeacherApiResponse = {
   assessment?: TeacherAssessment;
   modelInfo?: TeacherModelInfo;
   research?: LearningResearch;
+  lessonUpdate?: TeacherLessonUpdate;
 };
 
 export type LearningMessage = {
@@ -182,6 +197,7 @@ export type TeacherRequest = {
     completedQuestions: number;
     appliedDemonstrations: number;
   };
+  lessonContext?: Partial<TeacherLessonPlan>;
   scene?: Array<{
     name: string;
     kind: string;
@@ -244,6 +260,114 @@ export const normalizeLearningResearch = (value: unknown): LearningResearch | un
     searchedAt: cleanText(value.searchedAt, new Date().toISOString(), 40),
     providers: cleanList(value.providers, 8, 80),
     resources,
+  };
+};
+
+type MindMapNormalizationState = {
+  count: number;
+  ids: Set<string>;
+};
+
+const normalizeMindMapNode = (
+  value: unknown,
+  fallbackId: string,
+  depth: number,
+  state: MindMapNormalizationState,
+): TeacherMindMapNode | undefined => {
+  if (!isRecord(value) || depth > 3 || state.count >= 32) return undefined;
+  const label = cleanText(value.label ?? value.title, '', 140);
+  if (!label) return undefined;
+
+  const requestedId = cleanText(value.id, fallbackId, 80) || fallbackId;
+  let id = requestedId;
+  let suffix = 2;
+  while (state.ids.has(id)) id = `${requestedId}-${suffix++}`;
+  state.ids.add(id);
+  state.count += 1;
+
+  const children = Array.isArray(value.children)
+    ? value.children.slice(0, 6).flatMap((child, index) => {
+        const normalized = normalizeMindMapNode(child, `${id}-${index + 1}`, depth + 1, state);
+        return normalized ? [normalized] : [];
+      })
+    : [];
+  return {
+    id,
+    label,
+    summary: cleanText(value.summary ?? value.description, 'Conecte esta ideia ao tema central.', 320),
+    children,
+  };
+};
+
+const createFallbackMindMap = (
+  topic: string,
+  objective: string,
+  objectives: string[],
+  prerequisites: string[],
+  steps: TeacherLessonStep[],
+): TeacherMindMapNode => ({
+  id: 'mind-map-root',
+  label: topic || 'Mapa da aula',
+  summary: objective || 'Visão geral dos conceitos estudados nesta aula.',
+  children: [
+    ...(objectives.length > 0 ? [{
+      id: 'mind-map-ideas',
+      label: 'Ideias-chave',
+      summary: 'Os pontos centrais que organizam a compreensão do tema.',
+      children: objectives.slice(0, 5).map((item, index) => ({
+        id: `mind-map-idea-${index + 1}`,
+        label: item,
+        summary: 'Retome esta ideia usando a explicação principal da aula.',
+        children: [],
+      })),
+    }] : []),
+    ...(steps.length > 0 ? [{
+      id: 'mind-map-path',
+      label: 'Roteiro de aprendizagem',
+      summary: 'A sequência sugerida para transformar o conceito em compreensão e prática.',
+      children: steps.slice(0, 5).map((step) => ({
+        id: `mind-map-${step.id}`,
+        label: step.title,
+        summary: step.content,
+        children: [],
+      })),
+    }] : []),
+    ...(prerequisites.length > 0 ? [{
+      id: 'mind-map-prerequisites',
+      label: 'Pré-requisitos',
+      summary: 'Conhecimentos que ajudam a acompanhar a aula.',
+      children: prerequisites.slice(0, 4).map((item, index) => ({
+        id: `mind-map-prerequisite-${index + 1}`,
+        label: item,
+        summary: 'Se necessário, revise este ponto antes de avançar.',
+        children: [],
+      })),
+    }] : []),
+  ],
+});
+
+export const normalizeTeacherLessonUpdate = (value: unknown): TeacherLessonUpdate | undefined => {
+  if (!isRecord(value)) return undefined;
+  const explanation = cleanText(value.explanation, '', 7000);
+  const addQuestions = Array.isArray(value.addQuestions)
+    ? value.addQuestions.slice(0, 6).flatMap((question, index) => {
+        if (!isRecord(question)) return [];
+        const prompt = cleanText(question.prompt, '', 420);
+        if (!prompt) return [];
+        return [{
+          id: cleanText(question.id, `question-addition-${index + 1}`, 80),
+          prompt,
+          learningObjective: cleanText(question.learningObjective, 'Verificar a compreensão do tema.', 220),
+        }];
+      })
+    : [];
+  const rawMindMap = isRecord(value.mindMap) && isRecord(value.mindMap.root) ? value.mindMap.root : value.mindMap;
+  const mindMap = normalizeMindMapNode(rawMindMap, 'mind-map-root', 0, { count: 0, ids: new Set<string>() });
+  if (!explanation && addQuestions.length === 0 && !mindMap) return undefined;
+  return {
+    ...(explanation ? { explanation } : {}),
+    ...(addQuestions.length > 0 ? { addQuestions } : {}),
+    ...(mindMap ? { mindMap } : {}),
   };
 };
 
@@ -362,20 +486,29 @@ export const normalizeTeacherResponse = (value: unknown): TeacherApiResponse => 
     const level = levels.includes(raw.level as LearningLevel) ? (raw.level as LearningLevel) : 'beginner';
     const explanation = cleanText(raw.explanation, '', 7000) || steps.map((step) => step.content).join('\n\n');
     const resources = normalizeLearningResources(raw.resources);
+    const title = cleanText(raw.title, 'Aula interativa', 120);
+    const topic = cleanText(raw.topic, 'Tema de estudo', 180);
+    const objective = cleanText(raw.objective, 'Compreender o tema por meio de explicação e prática.', 360);
+    const prerequisites = cleanList(raw.prerequisites, 5);
+    const objectives = cleanList(raw.objectives, 6);
+    const rawMindMap = isRecord(raw.mindMap) && isRecord(raw.mindMap.root) ? raw.mindMap.root : raw.mindMap;
+    const mindMap = normalizeMindMapNode(rawMindMap, 'mind-map-root', 0, { count: 0, ids: new Set<string>() })
+      ?? createFallbackMindMap(topic, objective, objectives, prerequisites, steps);
     lesson = {
-      title: cleanText(raw.title, 'Aula interativa', 120),
+      title,
       subjectId: cleanText(raw.subjectId, 'general', 80),
       subjectName: cleanText(raw.subjectName, 'Conhecimentos gerais', 80),
-      topic: cleanText(raw.topic, 'Tema de estudo', 180),
+      topic,
       level,
-      objective: cleanText(raw.objective, 'Compreender o tema por meio de explicação e prática.', 360),
+      objective,
       explanation,
-      prerequisites: cleanList(raw.prerequisites, 5),
-      objectives: cleanList(raw.objectives, 6),
+      prerequisites,
+      objectives,
       steps,
       activities,
       questions,
       actions: normalizeTeacherActions(raw.actions),
+      mindMap,
       ...(resources.length > 0 ? { resources } : {}),
     };
     if (steps.length === 0) throw new Error('O plano de aula veio sem etapas válidas. Tente novamente.');
@@ -397,6 +530,7 @@ export const normalizeTeacherResponse = (value: unknown): TeacherApiResponse => 
 
   const modelInfo = normalizeTeacherModelInfo(value.modelInfo);
   const research = normalizeLearningResearch(value.research);
+  const lessonUpdate = normalizeTeacherLessonUpdate(value.lessonUpdate);
   return {
     reply,
     ...(lesson ? { lesson } : {}),
@@ -404,6 +538,7 @@ export const normalizeTeacherResponse = (value: unknown): TeacherApiResponse => 
     ...(assessment ? { assessment } : {}),
     ...(modelInfo ? { modelInfo } : {}),
     ...(research ? { research } : {}),
+    ...(lessonUpdate ? { lessonUpdate } : {}),
   };
 };
 
