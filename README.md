@@ -189,7 +189,7 @@
 ### IA
 
 - Agente NVIDIA NIM para gerar malhas 3D (vertices + faces) via prompt.
-- Mestre IA no modo `Aprender`: aulas estruturadas, conversa contextual e feedback formativo.
+- Coru no modo `Aprender`: aulas estruturadas, conversa contextual e feedback formativo.
 - Progresso da sessao salvo no autosave e no arquivo `.web3d.json`.
 - Demonstracoes autorizadas de geometria e gravidade que usam os stores reais do editor.
 - Decomposicao automatica em varias partes com hierarquia via parentName.
@@ -201,16 +201,16 @@
 
 ## Aprender
 
-O modo `Aprender` transforma o editor em um ambiente de estudo com o Mestre IA. O estudante pode escolher uma area, um nivel e um tema, ou apenas escrever o que deseja aprender. A resposta inicial apresenta o conteudo da aula em uma explicacao desenvolvida; roteiro, atividade e perguntas sao complementos, nao substitutos da aula.
+O modo `Aprender` transforma o editor em um ambiente de estudo com o Coru. O estudante pode escolher uma area, um nivel e um tema, ou apenas escrever o que deseja aprender. A resposta inicial apresenta o conteudo da aula em uma explicacao desenvolvida; roteiro, atividade e perguntas sao complementos, nao substitutos da aula.
 
-O painel permite conversar sobre a aula, pedir exemplos e enviar respostas para receber feedback e pistas. Pedidos explícitos como "faça o modelo" acionam o gerador de malhas 3D e inserem o resultado na cena; perguntas e pedidos de explicação continuam no chat. Essa geração usa NVIDIA NIM e `NVIDIA_NIM_API_KEY`, independentemente do modelo selecionado para o Mestre IA. Etapas concluidas, respostas corretas, demonstracoes aplicadas e mensagens recentes ficam no projeto educacional e acompanham o autosave, o historico e o arquivo `.web3d.json`.
+O painel permite conversar sobre a aula, pedir exemplos e enviar respostas para receber feedback e pistas. Pedidos explícitos como "faça o modelo" acionam o gerador de malhas 3D e inserem o resultado na cena; perguntas e pedidos de explicação continuam no chat. Essa geração usa NVIDIA NIM e `NVIDIA_NIM_API_KEY`, independentemente do modelo selecionado para o Coru. Etapas concluidas, respostas corretas, demonstracoes aplicadas e mensagens recentes ficam no projeto educacional e acompanham o autosave, o historico e o arquivo `.web3d.json`.
 
 Quando a aula sugere uma demonstracao disponivel, o estudante revisa a previa e confirma antes de alterar a cena. A primeira versao tem duas acoes reais:
 
 - **Geometria:** cria cubo, esfera, cilindro e cone coloridos na cena.
 - **Gravidade:** cria um piso estatico, esfera e cubo dinamicos e inicia a simulacao Rapier com gravidade.
 
-As demais areas podem receber aulas e atividades em texto; novas acoes visuais podem ser adicionadas ao catalogo fechado sem permitir que a IA execute codigo arbitrario. O seletor do Mestre IA oferece os modelos NVIDIA Nemotron 3.5 Super VL 120B, 3.5 Lightning 30B A3B, 3 Ultra 550B A55B e Kimi K3.1 Pro (`moonshotai/kimi-k3.1-pro`), os modelos gratuitos Z.AI GLM-4.7-Flash e GLM-4.5-Flash e os modelos Gemini que a API listar como compatíveis com `generateContent`. A lista Gemini e carregada dinamicamente e nao inclui modelos apenas de embedding; se a chave puder gerar conteúdo mas não puder listar modelos, exibimos um catálogo conhecido e deixamos a própria chamada confirmar a disponibilidade. Cada provedor usa sua propria chave de servidor: `NVIDIA_NIM_API_KEY`, `ZAI_API_KEY` e `GEMINI_API_KEY`. Em falhas, a rota tenta automaticamente outros modelos configurados, sem repetir chamadas identicas. O Mestre IA aceita `NVIDIA_NIM_TEACHER_MODEL_PRIMARY` para escolher seu modelo inicial sem alterar o modelo do gerador de malhas. As chaves nunca sao enviadas ao navegador.
+As demais areas podem receber aulas e atividades em texto; novas acoes visuais podem ser adicionadas ao catalogo fechado sem permitir que a IA execute codigo arbitrario. O seletor do Coru oferece os modelos NVIDIA Nemotron 3.5 Super VL 120B, 3.5 Lightning 30B A3B, 3 Ultra 550B A55B, Kimi K3.1 Pro (`moonshotai/kimi-k3.1-pro`) e os modelos gratuitos Z.AI GLM-4.7-Flash e GLM-4.5-Flash. Gemini nao aparece no seletor, mas pode ser usado como fallback automatico quando configurado no servidor. Cada provedor usa sua propria chave de servidor: `NVIDIA_NIM_API_KEY`, `ZAI_API_KEY` e `GEMINI_API_KEY`. Em falhas, a rota tenta automaticamente outros modelos configurados e a resposta identifica o modelo que falhou e o modelo que respondeu. O Coru aceita `NVIDIA_NIM_TEACHER_MODEL_PRIMARY` para escolher seu modelo inicial sem alterar o modelo do gerador de malhas. As chaves nunca sao enviadas ao navegador.
 
 Para validar os schemas e a persistencia da camada educacional, execute `npm run test:learning`.
 
@@ -224,7 +224,7 @@ O produto deixou de ser somente um editor de cena/modelagem 3D e passou a ter um
 
 - Navegacao principal por modos:
   - `Cena`: mantem o editor 3D existente, sem recriar ou remover funcionalidades.
-  - `Aprender`: integra o Mestre IA, plano de aula, avaliacao formativa e demonstracoes educacionais autorizadas.
+  - `Aprender`: integra o Coru, plano de aula, avaliacao formativa e demonstracoes educacionais autorizadas.
   - `Pagina`: monta uma pagina visual usando elementos web e a cena 3D atual, com drag-and-drop e reparenting.
   - `Dados`: inicia o System Builder com modelo de dados visual para colecoes, campos, validacoes e queries.
   - `Interacoes`: conecta elementos HTML da pagina com objetos/luzes/camera da cena.
@@ -1387,7 +1387,7 @@ Confira se existe algum objeto na cena e tente novamente em um navegador moderno
 - [x] Modelagem poligonal: Draw Polygon, Knife, Edge Loop/Ring, Bridge, Fill, Inset
 - [x] Sculpt com fallback de pressao para mouse
 - [x] Navegacao por modos: Cena, Aprender, Pagina, Interacoes, Preview e Exportar
-- [x] Modo Aprender inicial: Mestre IA NVIDIA NIM, plano de aula, conversa, avaliacao formativa e persistencia de sessao
+- [x] Modo Aprender inicial: Coru com NVIDIA NIM, plano de aula, conversa, avaliacao formativa e persistencia de sessao
 - [x] Acoes educacionais autorizadas para demonstracoes de geometria e gravidade com confirmacao do estudante
 - [x] Primeira versao do Page Builder
 - [x] Arvore de projeto hibrida Page + Scene

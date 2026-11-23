@@ -39,6 +39,29 @@ test('teacher response limits lesson content and rejects empty replies', () => {
   assert.throws(() => normalizeTeacherResponse({ reply: '   ' }), /resposta vazia/i);
 });
 
+test('teacher response keeps model and failover telemetry', () => {
+  const response = normalizeTeacherResponse({
+    reply: 'A resposta veio de uma alternativa segura.',
+    modelInfo: {
+      requestedModelId: 'nvidia/primary',
+      requestedModelName: 'Modelo escolhido',
+      respondedModelId: 'glm-4.7-flash',
+      respondedModelName: 'GLM-4.7-Flash',
+      didFailover: true,
+      failedAttempts: [{
+        modelId: 'nvidia/primary',
+        modelName: 'Modelo escolhido',
+        provider: 'nvidia',
+        reasonCode: 'provider_timeout',
+      }],
+    },
+  });
+
+  assert.equal(response.modelInfo?.respondedModelName, 'GLM-4.7-Flash');
+  assert.equal(response.modelInfo?.didFailover, true);
+  assert.equal(response.modelInfo?.failedAttempts[0].reasonCode, 'provider_timeout');
+});
+
 test('learning project migration keeps valid progress and filters invalid messages', () => {
   const migrated = normalizeLearningProject({
     currentSession: {
@@ -55,7 +78,20 @@ test('learning project migration keeps valid progress and filters invalid messag
       updatedAt: '2026-01-01T00:10:00.000Z',
     },
     messages: [
-      { id: 'good', role: 'student', content: 'A massa não alterou a aceleração.', createdAt: '2026-01-01T00:01:00.000Z' },
+      {
+        id: 'good',
+        role: 'teacher',
+        content: 'A massa não alterou a aceleração.',
+        createdAt: '2026-01-01T00:01:00.000Z',
+        modelInfo: {
+          requestedModelId: 'nvidia/primary',
+          requestedModelName: 'Escolhido',
+          respondedModelId: 'zai/fallback',
+          respondedModelName: 'Fallback',
+          didFailover: true,
+          failedAttempts: [{ modelId: 'nvidia/primary', modelName: 'Escolhido', provider: 'nvidia', reasonCode: 'provider_timeout' }],
+        },
+      },
       { id: 'invalid', role: 'system', content: 'não aceito', createdAt: '2026-01-01T00:02:00.000Z' },
     ],
     history: [],
@@ -65,4 +101,5 @@ test('learning project migration keeps valid progress and filters invalid messag
   assert.deepEqual(migrated.currentSession?.completedQuestionIds, ['question-1']);
   assert.deepEqual(migrated.currentSession?.appliedActionIds, ['gravity']);
   assert.equal(migrated.messages.length, 1);
+  assert.equal(migrated.messages[0].modelInfo?.respondedModelName, 'Fallback');
 });

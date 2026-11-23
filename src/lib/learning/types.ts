@@ -2,7 +2,7 @@ import {
   DEFAULT_TEACHER_MODEL_ID,
   isAvailableTeacherModelId,
   type AvailableTeacherModelId,
-} from './models';
+} from './models.ts';
 
 export type LearningLevel = 'beginner' | 'intermediate' | 'advanced';
 export type LearningSessionStatus = 'active' | 'paused' | 'completed';
@@ -79,11 +79,28 @@ export type TeacherAssessment = {
   revisit: string[];
 };
 
+export type TeacherModelFailure = {
+  modelId: string;
+  modelName: string;
+  provider: string;
+  reasonCode: string;
+};
+
+export type TeacherModelInfo = {
+  requestedModelId: string;
+  requestedModelName: string;
+  respondedModelId: string;
+  respondedModelName: string;
+  didFailover: boolean;
+  failedAttempts: TeacherModelFailure[];
+};
+
 export type TeacherApiResponse = {
   reply: string;
   lesson?: TeacherLessonPlan;
   actions?: TeacherActionSuggestion[];
   assessment?: TeacherAssessment;
+  modelInfo?: TeacherModelInfo;
 };
 
 export type LearningMessage = {
@@ -92,6 +109,7 @@ export type LearningMessage = {
   content: string;
   createdAt: string;
   assessment?: TeacherAssessment;
+  modelInfo?: TeacherModelInfo;
 };
 
 export type LearningSession = {
@@ -118,7 +136,7 @@ export type LearningSessionSummary = {
 };
 
 export type LearningProjectState = {
-  schemaVersion: 1;
+  schemaVersion: 2;
   modelId: AvailableTeacherModelId;
   currentSession: LearningSession | null;
   messages: LearningMessage[];
@@ -191,6 +209,36 @@ export const normalizeTeacherActions = (value: unknown): TeacherActionSuggestion
         description,
       }];
     });
+};
+
+const normalizeTeacherModelInfo = (value: unknown): TeacherModelInfo | undefined => {
+  if (!isRecord(value)) return undefined;
+  const requestedModelId = cleanText(value.requestedModelId, '', 180);
+  const requestedModelName = cleanText(value.requestedModelName, requestedModelId, 180);
+  const respondedModelId = cleanText(value.respondedModelId, '', 180);
+  const respondedModelName = cleanText(value.respondedModelName, respondedModelId, 180);
+  if (!requestedModelId || !respondedModelId) return undefined;
+  const failedAttempts: TeacherModelFailure[] = Array.isArray(value.failedAttempts)
+    ? value.failedAttempts.slice(0, 5).flatMap((attempt) => {
+        if (!isRecord(attempt)) return [];
+        const modelId = cleanText(attempt.modelId, '', 180);
+        if (!modelId) return [];
+        return [{
+          modelId,
+          modelName: cleanText(attempt.modelName, modelId, 180),
+          provider: cleanText(attempt.provider, 'unknown', 40),
+          reasonCode: cleanText(attempt.reasonCode, 'unknown', 80),
+        }];
+      })
+    : [];
+  return {
+    requestedModelId,
+    requestedModelName,
+    respondedModelId,
+    respondedModelName,
+    didFailover: value.didFailover === true || respondedModelId !== requestedModelId,
+    failedAttempts,
+  };
 };
 
 export const normalizeTeacherResponse = (value: unknown): TeacherApiResponse => {
@@ -278,11 +326,13 @@ export const normalizeTeacherResponse = (value: unknown): TeacherApiResponse => 
     };
   }
 
+  const modelInfo = normalizeTeacherModelInfo(value.modelInfo);
   return {
     reply,
     ...(lesson ? { lesson } : {}),
     actions: normalizeTeacherActions(value.actions),
     ...(assessment ? { assessment } : {}),
+    ...(modelInfo ? { modelInfo } : {}),
   };
 };
 
@@ -290,7 +340,7 @@ const normalizeLevel = (value: unknown): LearningLevel =>
   levels.includes(value as LearningLevel) ? (value as LearningLevel) : 'beginner';
 
 export const createInitialLearningProject = (): LearningProjectState => ({
-  schemaVersion: 1,
+  schemaVersion: 2,
   modelId: DEFAULT_TEACHER_MODEL_ID,
   currentSession: null,
   messages: [],
@@ -346,12 +396,14 @@ export const normalizeLearningProject = (value: unknown): LearningProjectState =
             assessment = undefined;
           }
         }
+        const modelInfo = normalizeTeacherModelInfo(message.modelInfo);
         return [{
           id: cleanText(message.id, `message-${index + 1}`, 100),
           role: message.role as LearningMessage['role'],
           content,
           createdAt: cleanText(message.createdAt, new Date().toISOString(), 40),
           ...(assessment ? { assessment } : {}),
+          ...(modelInfo ? { modelInfo } : {}),
         }];
       })
     : [];
@@ -372,7 +424,7 @@ export const normalizeLearningProject = (value: unknown): LearningProjectState =
       })
     : [];
   return {
-    schemaVersion: 1,
+    schemaVersion: 2,
     modelId: isAvailableTeacherModelId(value.modelId) ? value.modelId : DEFAULT_TEACHER_MODEL_ID,
     currentSession,
     messages,

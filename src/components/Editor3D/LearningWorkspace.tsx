@@ -3,6 +3,7 @@
 import Image from 'next/image';
 import { type FormEvent, useEffect, useRef, useState } from 'react';
 import {
+  AlertTriangle,
   ArrowRight,
   Atom,
   BookOpen,
@@ -16,7 +17,6 @@ import {
   Code2,
   Dna,
   FlaskConical,
-  GraduationCap,
   Globe2,
   Landmark,
   Languages,
@@ -33,10 +33,8 @@ import {
 import {
   TEACHER_MODELS,
   type AvailableTeacherModelId,
-  type GeminiTeacherModel,
   type TeacherModelOption,
   type TeacherProvider,
-  isGeminiTeacherModelId,
 } from '@/lib/learning/models';
 import { isExplicit3DModelRequest } from '@/lib/learning/modelIntent';
 import { LEARNING_SUBJECTS, findLearningSubject } from '@/lib/learning/subjects';
@@ -170,8 +168,9 @@ const levelLabels: Record<LearningLevel, string> = {
 
 const quickPrompts = [
   'Explique com um exemplo do cotidiano.',
-  'Dê uma pista para eu continuar pensando.',
-  'Como isso aparece em outra área do conhecimento?',
+  'Dê uma pista sem entregar a resposta.',
+  'Faça um mini quiz sobre isso.',
+  'Como isso aparece em uma cena 3D?',
 ];
 
 const subjectIcons: Record<string, LucideIcon> = {
@@ -194,10 +193,6 @@ type TeacherModelSelectorProps = {
 
 const TeacherModelSelector = ({ modelId, onModelChange }: TeacherModelSelectorProps) => {
   const detailsRef = useRef<HTMLDetailsElement>(null);
-  const [geminiModels, setGeminiModels] = useState<GeminiTeacherModel[]>([]);
-  const [geminiConfigured, setGeminiConfigured] = useState<boolean | null>(null);
-  const [geminiLoading, setGeminiLoading] = useState(true);
-  const [geminiError, setGeminiError] = useState('');
   const models: TeacherModelOption[] = [...TEACHER_MODELS];
   const selectedModel = models.find((model) => model.id === modelId)
     ?? models[0];
@@ -227,51 +222,10 @@ const TeacherModelSelector = ({ modelId, onModelChange }: TeacherModelSelectorPr
     return () => document.removeEventListener('pointerdown', closeOnOutsideClick);
   }, []);
 
-  useEffect(() => {
-    let active = true;
-    fetch('/api/ai/teacher/models')
-      .then(async (response) => {
-        const payload: unknown = await response.json();
-        if (!response.ok) {
-          const message = isRecord(payload) && typeof payload.error === 'string'
-            ? payload.error
-            : 'Não foi possível carregar os modelos Gemini.';
-          throw new Error(message);
-        }
-        if (!isRecord(payload) || !Array.isArray(payload.models)) {
-          throw new Error('A API retornou um catálogo Gemini inválido.');
-        }
-        const loadedModels = payload.models.filter((model): model is GeminiTeacherModel =>
-          isRecord(model)
-          && isGeminiTeacherModelId(model.id)
-          && typeof model.name === 'string'
-          && model.provider === 'gemini'
-          && model.apiAvailable === true,
-        ).filter((model) => /gemini-(?:2\.5-flash(?:-lite)?|flash(?:-lite)?-latest|3(?:\.1)?-flash(?:-lite)?(?:-preview)?)/i.test(model.id));
-        if (!active) return;
-        setGeminiModels(loadedModels);
-        if (loadedModels[0] && !isGeminiTeacherModelId(modelId)) {
-          onModelChange(loadedModels[0].id);
-        }
-        setGeminiConfigured(payload.configured === true);
-        setGeminiError('');
-      })
-      .catch((requestError: unknown) => {
-        if (!active) return;
-        setGeminiError(requestError instanceof Error ? requestError.message : 'Não foi possível carregar os modelos Gemini.');
-      })
-      .finally(() => {
-        if (active) setGeminiLoading(false);
-      });
-    return () => {
-      active = false;
-    };
-  }, []);
-
   return (
     <details ref={detailsRef} className="relative">
       <summary
-        aria-label={`Modelo do Professor IA: ${providerName[selectedModel.provider]} ${selectedModel.name}`}
+        aria-label={`Modelo do Coru: ${providerName[selectedModel.provider]} ${selectedModel.name}`}
         className="flex max-w-64 cursor-pointer list-none items-center gap-2 rounded-lg border border-neutral-800 bg-neutral-950/50 px-2.5 py-1.5 outline-none transition hover:border-neutral-700 focus-visible:ring-2 focus-visible:ring-emerald-500 [&::-webkit-details-marker]:hidden"
       >
         <AIModelBrandMark provider={selectedModel.provider} className="size-5 shrink-0" />
@@ -285,7 +239,7 @@ const TeacherModelSelector = ({ modelId, onModelChange }: TeacherModelSelectorPr
       </summary>
       <div
         role="group"
-        aria-label="Modelos de IA disponíveis para o Professor IA"
+        aria-label="Modelos de IA disponíveis para o Coru"
         className="absolute right-0 top-full z-[80] mt-2 max-h-[18rem] w-[min(20rem,calc(100vw-2rem))] overflow-y-auto overflow-x-hidden rounded-xl border border-neutral-700 bg-[#17191b] p-1.5 shadow-2xl shadow-black/50"
       >
         <p className="px-2.5 pb-1.5 pt-2 text-[10px] font-semibold uppercase tracking-[0.14em] text-neutral-500">
@@ -296,7 +250,7 @@ const TeacherModelSelector = ({ modelId, onModelChange }: TeacherModelSelectorPr
             key={model.id}
             type="button"
             disabled={!model.apiAvailable}
-            aria-pressed={model.id === modelId}
+            aria-pressed={model.id === selectedModel.id}
             onClick={() => {
               if (!model.apiAvailable) return;
               onModelChange(model.id);
@@ -315,7 +269,7 @@ const TeacherModelSelector = ({ modelId, onModelChange }: TeacherModelSelectorPr
               <span className="mt-1 block text-xs font-semibold text-neutral-100">{model.name}</span>
               <span className="mt-1 block text-[11px] leading-4 text-neutral-400">{model.description}</span>
             </span>
-            {model.id === modelId && <Check size={15} className="mt-1 shrink-0 text-emerald-300" aria-label="Selecionado" />}
+            {model.id === selectedModel.id && <Check size={15} className="mt-1 shrink-0 text-emerald-300" aria-label="Selecionado" />}
           </button>
         ))}
       </div>
@@ -335,6 +289,16 @@ const AIModelBrandMark = ({ provider, className }: { provider: TeacherProvider; 
   )
 );
 
+const CoruAvatar = ({ className }: { className: string }) => (
+  <Image
+    src="/coru.png"
+    alt="Coru"
+    width={64}
+    height={64}
+    className={`${className} object-contain`}
+  />
+);
+
 const callTeacher = async (request: TeacherRequest): Promise<TeacherApiResponse> => {
   const response = await fetch('/api/ai/teacher', {
     method: 'POST',
@@ -345,7 +309,7 @@ const callTeacher = async (request: TeacherRequest): Promise<TeacherApiResponse>
   if (!response.ok) {
     const message = typeof payload === 'object' && payload !== null && 'error' in payload && typeof payload.error === 'string'
       ? payload.error
-      : 'Não foi possível falar com o Mestre IA.';
+      : 'Não foi possível falar com o Coru.';
     const debugCode = typeof payload === 'object' && payload !== null && 'debugCode' in payload && typeof payload.debugCode === 'string'
       ? ` (${payload.debugCode})`
       : '';
@@ -430,6 +394,8 @@ const createGravityExperiment = () => {
 function MessageBubble({ message }: { message: LearningMessage }) {
   const isTeacher = message.role === 'teacher';
   const assessment = message.assessment;
+  const modelInfo = isTeacher ? message.modelInfo : undefined;
+  const failedModels = modelInfo?.failedAttempts.map((attempt) => attempt.modelName).filter(Boolean) ?? [];
   const assessmentTone = assessment?.result === 'correct'
     ? 'border-emerald-500/30 bg-emerald-500/5 text-emerald-200'
     : assessment?.result === 'incorrect'
@@ -437,14 +403,30 @@ function MessageBubble({ message }: { message: LearningMessage }) {
       : 'border-sky-500/30 bg-sky-500/5 text-sky-100';
   return (
     <article className={`flex gap-3 ${isTeacher ? '' : 'flex-row-reverse'}`}>
-      <div className={`mt-0.5 flex size-8 shrink-0 items-center justify-center rounded-xl ${isTeacher ? 'bg-emerald-400/10 text-emerald-300' : 'bg-sky-400/10 text-sky-300'}`}>
-        {isTeacher ? <GraduationCap size={16} /> : <MessageCircle size={15} />}
+      <div className={`mt-0.5 flex size-8 shrink-0 items-center justify-center overflow-hidden rounded-xl ${isTeacher ? 'bg-emerald-400/10 text-emerald-300' : 'bg-sky-400/10 text-sky-300'}`}>
+        {isTeacher ? <CoruAvatar className="size-8" /> : <MessageCircle size={15} />}
       </div>
       <div className={`max-w-[min(100%,720px)] rounded-2xl border px-4 py-3 ${isTeacher ? 'border-neutral-800 bg-[#171a1d]' : 'border-sky-900/50 bg-sky-950/25'}`}>
-        <div className="mb-1.5 flex items-center justify-between gap-4 text-[10px] font-semibold uppercase tracking-[0.15em] text-neutral-500">
-          <span>{isTeacher ? 'Mestre IA' : 'Você'}</span>
+        <div className="mb-1.5 flex flex-wrap items-center justify-between gap-2 text-[10px] font-semibold uppercase tracking-[0.15em] text-neutral-500">
+          <span className="flex flex-wrap items-center gap-2">
+            <span>{isTeacher ? 'Coru' : 'Você'}</span>
+            {modelInfo?.respondedModelName && (
+              <span className="rounded-full border border-emerald-900/60 bg-emerald-950/40 px-2 py-0.5 text-[9px] font-medium normal-case tracking-normal text-emerald-200" title={`Modelo que respondeu: ${modelInfo.respondedModelName}`}>
+                {modelInfo.respondedModelName}
+              </span>
+            )}
+          </span>
           <time>{new Date(message.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</time>
         </div>
+        {modelInfo?.didFailover && (
+          <div className="mb-3 flex items-start gap-2 rounded-xl border border-amber-500/25 bg-amber-500/5 px-3 py-2 text-[11px] leading-4 text-amber-100" role="status">
+            <AlertTriangle size={14} className="mt-0.5 shrink-0 text-amber-300" />
+            <span>
+              Modelo escolhido falhou: <strong>{failedModels.join(', ') || modelInfo.requestedModelName}</strong>.
+              {' '}Resposta gerada por <strong>{modelInfo.respondedModelName}</strong>.
+            </span>
+          </div>
+        )}
         <p className="whitespace-pre-wrap text-sm leading-6 text-neutral-200">{message.content}</p>
         {assessment && (
           <div className={`mt-3 rounded-xl border p-3 ${assessmentTone}`}>
@@ -789,7 +771,7 @@ export default function LearningWorkspace() {
         level: targetSession.level,
         scene: getSceneContext(),
       });
-      if (!result.lesson) throw new Error('O professor não conseguiu montar o plano da aula.');
+      if (!result.lesson) throw new Error('O Coru não conseguiu montar o plano da aula.');
       const lesson = {
         ...result.lesson,
         actions: result.lesson.actions.length > 0
@@ -797,7 +779,7 @@ export default function LearningWorkspace() {
           : builtInActions(result.lesson.subjectId, targetSession.topic),
       };
       setLesson(lesson);
-      addMessage({ role: 'teacher', content: result.reply });
+      addMessage({ role: 'teacher', content: result.reply, modelInfo: result.modelInfo });
       addActions(result.actions ?? []);
     } catch (requestError) {
       setError(requestError instanceof Error ? requestError.message : 'Não foi possível iniciar a aula.');
@@ -841,10 +823,10 @@ export default function LearningWorkspace() {
         progress: learningProgress(current),
         scene: getSceneContext(),
       });
-      addMessage({ role: 'teacher', content: response.reply });
+      addMessage({ role: 'teacher', content: response.reply, modelInfo: response.modelInfo });
       addActions(response.actions ?? []);
     } catch (requestError) {
-      setError(requestError instanceof Error ? requestError.message : 'O professor não conseguiu responder.');
+      setError(requestError instanceof Error ? requestError.message : 'O Coru não conseguiu responder.');
     } finally {
       setIsSending(false);
       setIsGeneratingModel(false);
@@ -872,7 +854,7 @@ export default function LearningWorkspace() {
         progress: learningProgress(current),
         scene: getSceneContext(),
       });
-      addMessage({ role: 'teacher', content: response.reply, assessment: response.assessment });
+      addMessage({ role: 'teacher', content: response.reply, assessment: response.assessment, modelInfo: response.modelInfo });
       if (response.assessment?.result === 'correct') markQuestionComplete(question.id);
     } catch (requestError) {
       setError(requestError instanceof Error ? requestError.message : 'Não foi possível avaliar a resposta.');
@@ -924,14 +906,32 @@ export default function LearningWorkspace() {
   };
 
   const selectedSubject = LEARNING_SUBJECTS.find((item) => item.id === subjectId);
+  const progressTotal = session?.lesson
+    ? session.lesson.steps.length + session.lesson.questions.length
+    : 0;
+  const progressDone = session
+    ? session.completedStepIds.length + session.completedQuestionIds.length
+    : 0;
+  const progressPercent = progressTotal > 0
+    ? Math.min(100, Math.round((progressDone / progressTotal) * 100))
+    : 0;
 
   return (
-    <div className="flex h-full min-h-0 flex-col bg-[#0d0f10] text-neutral-100" data-tutorial="learning-workspace">
+    <div
+      className="relative flex h-full min-h-0 flex-col bg-[#0d0f10] text-neutral-100"
+      data-tutorial="learning-workspace"
+      style={{
+        backgroundImage: "linear-gradient(rgba(5, 10, 7, 0.32), rgba(5, 10, 7, 0.58)), url('/background_leaning.png')",
+        backgroundSize: 'cover',
+        backgroundPosition: 'center',
+        backgroundAttachment: 'fixed',
+      }}
+    >
       <header className="flex shrink-0 flex-wrap items-center justify-between gap-3 border-b border-neutral-800/80 bg-[#151719] px-4 py-3 lg:px-6">
         <div className="flex items-center gap-3">
-          <div className="flex size-9 items-center justify-center rounded-xl bg-emerald-400/10 text-emerald-300"><GraduationCap size={19} /></div>
+          <div className="flex size-10 items-center justify-center overflow-hidden rounded-xl border border-emerald-400/20 bg-emerald-400/10"><CoruAvatar className="size-10" /></div>
           <div>
-            <p className="text-sm font-semibold text-neutral-100">Mestre IA</p>
+            <p className="text-sm font-semibold text-neutral-100">Coru</p>
             <p className="text-[11px] text-neutral-500">Aprender construindo · várias áreas do conhecimento</p>
           </div>
         </div>
@@ -954,9 +954,9 @@ export default function LearningWorkspace() {
         <div className="min-h-0 flex-1 overflow-y-auto p-4 lg:p-8">
           <div className="mx-auto max-w-5xl">
             <div className="mb-8 max-w-2xl">
-              <div className="mb-3 inline-flex items-center gap-2 rounded-full border border-emerald-900/50 bg-emerald-950/20 px-3 py-1.5 text-[11px] font-medium text-emerald-200"><Lightbulb size={13} /> Aprender fazendo</div>
+              {/* <div className="mb-3 inline-flex items-center gap-2 rounded-full border border-emerald-900/50 bg-emerald-950/20 px-3 py-1.5 text-[11px] font-medium text-emerald-200"><Lightbulb size={13} /> Aprender fazendo</div> */}
               <h1 className="text-3xl font-semibold tracking-tight text-white sm:text-4xl">O que você quer aprender hoje?</h1>
-              <p className="mt-3 text-sm leading-6 text-neutral-400">Comece pelo tema. O professor organiza uma aula, propõe atividades e, quando ajudar, prepara uma demonstração dentro do editor.</p>
+              <p className="mt-3 text-sm leading-6 text-neutral-400">Comece pelo tema. O Coru organiza uma aula, propõe atividades e, quando ajudar, prepara uma demonstração dentro do editor.</p>
             </div>
 
             {project.currentSession && (
@@ -981,7 +981,7 @@ export default function LearningWorkspace() {
                 <div>
                   <label htmlFor="learning-subject" className="mb-2 block text-xs font-medium text-neutral-400">Área do conhecimento <span className="text-neutral-600">(opcional)</span></label>
                   <select id="learning-subject" value={subjectId} onChange={(event) => setSubjectId(event.target.value)} className="h-10 w-full rounded-lg border border-neutral-800 bg-neutral-950 px-3 text-xs text-neutral-200 outline-none focus:border-emerald-500/60">
-                    <option value="general">Deixe o professor escolher</option>
+                    <option value="general">Deixe o Coru escolher</option>
                     {LEARNING_SUBJECTS.map((subject) => <option key={subject.id} value={subject.id}>{subject.name}</option>)}
                   </select>
                 </div>
@@ -1033,16 +1033,27 @@ export default function LearningWorkspace() {
         </div>
       ) : (
         <div className="flex min-h-0 flex-1 flex-col xl:flex-row">
-          <section className="flex min-h-[45%] min-w-0 flex-1 flex-col xl:basis-1/2 xl:min-h-0 xl:border-r xl:border-neutral-800">
+          <section className="flex min-h-[45%] min-w-0 flex-1 flex-col bg-[#080c0a]/95 shadow-[inset_-1px_0_0_rgba(52,211,153,0.08)] backdrop-blur-sm xl:basis-1/2 xl:min-h-0 xl:border-r xl:border-neutral-800">
             <div className="flex shrink-0 items-center justify-between border-b border-neutral-800/80 px-4 py-2.5 lg:px-6">
-              <div className="min-w-0"><p className="truncate text-xs font-semibold text-neutral-200">{session.subjectName} · {session.topic}</p><p className="mt-0.5 text-[10px] text-neutral-600">Nível {levelLabels[session.level].toLowerCase()} · {project.messages.length} mensagens</p></div>
+              <div className="min-w-0">
+                <p className="truncate text-xs font-semibold text-neutral-200">{session.subjectName} · {session.topic}</p>
+                <div className="mt-1 flex items-center gap-2 text-[10px] text-neutral-600">
+                  <span>Nível {levelLabels[session.level].toLowerCase()} · {project.messages.length} mensagens</span>
+                  {progressTotal > 0 && <span className="text-emerald-300">{progressPercent}% concluído</span>}
+                </div>
+                {progressTotal > 0 && (
+                  <div className="mt-2 h-1 max-w-64 overflow-hidden rounded-full bg-neutral-800" aria-label={`${progressPercent}% da aula concluída`} role="progressbar" aria-valuemin={0} aria-valuemax={100} aria-valuenow={progressPercent}>
+                    <div className="h-full rounded-full bg-emerald-400 transition-all" style={{ width: `${progressPercent}%` }} />
+                  </div>
+                )}
+              </div>
               <button type="button" onClick={() => setActiveMode('scene')} className="ml-3 shrink-0 rounded-lg border border-neutral-700 px-3 py-2 text-[10px] font-medium text-neutral-300 hover:border-emerald-700/50 hover:text-emerald-200">Abrir cena</button>
             </div>
             <div className="min-h-0 flex-1 overflow-y-auto px-4 py-5 lg:px-8">
               <div className="mx-auto flex max-w-4xl flex-col gap-4">
                 {project.messages.map((message) => <MessageBubble key={message.id} message={message} />)}
                 {isSending && (
-                  <div className="flex items-center gap-3 text-xs text-neutral-500"><span className="flex size-8 items-center justify-center rounded-xl bg-emerald-400/10 text-emerald-300"><GraduationCap size={15} /></span><LoaderCircle size={14} className="animate-spin" /> {isGeneratingModel ? 'Criando seu modelo 3D...' : 'O professor está pensando...'}</div>
+                  <div className="flex items-center gap-3 text-xs text-neutral-500"><span className="flex size-8 items-center justify-center overflow-hidden rounded-xl bg-emerald-400/10 text-emerald-300"><CoruAvatar className="size-8" /></span><LoaderCircle size={14} className="animate-spin" /> {isGeneratingModel ? 'Criando seu modelo 3D...' : 'Coru está pensando...'}</div>
                 )}
                 {error && (
                   <div role="alert" className="ml-11 rounded-xl border border-rose-900/50 bg-rose-950/20 px-3 py-2 text-xs text-rose-200">

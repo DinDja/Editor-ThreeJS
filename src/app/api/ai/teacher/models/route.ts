@@ -11,7 +11,7 @@ export async function GET() {
     const models = await listGeminiModels(apiKey);
     return NextResponse.json({ configured: true, models });
   } catch {
-    console.error('[Mestre IA] Falha ao consultar o catálogo de modelos Gemini.');
+    console.error('[Coru] Falha ao consultar o catálogo de modelos Gemini.');
     return NextResponse.json({
       configured: true,
       models: getKnownGeminiModels(),
