@@ -54,6 +54,7 @@ export const normalizeGeminiModels = (value: unknown): GeminiTeacherModel[] => {
 const MODEL_LIST_URL = 'https://generativelanguage.googleapis.com/v1beta/models';
 const MODEL_LIST_TIMEOUT_MS = 8_000;
 const MODEL_LIST_CACHE_MS = 5 * 60_000;
+const MODEL_LIST_MAX_PAGES = 3;
 const KNOWN_GEMINI_MODELS = [
   'gemini-2.5-flash',
   'gemini-2.5-flash-lite',
@@ -72,7 +73,7 @@ export const listGeminiModels = async (apiKey: string): Promise<GeminiTeacherMod
     let pages = 0;
     do {
       const url = new URL(MODEL_LIST_URL);
-      url.searchParams.set('pageSize', '1000');
+      url.searchParams.set('pageSize', '100');
       if (pageToken) url.searchParams.set('pageToken', pageToken);
       const response = await fetch(url, {
         headers: { 'x-goog-api-key': apiKey },
@@ -89,7 +90,7 @@ export const listGeminiModels = async (apiKey: string): Promise<GeminiTeacherMod
       models.push(...payload.models);
       pageToken = typeof payload.nextPageToken === 'string' ? payload.nextPageToken : '';
       pages += 1;
-    } while (pageToken && pages < 10);
+    } while (pageToken && pages < MODEL_LIST_MAX_PAGES);
 
     if (pageToken) throw new Error('Gemini model list exceeded the supported number of pages.');
 

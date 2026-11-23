@@ -1,6 +1,18 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
+import { normalizeAiText } from './richText.ts';
 import { normalizeLearningProject, normalizeTeacherResponse } from './types.ts';
+
+test('rich text restores JSON-corrupted LaTeX commands and delimiters', () => {
+  const broken = 'Calcule $2\times 2$ e use $\frac{1}{2}$. Compare $a \neq b$. Veja também \\(x^2\\) e \\[x+y\\].';
+  const normalized = normalizeAiText(broken);
+
+  assert.match(normalized, /\$2\\times 2\$/);
+  assert.match(normalized, /\$\\frac\{1\}\{2\}\$/);
+  assert.match(normalized, /\$a \\neq b\$/);
+  assert.match(normalized, /\$x\^2\$/);
+  assert.match(normalized, /\$\$x\+y\$\$/);
+});
 
 test('teacher response keeps only registered editor actions', () => {
   const response = normalizeTeacherResponse({

@@ -1,4 +1,5 @@
 @import "tailwindcss";
+@import "katex/dist/katex.min.css";
 
 @theme inline {
   --font-sans: var(--font-geist-sans);
@@ -171,4 +172,185 @@ input:disabled {
 .ed-divider {
   height: 1px;
   background: linear-gradient(to right, transparent, var(--ed-border-soft) 18%, var(--ed-border-soft) 82%, transparent);
+}
+
+/* --------------------------- Subject Tree Animations -------------------------- */
+
+.subject-tree {
+  animation: subject-tree-enter 0.5s ease-out forwards;
+}
+
+@keyframes subject-tree-enter {
+  from {
+    opacity: 0;
+    transform: translateY(-12px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.subject-tree-container {
+  position: relative;
+  padding-left: 1.5rem;
+  margin-left: 0.5rem;
+}
+
+.subject-tree-trunk {
+  position: absolute;
+  left: 0.5rem;
+  top: 0;
+  bottom: 0;
+  width: 2px;
+  background: linear-gradient(to bottom, var(--ed-accent), var(--ed-accent-soft));
+  border-radius: 1px;
+  animation: trunk-grow 0.6s ease-out forwards;
+  transform-origin: top;
+  transform: scaleY(0);
+}
+
+@keyframes trunk-grow {
+  from { transform: scaleY(0); }
+  to { transform: scaleY(1); }
+}
+
+.subject-tree-branches {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.subject-tree-topic {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.5rem 0.75rem;
+  background: var(--ed-surface-2);
+  border: 1px solid var(--ed-border);
+  border-radius: 0.5rem;
+  color: var(--ed-text);
+  font-size: 0.8125rem;
+  line-height: 1.4;
+  text-align: left;
+  transition: all 0.2s ease;
+  opacity: 0;
+  transform: translateX(-16px);
+  animation: branch-enter 0.4s ease-out forwards;
+  animation-delay: calc(var(--topic-index, 0) * 60ms + 200ms);
+}
+
+@keyframes branch-enter {
+  from {
+    opacity: 0;
+    transform: translateX(-16px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+.subject-tree-topic:hover {
+  background: var(--ed-surface-3);
+  border-color: var(--ed-accent-line);
+  transform: translateX(4px);
+}
+
+.subject-tree-topic:focus-visible {
+  outline: none;
+  border-color: var(--ed-accent);
+  box-shadow: 0 0 0 3px var(--ed-accent-soft);
+}
+
+.subject-tree-topic-dot {
+  flex-shrink: 0;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--ed-accent);
+  box-shadow: 0 0 8px var(--ed-accent);
+  animation: dot-pulse 2s ease-in-out infinite;
+  animation-delay: calc(var(--topic-index, 0) * 100ms);
+}
+
+@keyframes dot-pulse {
+  0%, 100% { opacity: 0.6; transform: scale(1); }
+  50% { opacity: 1; transform: scale(1.2); }
+}
+
+.subject-tree-topic-label {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 100%;
+}
+
+.subject-tree-hint {
+  margin-top: 0.75rem;
+  padding: 0.5rem 0.75rem;
+  font-size: 0.75rem;
+  color: var(--ed-text-mute);
+  background: var(--ed-surface-1);
+  border: 1px dashed var(--ed-border-soft);
+  border-radius: 0.375rem;
+  text-align: center;
+  animation: hint-fade 0.5s ease-out forwards;
+  animation-delay: calc(var(--topic-count, 8) * 60ms + 300ms);
+  opacity: 0;
+}
+
+@keyframes hint-fade {
+  from { opacity: 0; transform: translateY(4px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+/* Responsive: two columns on desktop */
+@media (min-width: 768px) {
+  .subject-tree-branches {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 0.5rem;
+  }
+  
+  .subject-tree-topic {
+    transform: translateY(-16px);
+  }
+  
+  @keyframes branch-enter {
+    from {
+      opacity: 0;
+      transform: translateY(-16px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+}
+
+/* Reduced motion support */
+@media (prefers-reduced-motion: reduce) {
+  .subject-tree,
+  .subject-tree-trunk,
+  .subject-tree-topic,
+  .subject-tree-topic-dot,
+  .subject-tree-hint {
+    animation: none !important;
+    opacity: 1 !important;
+    transform: none !important;
+  }
+  
+  .subject-tree-trunk {
+    transform: scaleY(1) !important;
+  }
+  
+  .subject-tree-topic {
+    transform: none !important;
+  }
+  
+  .subject-tree-topic:hover {
+    transform: none !important;
+  }
 }
