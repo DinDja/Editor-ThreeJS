@@ -208,7 +208,7 @@ const toCssNumber = (value: number | string | undefined): number => {
 };
 
 export const useExperienceStore = create<ExperienceState>((set, get) => ({
-  activeMode: 'scene',
+  activeMode: 'learning',
   page: defaultPage,
   pages: [defaultPage],
   activePageId: defaultPage.id,

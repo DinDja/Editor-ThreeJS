@@ -78,17 +78,16 @@ export type GeminiTeacherModel = {
   apiAvailable: true;
 };
 
-export type TeacherProvider = 'nvidia' | 'zai' | 'gemini';
-export type TeacherModelOption = (typeof TEACHER_MODELS)[number] | GeminiTeacherModel;
+export type TeacherProvider = 'nvidia' | 'zai';
+export type TeacherModelOption = (typeof TEACHER_MODELS)[number];
 export type TeacherModelId = (typeof TEACHER_MODELS)[number]['id'];
 export type AvailableTeacherModelId = Extract<
   (typeof TEACHER_MODELS)[number],
   { apiAvailable: true }
->['id'] | GeminiTeacherModelId;
+>['id'];
 
 export const isGeminiTeacherModelId = (value: unknown): value is GeminiTeacherModelId =>
   typeof value === 'string' && /^gemini\/[A-Za-z0-9._-]+$/.test(value);
 
 export const isAvailableTeacherModelId = (value: unknown): value is AvailableTeacherModelId =>
-  TEACHER_MODELS.some((model) => model.id === value && model.apiAvailable)
-  || isGeminiTeacherModelId(value);
+  TEACHER_MODELS.some((model) => model.id === value && model.apiAvailable);

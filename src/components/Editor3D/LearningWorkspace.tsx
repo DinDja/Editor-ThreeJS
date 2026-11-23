@@ -11,11 +11,11 @@ import {
   Check,
   ChevronDown,
   ClipboardCheck,
-  Circle,
   CircleCheck,
   Clock3,
   Code2,
   Dna,
+  ExternalLink,
   FlaskConical,
   FolderOpen,
   Globe2,
@@ -47,6 +47,7 @@ import {
   type LearningLevel,
   type LearningMessage,
   type LearningProjectState,
+  type LearningResource,
   type LearningSessionSummary,
   type TeacherActionSuggestion,
   type TeacherApiResponse,
@@ -179,6 +180,13 @@ const quickPrompts = [
   'Como isso aparece em uma cena 3D?',
 ];
 
+const stepKindLabels: Record<string, string> = {
+  explanation: 'Entender',
+  demonstration: 'Observar',
+  practice: 'Praticar',
+  reflection: 'Refletir',
+};
+
 const subjectIcons: Record<string, LucideIcon> = {
   mathematics: Calculator,
   physics: Atom,
@@ -205,17 +213,14 @@ const TeacherModelSelector = ({ modelId, onModelChange }: TeacherModelSelectorPr
   const providerName: Record<TeacherProvider, string> = {
     nvidia: 'NVIDIA · IA',
     zai: 'Z.AI · GLM',
-    gemini: 'Google · Gemini',
   };
   const providerDetailName: Record<TeacherProvider, string> = {
     nvidia: 'NVIDIA Nemotron',
     zai: 'Z.AI GLM',
-    gemini: 'Google Gemini',
   };
   const providerColor: Record<TeacherProvider, string> = {
     nvidia: 'text-[#76b900]',
     zai: 'text-sky-300',
-    gemini: 'text-violet-300',
   };
 
   useEffect(() => {
@@ -288,10 +293,8 @@ const AIModelBrandMark = ({ provider, className }: { provider: TeacherProvider; 
     <svg className={`${className} text-[#76b900]`} viewBox="0 0 24 24" fill="currentColor" aria-hidden="true" focusable="false">
       <path d="M8.948 8.798v-1.43a6.7 6.7 0 0 1 .424-.018c3.922-.124 6.493 3.374 6.493 3.374s-2.774 3.851-5.75 3.851c-.398 0-.787-.062-1.158-.185v-4.346c1.528.185 1.837.857 2.747 2.385l2.04-1.714s-1.492-1.952-4-1.952a6.016 6.016 0 0 0-.796.035m0-4.735v2.138l.424-.027c5.45-.185 9.01 4.47 9.01 4.47s-4.08 4.964-8.33 4.964c-.37 0-.733-.035-1.095-.097v1.325c.3.035.61.062.91.062 3.957 0 6.82-2.023 9.593-4.408.459.371 2.34 1.263 2.73 1.652-2.633 2.208-8.772 3.984-12.253 3.984-.335 0-.653-.018-.971-.053v1.864H24V4.063zm0 10.326v1.131c-3.657-.654-4.673-4.46-4.673-4.46s1.758-1.944 4.673-2.262v1.237H8.94c-1.528-.186-2.73 1.245-2.73 1.245s.68 2.412 2.739 3.11M2.456 10.9s2.164-3.197 6.5-3.533V6.201C4.153 6.59 0 10.653 0 10.653s2.35 6.802 8.948 7.42v-1.237c-4.84-.6-6.492-5.936-6.492-5.936z" />
     </svg>
-  ) : provider === 'zai' ? (
-    <Image src="/zai-logo.svg" alt="" width={24} height={24} className={className} />
   ) : (
-    <Image src="/gemini-logo.svg" alt="" width={24} height={24} className={className} />
+    <Image src="/zai-logo.svg" alt="" width={24} height={24} className={className} />
   )
 );
 
@@ -470,6 +473,59 @@ function MessageBubble({ message }: { message: LearningMessage }) {
   );
 }
 
+function LearningResourceCard({ resource }: { resource: LearningResource }) {
+  const [imageError, setImageError] = useState(false);
+  const isVideo = resource.kind === 'video' || resource.provider.toLocaleLowerCase('pt-BR').includes('youtube');
+  const host = (() => {
+    try {
+      return new URL(resource.url).hostname.replace(/^www\./, '');
+    } catch {
+      return resource.provider;
+    }
+  })();
+  const hasThumbnail = Boolean(resource.thumbnailUrl && !imageError);
+  return (
+    <a
+      href={resource.url}
+      target="_blank"
+      rel="noreferrer"
+      className="group min-w-0 overflow-hidden rounded-2xl border border-neutral-800 bg-neutral-950/45 transition hover:border-emerald-700/60 hover:bg-neutral-900/80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-400/70"
+    >
+      <span className={`relative block aspect-[16/8] overflow-hidden ${isVideo ? 'bg-gradient-to-br from-red-950 via-neutral-900 to-neutral-950' : 'bg-gradient-to-br from-sky-950 via-neutral-900 to-neutral-950'}`}>
+        {hasThumbnail ? (
+          <Image
+            src={resource.thumbnailUrl as string}
+            alt=""
+            fill
+            unoptimized
+            sizes="(max-width: 640px) 100vw, 320px"
+            className="object-cover transition duration-500 group-hover:scale-105"
+            onError={() => setImageError(true)}
+          />
+        ) : (
+          <span className={`absolute inset-0 flex flex-col items-center justify-center gap-2 ${isVideo ? 'text-red-200' : 'text-sky-200'}`}>
+            <span className={`flex size-11 items-center justify-center rounded-2xl border ${isVideo ? 'border-red-300/20 bg-red-400/15' : 'border-sky-300/20 bg-sky-400/15'}`}>
+              {isVideo ? <Play size={20} fill="currentColor" /> : <Globe2 size={20} />}
+            </span>
+            <span className="max-w-[80%] truncate text-[10px] font-medium text-neutral-400">{isVideo ? 'Prévia do vídeo' : host}</span>
+          </span>
+        )}
+        <span className="pointer-events-none absolute inset-0 bg-gradient-to-t from-black/80 via-black/10 to-black/10" />
+        <span className="absolute left-2.5 top-2.5 rounded-full border border-white/10 bg-black/55 px-2 py-1 text-[9px] font-semibold uppercase tracking-[0.1em] text-white/80 backdrop-blur-sm">{resource.provider}</span>
+        <span className="absolute bottom-2.5 right-2.5 flex items-center gap-1 rounded-full bg-black/65 px-2 py-1 text-[9px] font-semibold text-white/85 backdrop-blur-sm">
+          {isVideo ? <Play size={10} fill="currentColor" /> : <ExternalLink size={10} />}
+          {isVideo ? 'Assistir' : 'Abrir fonte'}
+        </span>
+      </span>
+      <span className="block min-w-0 p-3">
+        <span className="block line-clamp-2 text-xs font-semibold leading-4 text-neutral-200 group-hover:text-emerald-100">{resource.title}</span>
+        <span className="mt-1 block truncate text-[10px] text-neutral-600">{resource.author || host}</span>
+        <span className="mt-1.5 block line-clamp-2 text-[11px] leading-4 text-neutral-500">{resource.description}</span>
+      </span>
+    </a>
+  );
+}
+
 function LessonDetails({
   onAskAssessment,
   busyQuestionId,
@@ -502,56 +558,134 @@ function LessonDetails({
   const doneSteps = new Set(currentSession.completedStepIds);
   const doneQuestions = new Set(currentSession.completedQuestionIds);
   const appliedActions = new Set(currentSession.appliedActionIds);
+  const progressTotal = lesson.steps.length + lesson.questions.length;
+  const progressDone = doneSteps.size + doneQuestions.size;
+  const progressPercent = progressTotal > 0 ? Math.round((progressDone / progressTotal) * 100) : 0;
+  const nextStepId = lesson.steps.find((step) => !doneSteps.has(step.id))?.id;
+  const researchResources = lesson.resources ?? [];
+  const resourceGroups = researchResources.reduce<Array<{ provider: string; resources: LearningResource[] }>>((groups, resource) => {
+    const provider = resource.provider.trim() || 'Outras fontes';
+    const existing = groups.find((group) => group.provider === provider);
+    if (existing) existing.resources.push(resource);
+    else groups.push({ provider, resources: [resource] });
+    return groups;
+  }, []).sort((left, right) => {
+    if (left.provider === 'YouTube') return -1;
+    if (right.provider === 'YouTube') return 1;
+    return left.provider.localeCompare(right.provider, 'pt-BR');
+  });
   return (
     <div className="space-y-4">
-      <section className="rounded-2xl border border-neutral-800 bg-[#15181b] p-4">
-        <div className="mb-3 flex items-center gap-2 text-[11px] font-semibold uppercase tracking-[0.14em] text-emerald-300">
-          <BookOpen size={14} /> Aula
-        </div>
-        <LearningRichText className="text-lg font-semibold text-white">{lesson.title}</LearningRichText>
-        <p className="mt-1 text-xs text-neutral-500">{lesson.subjectName} · {levelLabels[lesson.level]}</p>
-        <div className="mt-4 rounded-xl bg-neutral-900/70 p-3">
-          <p className="text-[10px] font-semibold uppercase tracking-wide text-neutral-500">Objetivo</p>
-          <LearningRichText className="mt-1 text-sm leading-5 text-neutral-200">{lesson.objective}</LearningRichText>
-        </div>
-        <div className="mt-4 rounded-xl border border-emerald-900/40 bg-neutral-950/60 p-4 sm:p-5">
-          <h3 className="mb-3 text-sm font-semibold text-emerald-200">Conteúdo da aula</h3>
-          <LearningRichText className="text-sm leading-7 text-neutral-200">{lesson.explanation}</LearningRichText>
-        </div>
-        {lesson.prerequisites.length > 0 && (
-          <div className="mt-3">
-            <p className="text-[10px] font-semibold uppercase tracking-wide text-neutral-500">Para começar</p>
-            <ul className="mt-1 space-y-1 text-xs text-neutral-400">
-              {lesson.prerequisites.map((item) => (
-                <li key={item}>
-                  <LearningRichText className="text-xs text-neutral-400">• {item}</LearningRichText>
-                </li>
-              ))}
-            </ul>
+      <section className="relative overflow-hidden rounded-3xl border border-emerald-800/50 bg-gradient-to-br from-[#172820] via-[#121a17] to-[#15181b] p-4 shadow-lg shadow-emerald-950/10 sm:p-5">
+        <div className="pointer-events-none absolute -right-12 -top-12 size-36 rounded-full bg-emerald-400/10 blur-3xl" aria-hidden="true" />
+        <div className="relative">
+          <div className="flex items-start gap-3">
+            <div className="flex size-11 shrink-0 items-center justify-center overflow-hidden rounded-2xl border border-emerald-300/20 bg-emerald-400/10 shadow-lg shadow-emerald-950/30">
+              <CoruAvatar className="size-11" />
+            </div>
+            <div className="min-w-0">
+              <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-emerald-300">Trilha guiada · {lesson.subjectName}</p>
+              <LearningRichText className="mt-1 text-xl font-semibold tracking-tight text-white">{lesson.title}</LearningRichText>
+              <p className="mt-1 truncate text-[11px] text-neutral-500">{lesson.topic} · nível {levelLabels[lesson.level].toLowerCase()}</p>
+            </div>
           </div>
-        )}
+
+          <div className="mt-5 rounded-2xl border border-white/10 bg-black/20 p-3">
+            <div className="flex items-center justify-between gap-3">
+              <div>
+                <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-neutral-500">Seu progresso</p>
+                <p className="mt-1 text-xs text-neutral-300">{progressDone} de {progressTotal} desafios concluídos</p>
+              </div>
+              <span className="text-lg font-semibold text-emerald-200">{progressPercent}%</span>
+            </div>
+            <div className="mt-3 h-2 overflow-hidden rounded-full bg-neutral-900/80" role="progressbar" aria-label={`${progressPercent}% da aula concluída`} aria-valuemin={0} aria-valuemax={100} aria-valuenow={progressPercent}>
+              <div className="h-full rounded-full bg-gradient-to-r from-emerald-500 to-lime-300 transition-all duration-500" style={{ width: `${progressPercent}%` }} />
+            </div>
+          </div>
+
+          <div className="mt-3 rounded-2xl border border-emerald-900/50 bg-emerald-950/25 p-3">
+            <p className="flex items-center gap-2 text-[10px] font-semibold uppercase tracking-[0.14em] text-emerald-300"><Lightbulb size={13} /> Ao final, você vai conseguir</p>
+            <LearningRichText className="mt-1 text-sm leading-6 text-neutral-100">{lesson.objective}</LearningRichText>
+          </div>
+
+          {lesson.prerequisites.length > 0 && (
+            <div className="mt-3 flex flex-wrap items-center gap-2">
+              <span className="text-[10px] font-semibold uppercase tracking-[0.12em] text-neutral-600">Antes de começar:</span>
+              {lesson.prerequisites.map((item) => (
+                <span key={item} className="rounded-full border border-neutral-800 bg-neutral-950/40 px-2.5 py-1 text-[10px] text-neutral-400">{item}</span>
+              ))}
+            </div>
+          )}
+        </div>
       </section>
 
-      <section className="rounded-2xl border border-neutral-800 bg-[#15181b] p-4">
-        <h3 className="mb-3 flex items-center gap-2 text-sm font-semibold text-neutral-200"><CircleCheck size={15} className="text-emerald-300" /> Roteiro para estudar</h3>
+      <section className="rounded-2xl border border-neutral-800 bg-[#15181b] p-4 sm:p-5">
+        <div className="mb-3 flex items-center justify-between gap-3">
+          <div>
+            <h3 className="flex items-center gap-2 text-sm font-semibold text-neutral-100"><BookOpen size={15} className="text-emerald-300" /> Conteúdo principal</h3>
+            <p className="mt-1 text-[11px] text-neutral-500">Leia no seu ritmo; depois avance pelo roteiro.</p>
+          </div>
+          <span className="rounded-full border border-neutral-800 bg-neutral-950/50 px-2 py-1 text-[10px] text-neutral-500">Leitura guiada</span>
+        </div>
+        <div className="rounded-2xl border border-emerald-900/40 bg-neutral-950/55 p-4 sm:p-5">
+          <LearningRichText className="text-sm leading-7 text-neutral-200">{lesson.explanation}</LearningRichText>
+        </div>
+      </section>
+
+      {researchResources.length > 0 && (
+        <section className="rounded-2xl border border-violet-900/40 bg-gradient-to-br from-violet-950/20 to-[#15181b] p-4 sm:p-5">
+          <div className="mb-4 flex items-start justify-between gap-3">
+            <div>
+              <h3 className="flex items-center gap-2 text-sm font-semibold text-violet-100"><Globe2 size={15} className="text-violet-300" /> Materiais para continuar</h3>
+              <p className="mt-1 text-[11px] leading-4 text-neutral-500">Pesquisados antes da aula e usados como apoio para montar esta explicação.</p>
+            </div>
+            <span className="shrink-0 rounded-full border border-violet-900/50 bg-violet-950/30 px-2 py-1 text-[10px] text-violet-200">{researchResources.length} fontes</span>
+          </div>
+
+          {resourceGroups.map((group, index) => (
+            <div key={group.provider} className={index > 0 ? 'mt-4' : ''}>
+              <p className={`mb-2 text-[10px] font-semibold uppercase tracking-[0.14em] ${group.provider === 'YouTube' ? 'text-red-300/80' : 'text-sky-300/80'}`}>{group.provider}</p>
+              <div className="grid gap-2 sm:grid-cols-2">
+                {group.resources.map((resource) => <LearningResourceCard key={resource.id} resource={resource} />)}
+              </div>
+            </div>
+          ))}
+        </section>
+      )}
+
+      <section className="rounded-2xl border border-neutral-800 bg-[#15181b] p-4 sm:p-5">
+        <div className="mb-3 flex items-end justify-between gap-3">
+          <div>
+            <h3 className="flex items-center gap-2 text-sm font-semibold text-neutral-100"><CircleCheck size={15} className="text-emerald-300" /> Roteiro para estudar</h3>
+            <p className="mt-1 text-[11px] text-neutral-500">Pequenos passos para transformar leitura em prática.</p>
+          </div>
+          <span className="shrink-0 text-[10px] font-semibold text-emerald-300">{doneSteps.size}/{lesson.steps.length}</span>
+        </div>
         <div className="space-y-2">
           {lesson.steps.map((step, index) => {
             const completed = doneSteps.has(step.id);
+            const isNext = step.id === nextStepId;
             return (
               <button
                 type="button"
                 key={step.id}
                 onClick={() => useLearningStore.getState().markStepComplete(step.id)}
-                className={`flex w-full gap-3 rounded-xl border p-3 text-left transition ${completed ? 'border-emerald-900/60 bg-emerald-950/20' : 'border-neutral-800 bg-neutral-900/40 hover:border-neutral-700'}`}
+                aria-pressed={completed}
+                className={`group flex w-full gap-3 rounded-2xl border p-3 text-left transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-400/70 ${completed ? 'border-emerald-900/60 bg-emerald-950/20' : isNext ? 'border-emerald-500/50 bg-emerald-400/5 shadow-[0_0_0_1px_rgba(52,211,153,0.08)]' : 'border-neutral-800 bg-neutral-900/40 hover:border-neutral-700'}`}
               >
-                <span className={`mt-0.5 flex size-5 shrink-0 items-center justify-center rounded-full ${completed ? 'bg-emerald-400 text-neutral-950' : 'border border-neutral-700 text-neutral-500'}`}>
+                <span className={`mt-0.5 flex size-7 shrink-0 items-center justify-center rounded-xl text-[10px] font-semibold ${completed ? 'bg-emerald-400 text-neutral-950' : isNext ? 'bg-emerald-400/15 text-emerald-200 ring-1 ring-emerald-400/30' : 'border border-neutral-700 text-neutral-500'}`}>
                   {completed ? <Check size={12} /> : <span className="text-[10px]">{index + 1}</span>}
                 </span>
-                <div className="min-w-0">
-                  <LearningRichText className="text-xs font-semibold text-neutral-200">{step.title}</LearningRichText>
+                <div className="min-w-0 flex-1">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <LearningRichText className="text-xs font-semibold text-neutral-100">{step.title}</LearningRichText>
+                    <span className={`rounded-full px-2 py-0.5 text-[9px] font-semibold uppercase tracking-[0.1em] ${completed ? 'bg-emerald-400/10 text-emerald-300' : isNext ? 'bg-emerald-400/10 text-emerald-200' : 'bg-neutral-800 text-neutral-500'}`}>
+                      {completed ? 'Concluído' : isNext ? 'Próximo passo' : stepKindLabels[step.kind] ?? step.kind}
+                    </span>
+                  </div>
                   <LearningRichText className="mt-1 text-xs leading-5 text-neutral-400">{step.content}</LearningRichText>
-                  <span className="mt-2 block text-[9px] uppercase tracking-[0.15em] text-neutral-600">{step.kind}</span>
                 </div>
+                {!completed && <ArrowRight size={14} className="mt-1 shrink-0 text-neutral-700 transition group-hover:translate-x-0.5 group-hover:text-emerald-300" />}
               </button>
             );
           })}
@@ -559,20 +693,29 @@ function LessonDetails({
       </section>
 
       {lesson.actions.length > 0 && (
-        <section className="rounded-2xl border border-emerald-900/50 bg-emerald-950/15 p-4">
-          <h3 className="mb-3 flex items-center gap-2 text-sm font-semibold text-emerald-100"><FlaskConical size={15} /> Aprender no editor</h3>
+        <section className="rounded-2xl border border-emerald-900/50 bg-gradient-to-br from-emerald-950/30 to-[#15181b] p-4 sm:p-5">
+          <div className="mb-3 flex items-start justify-between gap-3">
+            <div>
+              <h3 className="flex items-center gap-2 text-sm font-semibold text-emerald-100"><FlaskConical size={15} /> Aprender no editor</h3>
+              <p className="mt-1 text-[11px] text-neutral-500">Experimente o conceito na cena quando fizer sentido.</p>
+            </div>
+            <span className="rounded-full border border-emerald-900/60 bg-emerald-950/40 px-2 py-1 text-[10px] text-emerald-300">3D</span>
+          </div>
           <div className="space-y-2">
             {lesson.actions.map((action) => {
               const applied = appliedActions.has(action.id);
               const prepared = preparedActionId === action.id;
               return (
-                <div key={action.id} className="rounded-xl border border-emerald-900/50 bg-[#111816] p-3">
-                  <LearningRichText className="text-xs font-semibold text-neutral-100">{action.label}</LearningRichText>
+                <div key={action.id} className="rounded-2xl border border-emerald-900/50 bg-[#111816] p-3.5">
+                  <div className="flex items-start justify-between gap-3">
+                    <LearningRichText className="text-xs font-semibold text-neutral-100">{action.label}</LearningRichText>
+                    {applied && <CircleCheck size={15} className="shrink-0 text-emerald-300" />}
+                  </div>
                   <LearningRichText className="mt-1 text-xs leading-5 text-neutral-400">{action.description}</LearningRichText>
                   {action.type === 'gravity_experiment' && <p className="mt-2 text-[10px] text-neutral-500">Prévia: piso estático, esfera e cubo na mesma altura, gravidade do Rapier habilitada.</p>}
                   {action.type === 'geometry_demo' && <p className="mt-2 text-[10px] text-neutral-500">Prévia: quatro sólidos com materiais coloridos e nomes visíveis na árvore da cena.</p>}
                   {applied ? (
-                    <div className="mt-3 flex items-center gap-1.5 text-[11px] font-semibold text-emerald-300"><CircleCheck size={13} /> Criada na cena</div>
+                    <div className="mt-3 flex items-center gap-1.5 text-[11px] font-semibold text-emerald-300">Criada na cena</div>
                   ) : prepared ? (
                     <div className="mt-3 flex flex-wrap gap-2">
                       <button type="button" onClick={() => onApplyAction(action)} className="rounded-lg bg-emerald-400 px-3 py-2 text-[11px] font-semibold text-neutral-950 hover:bg-emerald-300">Confirmar e criar</button>
@@ -589,10 +732,16 @@ function LessonDetails({
       )}
 
       {lesson.activities.length > 0 && (
-        <section className="rounded-2xl border border-neutral-800 bg-[#15181b] p-4">
-        <h3 className="mb-3 flex items-center gap-2 text-sm font-semibold text-neutral-200"><ClipboardCheck size={15} className="text-amber-300" /> Atividade prática</h3>
+        <section className="rounded-2xl border border-amber-900/40 bg-gradient-to-br from-amber-950/20 to-[#15181b] p-4 sm:p-5">
+        <div className="mb-3 flex items-start justify-between gap-3">
+          <div>
+            <h3 className="flex items-center gap-2 text-sm font-semibold text-amber-100"><ClipboardCheck size={15} className="text-amber-300" /> Atividade prática</h3>
+            <p className="mt-1 text-[11px] text-neutral-500">Agora é sua vez de testar a ideia.</p>
+          </div>
+          <span className="rounded-full border border-amber-900/50 bg-amber-950/30 px-2 py-1 text-[10px] text-amber-200">Mão na massa</span>
+        </div>
           {lesson.activities.map((activity) => (
-            <div key={activity.id} className="mb-3 last:mb-0">
+            <div key={activity.id} className="mb-3 rounded-2xl border border-amber-900/30 bg-neutral-950/30 p-3 last:mb-0">
               <LearningRichText className="text-xs font-semibold text-neutral-200">{activity.title}</LearningRichText>
               <LearningRichText className="mt-1 text-xs leading-5 text-neutral-400">{activity.instructions}</LearningRichText>
             </div>
@@ -601,18 +750,25 @@ function LessonDetails({
       )}
 
       {lesson.questions.length > 0 && (
-        <section className="rounded-2xl border border-neutral-800 bg-[#15181b] p-4">
-          <h3 className="mb-3 flex items-center gap-2 text-sm font-semibold text-neutral-200"><Lightbulb size={15} className="text-amber-300" /> Verifique o que aprendeu</h3>
+        <section className="rounded-2xl border border-sky-900/40 bg-gradient-to-br from-sky-950/20 to-[#15181b] p-4 sm:p-5">
+          <div className="mb-4 flex items-start justify-between gap-3">
+            <div>
+              <h3 className="flex items-center gap-2 text-sm font-semibold text-sky-100"><Lightbulb size={15} className="text-sky-300" /> Verifique o que aprendeu</h3>
+              <p className="mt-1 text-[11px] text-neutral-500">Responda com suas palavras; o Coru ajuda a ajustar o raciocínio.</p>
+            </div>
+            <span className="rounded-full border border-sky-900/50 bg-sky-950/30 px-2 py-1 text-[10px] text-sky-200">Desafio</span>
+          </div>
           <div className="space-y-4">
             {lesson.questions.map((question, index) => {
               const completed = doneQuestions.has(question.id);
               const busy = busyQuestionId === question.id;
               return (
-                <div key={question.id} className="border-t border-neutral-800 pt-3 first:border-0 first:pt-0">
-                  <div className="flex gap-2 text-xs leading-5 text-neutral-200">
-                    {completed ? <CircleCheck size={15} className="mt-0.5 shrink-0 text-emerald-300" /> : <Circle size={15} className="mt-0.5 shrink-0 text-neutral-600" />}
+                <div key={question.id} className="rounded-2xl border border-sky-900/30 bg-neutral-950/35 p-3.5">
+                  <div className="flex gap-3 text-xs leading-5 text-neutral-200">
+                    <span className={`mt-0.5 flex size-6 shrink-0 items-center justify-center rounded-lg text-[10px] font-semibold ${completed ? 'bg-emerald-400 text-neutral-950' : 'bg-sky-400/10 text-sky-200'}`}>
+                      {completed ? <Check size={12} /> : index + 1}
+                    </span>
                     <div className="min-w-0">
-                      <span className="mr-1">{index + 1}.</span>
                       <LearningRichText className="inline text-xs leading-5 text-neutral-200">{question.prompt}</LearningRichText>
                     </div>
                   </div>
@@ -689,6 +845,20 @@ function SubjectTree({
           </button>
           );
         })}
+      </div>
+      <div className="mt-4 flex flex-col gap-3 border-t border-emerald-900/40 pt-3 sm:flex-row sm:items-center sm:justify-between">
+        <p className="text-[11px] leading-4 text-neutral-500">
+          {selectedTopic ? 'Tema escolhido. Você já pode iniciar sua aula.' : 'Selecione um tema para continuar.'}
+        </p>
+        <button
+          type="submit"
+          form="learning-start-form"
+          disabled={!selectedTopic.trim()}
+          className="flex h-10 items-center justify-center gap-2 rounded-xl bg-emerald-400 px-4 text-xs font-semibold text-neutral-950 transition hover:bg-emerald-300 disabled:cursor-not-allowed disabled:opacity-40"
+        >
+          <BookOpen size={14} />
+          Começar com este tema
+        </button>
       </div>
     </div>
   );
@@ -790,6 +960,7 @@ export default function LearningWorkspace() {
   const [draft, setDraft] = useState('');
   const [answers, setAnswers] = useState<Record<string, string>>({});
   const [isSending, setIsSending] = useState(false);
+  const [isResearching, setIsResearching] = useState(false);
   const [isGeneratingModel, setIsGeneratingModel] = useState(false);
   const [busyQuestionId, setBusyQuestionId] = useState<string | null>(null);
   const [error, setError] = useState('');
@@ -937,6 +1108,7 @@ export default function LearningWorkspace() {
     const controller = beginTeacherRequest();
     if (!controller) return;
     setIsSending(true);
+    setIsResearching(true);
     setError('');
     try {
       const targetSession = create
@@ -969,6 +1141,7 @@ export default function LearningWorkspace() {
     } finally {
       finishTeacherRequest(controller);
       setIsSending(false);
+      setIsResearching(false);
     }
   };
 
@@ -1123,7 +1296,7 @@ export default function LearningWorkspace() {
       className="relative flex h-full min-h-0 flex-col bg-[#0d0f10] text-neutral-100"
       data-tutorial="learning-workspace"
       style={{
-        backgroundImage: "linear-gradient(rgba(5, 10, 7, 0.32), rgba(5, 10, 7, 0.58)), url('/background_leaning.png')",
+        backgroundImage: "linear-gradient(rgba(5, 10, 7, 0.74), rgba(5, 10, 7, 0.90)), url('/background_leaning.png')",
         backgroundSize: 'cover',
         backgroundPosition: 'center',
         backgroundAttachment: 'fixed',
@@ -1181,7 +1354,7 @@ export default function LearningWorkspace() {
                   setTopicSearch('');
                 }}
               />
-              <form onSubmit={handleStartLesson} className="min-w-0 rounded-2xl border border-neutral-800 bg-[#15181b] p-4 shadow-xl shadow-black/10 sm:p-6">
+              <form id="learning-start-form" onSubmit={handleStartLesson} className="min-w-0 rounded-2xl border border-neutral-800 bg-[#15181b] p-4 shadow-xl shadow-black/10 sm:p-6">
               <label htmlFor="learning-topic" className="mb-2 block text-xs font-semibold uppercase tracking-[0.14em] text-neutral-400">Tema de estudo</label>
               <input
                 id="learning-topic"
@@ -1205,7 +1378,7 @@ export default function LearningWorkspace() {
               {error && <p role="alert" className="mt-3 rounded-lg border border-rose-900/50 bg-rose-950/25 px-3 py-2 text-xs text-rose-200">{error}</p>}
               <button type="submit" disabled={isSending || !topic.trim()} className="mt-5 flex h-11 w-full items-center justify-center gap-2 rounded-xl bg-emerald-400 px-4 text-sm font-semibold text-neutral-950 transition hover:bg-emerald-300 disabled:cursor-wait disabled:opacity-60 sm:w-auto sm:min-w-48">
                 {isSending ? <LoaderCircle size={16} className="animate-spin" /> : <BookOpen size={16} />}
-                {isSending ? 'Preparando sua aula...' : 'Começar a aprender'}
+                {isSending ? (isResearching ? 'Pesquisando fontes...' : 'Preparando sua aula...') : 'Começar a aprender'}
               </button>
               </form>
             </div>
@@ -1354,7 +1527,7 @@ export default function LearningWorkspace() {
               <div className="mx-auto flex max-w-4xl flex-col gap-4">
                 {project.messages.map((message) => <MessageBubble key={message.id} message={message} />)}
                 {isSending && (
-                  <div className="flex items-center gap-3 text-xs text-neutral-500"><span className="flex size-8 items-center justify-center overflow-hidden rounded-xl bg-emerald-400/10 text-emerald-300"><CoruAvatar className="size-8" /></span><LoaderCircle size={14} className="animate-spin" /> {isGeneratingModel ? 'Criando seu modelo 3D...' : 'Coru está pensando...'}</div>
+                  <div className="flex items-center gap-3 text-xs text-neutral-500"><span className="flex size-8 items-center justify-center overflow-hidden rounded-xl bg-emerald-400/10 text-emerald-300"><CoruAvatar className="size-8" /></span><LoaderCircle size={14} className="animate-spin" /> {isGeneratingModel ? 'Criando seu modelo 3D...' : isResearching ? 'Pesquisando fontes e montando sua aula...' : 'Coru está pensando...'}</div>
                 )}
                 {error && (
                   <div role="alert" className="ml-11 rounded-xl border border-rose-900/50 bg-rose-950/20 px-3 py-2 text-xs text-rose-200">

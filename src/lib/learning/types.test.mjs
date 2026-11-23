@@ -1,7 +1,13 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { normalizeAiText } from './richText.ts';
+import { isAvailableTeacherModelId } from './models.ts';
 import { normalizeLearningProject, normalizeTeacherResponse } from './types.ts';
+
+test('teacher model availability excludes Google models from the active pool', () => {
+  assert.equal(isAvailableTeacherModelId('gemini/gemini-2.5-flash'), false);
+  assert.equal(isAvailableTeacherModelId('glm-4.7-flash'), true);
+});
 
 test('rich text restores JSON-corrupted LaTeX commands and delimiters', () => {
   const broken = 'Calcule $2\times 2$ e use $\frac{1}{2}$. Compare $a \neq b$. Veja também \\(x^2\\) e \\[x+y\\].';
@@ -72,6 +78,28 @@ test('teacher response keeps model and failover telemetry', () => {
   assert.equal(response.modelInfo?.respondedModelName, 'GLM-4.7-Flash');
   assert.equal(response.modelInfo?.didFailover, true);
   assert.equal(response.modelInfo?.failedAttempts[0].reasonCode, 'provider_timeout');
+});
+
+test('teacher lesson keeps safe researched resources for the lesson cards', () => {
+  const response = normalizeTeacherResponse({
+    reply: 'Encontrei materiais para continuar estudando.',
+    research: {
+      query: 'Física: Gravidade',
+      providers: ['YouTube', 'Wikipedia'],
+      resources: [
+        { id: 'video-1', provider: 'YouTube', kind: 'video', title: 'Aula sobre gravidade', description: 'Uma explicação visual.', url: 'https://www.youtube.com/watch?v=abc123' },
+        { id: 'unsafe', provider: 'Web', kind: 'reference', title: 'Script', description: 'não deve passar', url: 'javascript:alert(1)' },
+      ],
+    },
+    lesson: {
+      explanation: 'A gravidade é uma interação fundamental que influencia o movimento dos corpos e pode ser observada em situações cotidianas e experimentos didáticos.\n\nEla será explorada com exemplos e perguntas ao longo da aula para conectar o conceito à cena 3D.',
+      steps: [{ id: 'step-1', title: 'Observe', content: 'Compare os movimentos.', kind: 'explanation' }],
+      resources: [{ id: 'video-1', provider: 'YouTube', kind: 'video', title: 'Aula sobre gravidade', description: 'Uma explicação visual.', url: 'https://www.youtube.com/watch?v=abc123' }],
+    },
+  });
+
+  assert.equal(response.research?.resources.length, 1);
+  assert.equal(response.lesson?.resources?.[0].provider, 'YouTube');
 });
 
 test('learning project migration keeps valid progress and filters invalid messages', () => {

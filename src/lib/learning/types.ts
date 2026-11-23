@@ -27,6 +27,26 @@ export type LearningSubject = {
   topics: string[];
 };
 
+export type LearningResourceKind = 'video' | 'reference' | 'search';
+
+export type LearningResource = {
+  id: string;
+  provider: string;
+  kind: LearningResourceKind;
+  title: string;
+  description: string;
+  url: string;
+  thumbnailUrl?: string;
+  author?: string;
+};
+
+export type LearningResearch = {
+  query: string;
+  searchedAt: string;
+  providers: string[];
+  resources: LearningResource[];
+};
+
 export type TeacherActionSuggestion = {
   id: string;
   type: TeacherActionType;
@@ -69,6 +89,7 @@ export type TeacherLessonPlan = {
   activities: TeacherActivity[];
   questions: TeacherQuestion[];
   actions: TeacherActionSuggestion[];
+  resources?: LearningResource[];
 };
 
 export type TeacherAssessment = {
@@ -101,6 +122,7 @@ export type TeacherApiResponse = {
   actions?: TeacherActionSuggestion[];
   assessment?: TeacherAssessment;
   modelInfo?: TeacherModelInfo;
+  research?: LearningResearch;
 };
 
 export type LearningMessage = {
@@ -175,10 +197,55 @@ const isRecord = (value: unknown): value is Record<string, unknown> =>
 const cleanText = (value: unknown, fallback = '', max = 1800) =>
   typeof value === 'string' ? value.trim().slice(0, max) : fallback;
 
+const cleanHttpUrl = (value: unknown, max = 700) => {
+  const candidate = cleanText(value, '', max);
+  try {
+    const url = new URL(candidate);
+    return url.protocol === 'http:' || url.protocol === 'https:' ? url.toString().slice(0, max) : '';
+  } catch {
+    return '';
+  }
+};
+
 const cleanList = (value: unknown, maxItems = 8, maxText = 360): string[] =>
   Array.isArray(value)
     ? value.slice(0, maxItems).map((item) => cleanText(item, '', maxText)).filter(Boolean)
     : [];
+
+export const normalizeLearningResources = (value: unknown): LearningResource[] => {
+  if (!Array.isArray(value)) return [];
+  return value.slice(0, 12).flatMap((item, index) => {
+    if (!isRecord(item)) return [];
+    const url = cleanHttpUrl(item.url);
+    const title = cleanText(item.title, '', 180);
+    if (!url || !title) return [];
+    const kind: LearningResourceKind = ['video', 'reference', 'search'].includes(item.kind as string)
+      ? (item.kind as LearningResourceKind)
+      : 'reference';
+    return [{
+      id: cleanText(item.id, `resource-${index + 1}`, 100),
+      provider: cleanText(item.provider, 'Fonte externa', 80),
+      kind,
+      title,
+      description: cleanText(item.description, 'Material complementar para aprofundar o tema.', 420),
+      url,
+      ...(cleanHttpUrl(item.thumbnailUrl) ? { thumbnailUrl: cleanHttpUrl(item.thumbnailUrl) } : {}),
+      ...(cleanText(item.author, '', 120) ? { author: cleanText(item.author, '', 120) } : {}),
+    }];
+  });
+};
+
+export const normalizeLearningResearch = (value: unknown): LearningResearch | undefined => {
+  if (!isRecord(value)) return undefined;
+  const resources = normalizeLearningResources(value.resources);
+  if (resources.length === 0) return undefined;
+  return {
+    query: cleanText(value.query, 'Tema da aula', 180),
+    searchedAt: cleanText(value.searchedAt, new Date().toISOString(), 40),
+    providers: cleanList(value.providers, 8, 80),
+    resources,
+  };
+};
 
 const levels: LearningLevel[] = ['beginner', 'intermediate', 'advanced'];
 const stepKinds: LessonStepKind[] = ['explanation', 'demonstration', 'practice', 'reflection'];
@@ -294,6 +361,7 @@ export const normalizeTeacherResponse = (value: unknown): TeacherApiResponse => 
     });
     const level = levels.includes(raw.level as LearningLevel) ? (raw.level as LearningLevel) : 'beginner';
     const explanation = cleanText(raw.explanation, '', 7000) || steps.map((step) => step.content).join('\n\n');
+    const resources = normalizeLearningResources(raw.resources);
     lesson = {
       title: cleanText(raw.title, 'Aula interativa', 120),
       subjectId: cleanText(raw.subjectId, 'general', 80),
@@ -308,6 +376,7 @@ export const normalizeTeacherResponse = (value: unknown): TeacherApiResponse => 
       activities,
       questions,
       actions: normalizeTeacherActions(raw.actions),
+      ...(resources.length > 0 ? { resources } : {}),
     };
     if (steps.length === 0) throw new Error('O plano de aula veio sem etapas válidas. Tente novamente.');
   }
@@ -327,12 +396,14 @@ export const normalizeTeacherResponse = (value: unknown): TeacherApiResponse => 
   }
 
   const modelInfo = normalizeTeacherModelInfo(value.modelInfo);
+  const research = normalizeLearningResearch(value.research);
   return {
     reply,
     ...(lesson ? { lesson } : {}),
     actions: normalizeTeacherActions(value.actions),
     ...(assessment ? { assessment } : {}),
     ...(modelInfo ? { modelInfo } : {}),
+    ...(research ? { research } : {}),
   };
 };
 
