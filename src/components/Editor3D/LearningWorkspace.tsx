@@ -1,5 +1,6 @@
 'use client';
 
+import Image from 'next/image';
 import { type FormEvent, useEffect, useRef, useState } from 'react';
 import {
   ArrowRight,
@@ -29,8 +30,17 @@ import {
   Send,
   type LucideIcon,
 } from 'lucide-react';
-import { TEACHER_MODELS, type AvailableTeacherModelId } from '@/lib/learning/models';
+import {
+  TEACHER_MODELS,
+  type AvailableTeacherModelId,
+  type GeminiTeacherModel,
+  type TeacherModelOption,
+  type TeacherProvider,
+  isGeminiTeacherModelId,
+} from '@/lib/learning/models';
+import { isExplicit3DModelRequest } from '@/lib/learning/modelIntent';
 import { LEARNING_SUBJECTS, findLearningSubject } from '@/lib/learning/subjects';
+import { buildEditableMeshFromAiData } from '@/lib/aiMeshEnhancer';
 import {
   normalizeTeacherResponse,
   type LearningLevel,
@@ -47,7 +57,110 @@ import { useLearningStore } from '@/store/learningStore';
 import { useMaterialStore } from '@/store/materialStore';
 import { usePhysicsStore } from '@/store/physicsStore';
 import { useSceneStore } from '@/store/sceneStore';
-import { DEFAULT_PHYSICS_CONFIG, type PrimitiveKind, type ScenePhysicsConfig } from '@/store/types';
+import { DEFAULT_PHYSICS_CONFIG, type EditorMaterial, type PrimitiveKind, type ScenePhysicsConfig, type Vec3 } from '@/store/types';
+
+type GeneratedMesh = {
+  name: string;
+  vertices: Vec3[];
+  faces: [number, number, number][];
+  position: Vec3;
+  rotation: Vec3;
+  scale: Vec3;
+  visible: boolean;
+  parentName?: string;
+  material: Partial<Pick<EditorMaterial,
+    | 'color'
+    | 'metalness'
+    | 'roughness'
+    | 'emissive'
+    | 'emissiveIntensity'
+    | 'opacity'
+    | 'textureRepeatX'
+    | 'textureRepeatY'
+    | 'textureOffsetX'
+    | 'textureOffsetY'
+    | 'textureRotation'
+  >>;
+};
+
+const isRecord = (value: unknown): value is Record<string, unknown> =>
+  typeof value === 'object' && value !== null && !Array.isArray(value);
+
+const isVec3 = (value: unknown): value is Vec3 =>
+  Array.isArray(value)
+  && value.length === 3
+  && value.every((coordinate) => typeof coordinate === 'number' && Number.isFinite(coordinate));
+
+const isTriangle = (value: unknown): value is [number, number, number] =>
+  Array.isArray(value)
+  && value.length === 3
+  && value.every((index) => typeof index === 'number' && Number.isInteger(index));
+
+const boundedNumber = (value: unknown, min: number, max: number) =>
+  typeof value === 'number' && Number.isFinite(value)
+    ? Math.max(min, Math.min(max, value))
+    : undefined;
+
+const normalizeGeneratedMesh = (value: unknown, index: number): GeneratedMesh => {
+  if (!isRecord(value) || typeof value.name !== 'string' || !value.name.trim()) {
+    throw new Error(`A malha ${index + 1} retornada pela IA não tem um nome válido.`);
+  }
+
+  const vertices = value.vertices;
+  const faces = value.faces;
+  if (!Array.isArray(vertices) || !vertices.every(isVec3)
+    || !Array.isArray(faces) || !faces.every(isTriangle)) {
+    throw new Error(`A malha "${value.name}" retornada pela IA está incompleta.`);
+  }
+
+  if (vertices.length < 8 || faces.length < 4
+    || faces.some((face) => face.some((vertexIndex) => vertexIndex < 0 || vertexIndex >= vertices.length))) {
+    throw new Error(`A malha "${value.name}" não contém geometria 3D válida.`);
+  }
+
+  const materialSource = isRecord(value.material) ? value.material : {};
+  const material: GeneratedMesh['material'] = {};
+  for (const key of ['color', 'emissive'] as const) {
+    const color = materialSource[key];
+    if (typeof color === 'string' && /^#([0-9a-f]{6})$/i.test(color)) material[key] = color;
+  }
+  const materialNumberRanges = {
+    metalness: [0, 1],
+    roughness: [0, 1],
+    emissiveIntensity: [0, 5],
+    opacity: [0, 1],
+    textureRepeatX: [0.1, 8],
+    textureRepeatY: [0.1, 8],
+    textureOffsetX: [-2, 2],
+    textureOffsetY: [-2, 2],
+    textureRotation: [-Math.PI, Math.PI],
+  } as const;
+  for (const [key, [min, max]] of Object.entries(materialNumberRanges) as Array<
+    [keyof typeof materialNumberRanges, readonly [number, number]]
+  >) {
+    const parsed = boundedNumber(materialSource[key], min, max);
+    if (parsed !== undefined) material[key] = parsed;
+  }
+
+  return {
+    name: value.name.trim(),
+    vertices,
+    faces,
+    position: isVec3(value.position) ? value.position : [0, 0.5, 0],
+    rotation: isVec3(value.rotation) ? value.rotation : [0, 0, 0],
+    scale: isVec3(value.scale) ? value.scale : [1, 1, 1],
+    visible: typeof value.visible === 'boolean' ? value.visible : true,
+    ...(typeof value.parentName === 'string' ? { parentName: value.parentName } : {}),
+    material,
+  };
+};
+
+const parseGeneratedMeshes = (value: unknown): GeneratedMesh[] => {
+  if (!isRecord(value) || !Array.isArray(value.objects) || value.objects.length === 0) {
+    throw new Error('A IA não retornou objetos para montar a cena.');
+  }
+  return value.objects.map(normalizeGeneratedMesh);
+};
 
 const levelLabels: Record<LearningLevel, string> = {
   beginner: 'Iniciante',
@@ -81,7 +194,28 @@ type TeacherModelSelectorProps = {
 
 const TeacherModelSelector = ({ modelId, onModelChange }: TeacherModelSelectorProps) => {
   const detailsRef = useRef<HTMLDetailsElement>(null);
-  const selectedModel = TEACHER_MODELS.find((model) => model.id === modelId) ?? TEACHER_MODELS[0];
+  const [geminiModels, setGeminiModels] = useState<GeminiTeacherModel[]>([]);
+  const [geminiConfigured, setGeminiConfigured] = useState<boolean | null>(null);
+  const [geminiLoading, setGeminiLoading] = useState(true);
+  const [geminiError, setGeminiError] = useState('');
+  const models: TeacherModelOption[] = [...TEACHER_MODELS];
+  const selectedModel = models.find((model) => model.id === modelId)
+    ?? models[0];
+  const providerName: Record<TeacherProvider, string> = {
+    nvidia: 'NVIDIA · IA',
+    zai: 'Z.AI · GLM',
+    gemini: 'Google · Gemini',
+  };
+  const providerDetailName: Record<TeacherProvider, string> = {
+    nvidia: 'NVIDIA Nemotron',
+    zai: 'Z.AI GLM',
+    gemini: 'Google Gemini',
+  };
+  const providerColor: Record<TeacherProvider, string> = {
+    nvidia: 'text-[#76b900]',
+    zai: 'text-sky-300',
+    gemini: 'text-violet-300',
+  };
 
   useEffect(() => {
     const closeOnOutsideClick = (event: PointerEvent) => {
@@ -93,28 +227,71 @@ const TeacherModelSelector = ({ modelId, onModelChange }: TeacherModelSelectorPr
     return () => document.removeEventListener('pointerdown', closeOnOutsideClick);
   }, []);
 
+  useEffect(() => {
+    let active = true;
+    fetch('/api/ai/teacher/models')
+      .then(async (response) => {
+        const payload: unknown = await response.json();
+        if (!response.ok) {
+          const message = isRecord(payload) && typeof payload.error === 'string'
+            ? payload.error
+            : 'Não foi possível carregar os modelos Gemini.';
+          throw new Error(message);
+        }
+        if (!isRecord(payload) || !Array.isArray(payload.models)) {
+          throw new Error('A API retornou um catálogo Gemini inválido.');
+        }
+        const loadedModels = payload.models.filter((model): model is GeminiTeacherModel =>
+          isRecord(model)
+          && isGeminiTeacherModelId(model.id)
+          && typeof model.name === 'string'
+          && model.provider === 'gemini'
+          && model.apiAvailable === true,
+        ).filter((model) => /gemini-(?:2\.5-flash(?:-lite)?|flash(?:-lite)?-latest|3(?:\.1)?-flash(?:-lite)?(?:-preview)?)/i.test(model.id));
+        if (!active) return;
+        setGeminiModels(loadedModels);
+        if (loadedModels[0] && !isGeminiTeacherModelId(modelId)) {
+          onModelChange(loadedModels[0].id);
+        }
+        setGeminiConfigured(payload.configured === true);
+        setGeminiError('');
+      })
+      .catch((requestError: unknown) => {
+        if (!active) return;
+        setGeminiError(requestError instanceof Error ? requestError.message : 'Não foi possível carregar os modelos Gemini.');
+      })
+      .finally(() => {
+        if (active) setGeminiLoading(false);
+      });
+    return () => {
+      active = false;
+    };
+  }, []);
+
   return (
     <details ref={detailsRef} className="relative">
       <summary
-        aria-label={`Modelo do Professor IA: NVIDIA ${selectedModel.name}`}
+        aria-label={`Modelo do Professor IA: ${providerName[selectedModel.provider]} ${selectedModel.name}`}
         className="flex max-w-64 cursor-pointer list-none items-center gap-2 rounded-lg border border-neutral-800 bg-neutral-950/50 px-2.5 py-1.5 outline-none transition hover:border-neutral-700 focus-visible:ring-2 focus-visible:ring-emerald-500 [&::-webkit-details-marker]:hidden"
       >
-        <NvidiaBrandMark className="size-5 shrink-0" />
+        <AIModelBrandMark provider={selectedModel.provider} className="size-5 shrink-0" />
         <span className="min-w-0 text-left">
-          <span className="block text-[9px] font-semibold uppercase tracking-[0.12em] text-[#76b900]">NVIDIA · IA</span>
+          <span className={`block text-[9px] font-semibold uppercase tracking-[0.12em] ${providerColor[selectedModel.provider]}`}>
+            {providerName[selectedModel.provider]}
+          </span>
           <span className="block truncate text-[11px] font-medium text-neutral-200">{selectedModel.name}</span>
         </span>
         <ChevronDown size={14} className="shrink-0 text-neutral-500" aria-hidden="true" />
       </summary>
       <div
         role="group"
-        aria-label="Modelos NVIDIA disponíveis para o Professor IA"
-        className="absolute right-0 top-full z-[80] mt-2 w-[min(22rem,calc(100vw-2rem))] overflow-hidden rounded-xl border border-neutral-700 bg-[#17191b] p-1.5 shadow-2xl shadow-black/50"
+        aria-label="Modelos de IA disponíveis para o Professor IA"
+        className="absolute right-0 top-full z-[80] mt-2 max-h-[18rem] w-[min(20rem,calc(100vw-2rem))] overflow-y-auto overflow-x-hidden rounded-xl border border-neutral-700 bg-[#17191b] p-1.5 shadow-2xl shadow-black/50"
       >
         <p className="px-2.5 pb-1.5 pt-2 text-[10px] font-semibold uppercase tracking-[0.14em] text-neutral-500">
           Escolha o modelo
         </p>
-        {TEACHER_MODELS.map((model) => (
+        {models.map((model) => (
           <button
             key={model.id}
             type="button"
@@ -125,12 +302,14 @@ const TeacherModelSelector = ({ modelId, onModelChange }: TeacherModelSelectorPr
               onModelChange(model.id);
               if (detailsRef.current) detailsRef.current.open = false;
             }}
-            className="flex w-full items-start gap-3 rounded-lg px-2.5 py-2.5 text-left transition hover:bg-neutral-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500 disabled:cursor-not-allowed disabled:opacity-45"
+            className="flex w-full items-start gap-2.5 rounded-lg px-2 py-2 text-left transition hover:bg-neutral-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500 disabled:cursor-not-allowed disabled:opacity-45"
           >
-            <NvidiaBrandMark className="mt-0.5 size-6 shrink-0" />
+            <AIModelBrandMark provider={model.provider} className="mt-0.5 size-6 shrink-0" />
             <span className="min-w-0 flex-1">
               <span className="flex flex-wrap items-center gap-x-1.5 gap-y-1">
-                <span className="text-[9px] font-semibold uppercase tracking-[0.1em] text-[#76b900]">NVIDIA Nemotron</span>
+                <span className={`text-[9px] font-semibold uppercase tracking-[0.1em] ${providerColor[model.provider]}`}>
+                  {providerDetailName[model.provider]}
+                </span>
                 <span className="rounded-full border border-neutral-700 px-1.5 py-0.5 text-[9px] text-neutral-400">{model.badge}</span>
               </span>
               <span className="mt-1 block text-xs font-semibold text-neutral-100">{model.name}</span>
@@ -144,10 +323,16 @@ const TeacherModelSelector = ({ modelId, onModelChange }: TeacherModelSelectorPr
   );
 };
 
-const NvidiaBrandMark = ({ className }: { className: string }) => (
-  <svg className={className} viewBox="0 0 24 24" fill="currentColor" aria-hidden="true" focusable="false">
-    <path d="M8.948 8.798v-1.43a6.7 6.7 0 0 1 .424-.018c3.922-.124 6.493 3.374 6.493 3.374s-2.774 3.851-5.75 3.851c-.398 0-.787-.062-1.158-.185v-4.346c1.528.185 1.837.857 2.747 2.385l2.04-1.714s-1.492-1.952-4-1.952a6.016 6.016 0 0 0-.796.035m0-4.735v2.138l.424-.027c5.45-.185 9.01 4.47 9.01 4.47s-4.08 4.964-8.33 4.964c-.37 0-.733-.035-1.095-.097v1.325c.3.035.61.062.91.062 3.957 0 6.82-2.023 9.593-4.408.459.371 2.34 1.263 2.73 1.652-2.633 2.208-8.772 3.984-12.253 3.984-.335 0-.653-.018-.971-.053v1.864H24V4.063zm0 10.326v1.131c-3.657-.654-4.673-4.46-4.673-4.46s1.758-1.944 4.673-2.262v1.237H8.94c-1.528-.186-2.73 1.245-2.73 1.245s.68 2.412 2.739 3.11M2.456 10.9s2.164-3.197 6.5-3.533V6.201C4.153 6.59 0 10.653 0 10.653s2.35 6.802 8.948 7.42v-1.237c-4.84-.6-6.492-5.936-6.492-5.936z" />
-  </svg>
+const AIModelBrandMark = ({ provider, className }: { provider: TeacherProvider; className: string }) => (
+  provider === 'nvidia' ? (
+    <svg className={`${className} text-[#76b900]`} viewBox="0 0 24 24" fill="currentColor" aria-hidden="true" focusable="false">
+      <path d="M8.948 8.798v-1.43a6.7 6.7 0 0 1 .424-.018c3.922-.124 6.493 3.374 6.493 3.374s-2.774 3.851-5.75 3.851c-.398 0-.787-.062-1.158-.185v-4.346c1.528.185 1.837.857 2.747 2.385l2.04-1.714s-1.492-1.952-4-1.952a6.016 6.016 0 0 0-.796.035m0-4.735v2.138l.424-.027c5.45-.185 9.01 4.47 9.01 4.47s-4.08 4.964-8.33 4.964c-.37 0-.733-.035-1.095-.097v1.325c.3.035.61.062.91.062 3.957 0 6.82-2.023 9.593-4.408.459.371 2.34 1.263 2.73 1.652-2.633 2.208-8.772 3.984-12.253 3.984-.335 0-.653-.018-.971-.053v1.864H24V4.063zm0 10.326v1.131c-3.657-.654-4.673-4.46-4.673-4.46s1.758-1.944 4.673-2.262v1.237H8.94c-1.528-.186-2.73 1.245-2.73 1.245s.68 2.412 2.739 3.11M2.456 10.9s2.164-3.197 6.5-3.533V6.201C4.153 6.59 0 10.653 0 10.653s2.35 6.802 8.948 7.42v-1.237c-4.84-.6-6.492-5.936-6.492-5.936z" />
+    </svg>
+  ) : provider === 'zai' ? (
+    <Image src="/zai-logo.svg" alt="" width={24} height={24} className={className} />
+  ) : (
+    <Image src="/gemini-logo.svg" alt="" width={24} height={24} className={className} />
+  )
 );
 
 const callTeacher = async (request: TeacherRequest): Promise<TeacherApiResponse> => {
@@ -161,7 +346,10 @@ const callTeacher = async (request: TeacherRequest): Promise<TeacherApiResponse>
     const message = typeof payload === 'object' && payload !== null && 'error' in payload && typeof payload.error === 'string'
       ? payload.error
       : 'Não foi possível falar com o Mestre IA.';
-    throw new Error(message);
+    const debugCode = typeof payload === 'object' && payload !== null && 'debugCode' in payload && typeof payload.debugCode === 'string'
+      ? ` (${payload.debugCode})`
+      : '';
+    throw new Error(`${message}${debugCode}`);
   }
   return normalizeTeacherResponse(payload);
 };
@@ -311,13 +499,19 @@ function LessonDetails({
     <div className="space-y-4">
       <section className="rounded-2xl border border-neutral-800 bg-[#15181b] p-4">
         <div className="mb-3 flex items-center gap-2 text-[11px] font-semibold uppercase tracking-[0.14em] text-emerald-300">
-          <BookOpen size={14} /> Plano da aula
+          <BookOpen size={14} /> Aula
         </div>
         <h2 className="text-lg font-semibold text-white">{lesson.title}</h2>
         <p className="mt-1 text-xs text-neutral-500">{lesson.subjectName} · {levelLabels[lesson.level]}</p>
         <div className="mt-4 rounded-xl bg-neutral-900/70 p-3">
           <p className="text-[10px] font-semibold uppercase tracking-wide text-neutral-500">Objetivo</p>
           <p className="mt-1 text-sm leading-5 text-neutral-200">{lesson.objective}</p>
+        </div>
+        <div className="mt-4 rounded-xl border border-emerald-900/40 bg-neutral-950/60 p-4 sm:p-5">
+          <h3 className="mb-3 text-sm font-semibold text-emerald-200">Conteúdo da aula</h3>
+          <div className="whitespace-pre-wrap text-sm leading-7 text-neutral-200">
+            {lesson.explanation}
+          </div>
         </div>
         {lesson.prerequisites.length > 0 && (
           <div className="mt-3">
@@ -330,7 +524,7 @@ function LessonDetails({
       </section>
 
       <section className="rounded-2xl border border-neutral-800 bg-[#15181b] p-4">
-        <h3 className="mb-3 flex items-center gap-2 text-sm font-semibold text-neutral-200"><CircleCheck size={15} className="text-emerald-300" /> Etapas</h3>
+        <h3 className="mb-3 flex items-center gap-2 text-sm font-semibold text-neutral-200"><CircleCheck size={15} className="text-emerald-300" /> Roteiro para estudar</h3>
         <div className="space-y-2">
           {lesson.steps.map((step, index) => {
             const completed = doneSteps.has(step.id);
@@ -449,8 +643,14 @@ export default function LearningWorkspace() {
   const setSessionStatus = useLearningStore((state) => state.setSessionStatus);
   const setActiveMode = useExperienceStore((state) => state.setActiveMode);
   const selectedObjectIds = useEditorStore((state) => state.selectedObjectIds);
+  const setSelectedObject = useEditorStore((state) => state.setSelectedObject);
   const setActiveTool = useEditorStore((state) => state.setActiveTool);
   const objects = useSceneStore((state) => state.objects);
+  const addObject = useSceneStore((state) => state.addObject);
+  const updateObject = useSceneStore((state) => state.updateObject);
+  const createMaterialForObject = useMaterialStore((state) => state.createMaterialForObject);
+  const updateMaterial = useMaterialStore((state) => state.updateMaterial);
+  const pushSnapshot = useHistoryStore((state) => state.pushSnapshot);
 
   const [subjectId, setSubjectId] = useState('general');
   const [level, setLevel] = useState<LearningLevel>('beginner');
@@ -458,6 +658,7 @@ export default function LearningWorkspace() {
   const [draft, setDraft] = useState('');
   const [answers, setAnswers] = useState<Record<string, string>>({});
   const [isSending, setIsSending] = useState(false);
+  const [isGeneratingModel, setIsGeneratingModel] = useState(false);
   const [busyQuestionId, setBusyQuestionId] = useState<string | null>(null);
   const [error, setError] = useState('');
   const [homeSessionId, setHomeSessionId] = useState<string | null>(null);
@@ -496,6 +697,80 @@ export default function LearningWorkspace() {
     completedQuestions: current.completedQuestionIds.length,
     appliedDemonstrations: current.appliedActionIds.length,
   });
+
+  const createModelFromPrompt = async (prompt: string, current: NonNullable<typeof session>) => {
+    const modelContext = `\nContexto: ${current.topic} (${current.subjectName}).`;
+    const instruction = '\nGere o modelo do pedido; se ele for genérico, modele o contexto.';
+    const suffix = `${modelContext}${instruction}`;
+    const modelPrompt = `${prompt.slice(0, Math.max(0, 800 - suffix.length))}${suffix}`;
+    const response = await fetch('/api/ai/generate', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ prompt: modelPrompt }),
+    });
+    const payload: unknown = await response.json();
+    if (!response.ok) {
+      const message = isRecord(payload) && typeof payload.error === 'string'
+        ? payload.error
+        : 'Não foi possível gerar o modelo 3D.';
+      throw new Error(message);
+    }
+
+    const generatedMeshes = parseGeneratedMeshes(payload).map((item) => ({
+      ...item,
+      editableMesh: buildEditableMeshFromAiData(item.vertices, item.faces),
+    }));
+    pushSnapshot();
+    let lastObjectId: string | null = null;
+    const createdObjects: Array<{
+      uuid: string;
+      name: string;
+      parentName?: string;
+      position: Vec3;
+    }> = [];
+
+    generatedMeshes.forEach((item) => {
+      const object = addObject({
+        name: item.name,
+        kind: 'mesh',
+        position: item.position,
+        rotation: item.rotation,
+        scale: item.scale,
+        visible: item.visible,
+        editableMesh: item.editableMesh,
+      });
+      createMaterialForObject(object.uuid, object.materialId, `Material ${item.name}`);
+      updateMaterial(object.materialId, item.material);
+      createdObjects.push({ uuid: object.uuid, name: item.name, parentName: item.parentName, position: item.position });
+      lastObjectId = object.uuid;
+    });
+
+    const nameToPosition = new Map(createdObjects.map((item) => [item.name.toLocaleLowerCase('pt-BR'), item.position]));
+    const nameToId = new Map(createdObjects.map((item) => [item.name.toLocaleLowerCase('pt-BR'), item.uuid]));
+    createdObjects.forEach((item) => {
+      if (!item.parentName) return;
+      const parentKey = item.parentName.toLocaleLowerCase('pt-BR');
+      const parentId = nameToId.get(parentKey);
+      if (!parentId || parentId === item.uuid) return;
+      const parentPosition = nameToPosition.get(parentKey);
+      const position: Vec3 = parentPosition
+        ? [
+            Number((item.position[0] - parentPosition[0]).toFixed(3)),
+            Number((item.position[1] - parentPosition[1]).toFixed(3)),
+            Number((item.position[2] - parentPosition[2]).toFixed(3)),
+          ]
+        : item.position;
+      updateObject(item.uuid, { parent: parentId, position });
+    });
+
+    if (lastObjectId) setSelectedObject(lastObjectId);
+    setActiveTool('translate');
+    setActiveMode('scene');
+    addMessage({
+      role: 'teacher',
+      content: `Criei o modelo 3D solicitado e adicionei ${generatedMeshes.length} partes à cena. Você já pode explorá-lo no editor.`,
+    });
+  };
 
   const requestLesson = async (subject: { id: string; name: string }, lessonTopic: string, lessonLevel: LearningLevel, create = true) => {
     setIsSending(true);
@@ -542,11 +817,18 @@ export default function LearningWorkspace() {
   const sendPrompt = async (prompt: string) => {
     const current = useLearningStore.getState().project.currentSession;
     if (!current || !prompt.trim() || isSending) return;
-    addMessage({ role: 'student', content: prompt.trim() });
+    const trimmedPrompt = prompt.trim();
+    const requestsModel = isExplicit3DModelRequest(trimmedPrompt);
+    addMessage({ role: 'student', content: trimmedPrompt });
     setDraft('');
     setIsSending(true);
+    setIsGeneratingModel(requestsModel);
     setError('');
     try {
+      if (requestsModel) {
+        await createModelFromPrompt(trimmedPrompt, current);
+        return;
+      }
       const response = await callTeacher({
         mode: 'chat',
         modelId: project.modelId,
@@ -555,7 +837,7 @@ export default function LearningWorkspace() {
         topic: current.topic,
         level: current.level,
         messages: teacherHistory(),
-        prompt: prompt.trim(),
+        prompt: trimmedPrompt,
         progress: learningProgress(current),
         scene: getSceneContext(),
       });
@@ -565,6 +847,7 @@ export default function LearningWorkspace() {
       setError(requestError instanceof Error ? requestError.message : 'O professor não conseguiu responder.');
     } finally {
       setIsSending(false);
+      setIsGeneratingModel(false);
     }
   };
 
@@ -759,7 +1042,7 @@ export default function LearningWorkspace() {
               <div className="mx-auto flex max-w-4xl flex-col gap-4">
                 {project.messages.map((message) => <MessageBubble key={message.id} message={message} />)}
                 {isSending && (
-                  <div className="flex items-center gap-3 text-xs text-neutral-500"><span className="flex size-8 items-center justify-center rounded-xl bg-emerald-400/10 text-emerald-300"><GraduationCap size={15} /></span><LoaderCircle size={14} className="animate-spin" /> O professor está pensando...</div>
+                  <div className="flex items-center gap-3 text-xs text-neutral-500"><span className="flex size-8 items-center justify-center rounded-xl bg-emerald-400/10 text-emerald-300"><GraduationCap size={15} /></span><LoaderCircle size={14} className="animate-spin" /> {isGeneratingModel ? 'Criando seu modelo 3D...' : 'O professor está pensando...'}</div>
                 )}
                 {error && (
                   <div role="alert" className="ml-11 rounded-xl border border-rose-900/50 bg-rose-950/20 px-3 py-2 text-xs text-rose-200">

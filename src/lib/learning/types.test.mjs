@@ -11,6 +11,7 @@ test('teacher response keeps only registered editor actions', () => {
       subjectName: 'Matemática',
       topic: 'Geometria espacial',
       level: 'beginner',
+      explanation: 'Um sólido geométrico ocupa espaço e possui três dimensões. O cubo tem faces quadradas, enquanto a esfera apresenta uma superfície curva. Comparar essas propriedades permite classificar os objetos pela forma e compreender como as dimensões se relacionam.',
       steps: [{ id: 'step-1', title: 'Observe', content: 'Compare os objetos.', kind: 'explanation' }],
       actions: [
         { id: 'unsafe', type: 'run_script', label: 'Executar código', description: 'Código arbitrário.' },
@@ -21,6 +22,7 @@ test('teacher response keeps only registered editor actions', () => {
 
   assert.equal(response.lesson?.actions.length, 1);
   assert.equal(response.lesson?.actions[0].type, 'geometry_demo');
+  assert.match(response.lesson?.explanation ?? '', /três dimensões/);
 });
 
 test('teacher response limits lesson content and rejects empty replies', () => {

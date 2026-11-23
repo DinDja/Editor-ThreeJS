@@ -201,16 +201,16 @@
 
 ## Aprender
 
-O modo `Aprender` transforma o editor em um ambiente de estudo com o Mestre IA. O estudante pode escolher uma area, um nivel e um tema, ou apenas escrever o que deseja aprender. A resposta inicial cria um plano com objetivo, etapas, atividade e perguntas de verificacao.
+O modo `Aprender` transforma o editor em um ambiente de estudo com o Mestre IA. O estudante pode escolher uma area, um nivel e um tema, ou apenas escrever o que deseja aprender. A resposta inicial apresenta o conteudo da aula em uma explicacao desenvolvida; roteiro, atividade e perguntas sao complementos, nao substitutos da aula.
 
-O painel permite conversar sobre a aula, pedir exemplos e enviar respostas para receber feedback e pistas. Etapas concluidas, respostas corretas, demonstracoes aplicadas e mensagens recentes ficam no projeto educacional e acompanham o autosave, o historico e o arquivo `.web3d.json`.
+O painel permite conversar sobre a aula, pedir exemplos e enviar respostas para receber feedback e pistas. Pedidos explícitos como "faça o modelo" acionam o gerador de malhas 3D e inserem o resultado na cena; perguntas e pedidos de explicação continuam no chat. Essa geração usa NVIDIA NIM e `NVIDIA_NIM_API_KEY`, independentemente do modelo selecionado para o Mestre IA. Etapas concluidas, respostas corretas, demonstracoes aplicadas e mensagens recentes ficam no projeto educacional e acompanham o autosave, o historico e o arquivo `.web3d.json`.
 
 Quando a aula sugere uma demonstracao disponivel, o estudante revisa a previa e confirma antes de alterar a cena. A primeira versao tem duas acoes reais:
 
 - **Geometria:** cria cubo, esfera, cilindro e cone coloridos na cena.
 - **Gravidade:** cria um piso estatico, esfera e cubo dinamicos e inicia a simulacao Rapier com gravidade.
 
-As demais areas podem receber aulas e atividades em texto; novas acoes visuais podem ser adicionadas ao catalogo fechado sem permitir que a IA execute codigo arbitrario. O seletor do Mestre IA oferece tres modelos NVIDIA Nemotron via API: Nemotron 3.5 Super VL 120B como opcao recomendada, Nemotron 3.5 Lightning 30B A3B para respostas rapidas e Nemotron 3 Ultra 550B A55B para raciocinio avancado. Kimi K3.1 Pro nao aparece entre as opcoes porque o NVIDIA Build ainda o publica apenas para uso no Playground, sem acesso programatico. Falhas transitorias do provedor acionam novas tentativas automaticas e transparentes, limitadas para evitar esperas indefinidas. O Mestre IA usa `NVIDIA_NIM_API_KEY` no servidor e aceita `NVIDIA_NIM_TEACHER_MODEL_PRIMARY` para escolher seu modelo inicial sem alterar o modelo do gerador de malhas. A chave nunca e enviada ao navegador.
+As demais areas podem receber aulas e atividades em texto; novas acoes visuais podem ser adicionadas ao catalogo fechado sem permitir que a IA execute codigo arbitrario. O seletor do Mestre IA oferece os modelos NVIDIA Nemotron 3.5 Super VL 120B, 3.5 Lightning 30B A3B, 3 Ultra 550B A55B e Kimi K3.1 Pro (`moonshotai/kimi-k3.1-pro`), os modelos gratuitos Z.AI GLM-4.7-Flash e GLM-4.5-Flash e os modelos Gemini que a API listar como compatíveis com `generateContent`. A lista Gemini e carregada dinamicamente e nao inclui modelos apenas de embedding; se a chave puder gerar conteúdo mas não puder listar modelos, exibimos um catálogo conhecido e deixamos a própria chamada confirmar a disponibilidade. Cada provedor usa sua propria chave de servidor: `NVIDIA_NIM_API_KEY`, `ZAI_API_KEY` e `GEMINI_API_KEY`. Em falhas, a rota tenta automaticamente outros modelos configurados, sem repetir chamadas identicas. O Mestre IA aceita `NVIDIA_NIM_TEACHER_MODEL_PRIMARY` para escolher seu modelo inicial sem alterar o modelo do gerador de malhas. As chaves nunca sao enviadas ao navegador.
 
 Para validar os schemas e a persistencia da camada educacional, execute `npm run test:learning`.
 
@@ -1239,9 +1239,11 @@ NVIDIA_NIM_MODEL_PRIMARY=nvidia/llama-3.1-nemotron-70b-instruct
 NVIDIA_NIM_MODEL_FALLBACK=meta/llama-3.1-8b-instruct
 NVIDIA_NIM_TEACHER_MODEL_PRIMARY=nvidia/nemotron-3.5-super-vl-120b-a12b
 NVIDIA_NIM_BASE_URL=https://integrate.api.nvidia.com/v1
+ZAI_API_KEY=your_zai_api_key
+GEMINI_API_KEY=your_gemini_api_key
 ```
 
-No Vercel, configure as mesmas variaveis no projeto e faca redeploy para aplicar.
+`ZAI_API_KEY` e necessaria para selecionar os modelos GLM da Z.AI. `GEMINI_API_KEY` e necessaria para carregar o catalogo Gemini e usar seus modelos. No Vercel, configure as variaveis de cada provedor que pretende usar e faca redeploy para aplicar.
 
 </details>
 

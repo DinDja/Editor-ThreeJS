@@ -62,6 +62,7 @@ export type TeacherLessonPlan = {
   topic: string;
   level: LearningLevel;
   objective: string;
+  explanation: string;
   prerequisites: string[];
   objectives: string[];
   steps: TeacherLessonStep[];
@@ -244,6 +245,7 @@ export const normalizeTeacherResponse = (value: unknown): TeacherApiResponse => 
       }];
     });
     const level = levels.includes(raw.level as LearningLevel) ? (raw.level as LearningLevel) : 'beginner';
+    const explanation = cleanText(raw.explanation, '', 7000) || steps.map((step) => step.content).join('\n\n');
     lesson = {
       title: cleanText(raw.title, 'Aula interativa', 120),
       subjectId: cleanText(raw.subjectId, 'general', 80),
@@ -251,6 +253,7 @@ export const normalizeTeacherResponse = (value: unknown): TeacherApiResponse => 
       topic: cleanText(raw.topic, 'Tema de estudo', 180),
       level,
       objective: cleanText(raw.objective, 'Compreender o tema por meio de explicação e prática.', 360),
+      explanation,
       prerequisites: cleanList(raw.prerequisites, 5),
       objectives: cleanList(raw.objectives, 6),
       steps,
