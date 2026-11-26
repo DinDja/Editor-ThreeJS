@@ -11,6 +11,7 @@ import {
   type TeacherActionSuggestion,
   type TeacherLessonPlan,
   type TeacherAssessment,
+  type MindMapMark,
 } from '@/lib/learning/types';
 import type { AvailableTeacherModelId } from '@/lib/learning/models';
 
@@ -31,6 +32,8 @@ type LearningState = {
   markStepComplete: (stepId: string) => void;
   markQuestionComplete: (questionId: string) => void;
   markActionApplied: (actionId: string) => void;
+  setMindMapMark: (nodeId: string, mark: MindMapMark | null) => void;
+  setMindMapNote: (nodeId: string, note: string) => void;
   setSessionStatus: (status: LearningSessionStatus) => void;
   clearCurrentSession: () => void;
   loadLearningProject: (project: unknown) => void;
@@ -67,6 +70,8 @@ export const useLearningStore = create<LearningState>((set, get) => ({
       completedStepIds: [],
       completedQuestionIds: [],
       appliedActionIds: [],
+      mindMapMarks: {},
+      mindMapNotes: {},
       startedAt: timestamp,
       updatedAt: timestamp,
     };
@@ -178,6 +183,47 @@ export const useLearningStore = create<LearningState>((set, get) => ({
           currentSession: {
             ...session,
             appliedActionIds: [...session.appliedActionIds, actionId].slice(0, 8),
+            updatedAt: now(),
+          },
+        },
+      };
+    }),
+
+  setMindMapMark: (nodeId, mark) =>
+    set((state) => {
+      const session = state.project.currentSession;
+      const id = nodeId.trim().slice(0, 80);
+      if (!session || !id) return state;
+      const marks = { ...session.mindMapMarks };
+      if (mark) marks[id] = mark;
+      else delete marks[id];
+      return {
+        project: {
+          ...state.project,
+          currentSession: {
+            ...session,
+            mindMapMarks: Object.fromEntries(Object.entries(marks).slice(-64)),
+            updatedAt: now(),
+          },
+        },
+      };
+    }),
+
+  setMindMapNote: (nodeId, note) =>
+    set((state) => {
+      const session = state.project.currentSession;
+      const id = nodeId.trim().slice(0, 80);
+      if (!session || !id) return state;
+      const notes = { ...session.mindMapNotes };
+      const trimmed = note.trim().slice(0, 360);
+      if (trimmed) notes[id] = trimmed;
+      else delete notes[id];
+      return {
+        project: {
+          ...state.project,
+          currentSession: {
+            ...session,
+            mindMapNotes: Object.fromEntries(Object.entries(notes).slice(-64)),
             updatedAt: now(),
           },
         },

@@ -45,6 +45,20 @@ type PageExperienceProps = {
   onContextMenuNode?: (id: string, event: MouseEvent<HTMLElement>) => void;
 };
 
+// Helper to extract YouTube video ID from various URL formats
+const extractYouTubeId = (url: string): string | null => {
+  if (!url) return null;
+  const patterns = [
+    /(?:youtube\.com\/watch\?v=|youtu\.be\/|youtube\.com\/embed\/|youtube\.com\/v\/)([^&\n?#]+)/,
+    /youtube\.com\/shorts\/([^&\n?#]+)/,
+  ];
+  for (const pattern of patterns) {
+    const match = url.match(pattern);
+    if (match && match[1]) return match[1];
+  }
+  return null;
+};
+
 const toCssProperties = (node: PageNode, activeBreakpoint: string, pseudoOverride?: PseudoClass | null): CSSProperties => {
   const base = {
     ...(node.styles.base as CSSProperties),
@@ -444,6 +458,39 @@ function PageNodeView({
 
   if (node.type === 'video') {
     const src = typeof node.props.src === 'string' ? node.props.src : '';
+      const videoType = typeof node.props.videoType === 'string' ? node.props.videoType : 'file';
+    
+      if (videoType === 'youtube') {
+        // Extract YouTube video ID from URL
+        const youtubeId = extractYouTubeId(src);
+        if (youtubeId) {
+          const embedUrl = `https://www.youtube.com/embed/${youtubeId}?${new URLSearchParams({
+            autoplay: node.props.autoplay ? '1' : '0',
+            controls: node.props.controls !== false ? '1' : '0',
+            modestbranding: '1',
+            rel: '0',
+            playsinline: '1',
+          }).toString()}`;
+        
+          return (
+            <div {...sharedProps}>
+              <iframe
+                src={embedUrl}
+                title="YouTube video player"
+                frameBorder="0"
+                allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+                allowFullScreen
+                className="h-full w-full"
+                style={{ borderRadius: 'inherit' }}
+              />
+            </div>
+          );
+        }
+        // Fallback to placeholder if no valid YouTube ID
+        return <div {...sharedProps}><PlaceholderMedia type="video" /></div>;
+      }
+    
+      // Default: local video file
     return (
       <div {...sharedProps}>
         {src ? (

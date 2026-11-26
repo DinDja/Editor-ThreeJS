@@ -116,7 +116,7 @@ const defaultNodeData: Record<PageNodeType, Omit<PageNode, 'id'>> = {
   video: {
     type: 'video',
     name: 'Video',
-    props: { src: '', poster: '', controls: true, autoplay: false },
+      props: { src: '', poster: '', controls: true, autoplay: false, videoType: 'file' },
     styles: createResponsiveStyles({
       width: '100%',
       minHeight: 280,

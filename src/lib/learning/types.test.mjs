@@ -123,6 +123,45 @@ test('teacher lesson keeps safe researched resources for the lesson cards', () =
   assert.equal(response.lesson?.resources?.[0].provider, 'YouTube');
 });
 
+test('teacher mind map normalizes memory-oriented node kinds', () => {
+  const response = normalizeTeacherResponse({
+    reply: 'Mapa pronto.',
+    lesson: {
+      explanation: 'A fotossíntese converte luz em energia química e conecta a planta ao ambiente.',
+      steps: [{ id: 'step-1', title: 'Observe', content: 'Acompanhe o processo.', kind: 'explanation' }],
+      mindMap: {
+        id: 'mind-map-root',
+        label: 'Fotossíntese',
+        summary: 'Como a planta produz energia a partir da luz.',
+        kind: 'concept',
+        children: [
+          { id: 'definition', label: 'O que é?', summary: 'Processo de conversão de luz em energia.', kind: 'definição', children: [] },
+          { id: 'memory', label: 'Gancho', summary: 'Luz + água + gás carbônico.', kind: 'mnemonic', children: [] },
+          { id: 'unknown', label: 'Outro', summary: 'Detalhe.', kind: 'weird', children: [] },
+        ],
+      },
+    },
+  });
+
+  const children = response.lesson?.mindMap.children ?? [];
+  assert.equal(children[0].kind, 'definition');
+  assert.equal(children[1].kind, 'memory');
+  assert.equal(children[2].kind, 'concept');
+});
+
+test('learning project migration keeps mind map marks and notes', () => {
+  const migrated = normalizeLearningProject({
+    currentSession: {
+      topic: 'Fotossíntese',
+      mindMapMarks: { 'node-1': 'mastered', 'node-2': 'review', 'node-3': 'invalid' },
+      mindMapNotes: { 'node-1': 'luz + água + gás carbônico', 'node-2': '' },
+    },
+  });
+
+  assert.deepEqual(migrated.currentSession?.mindMapMarks, { 'node-1': 'mastered', 'node-2': 'review' });
+  assert.deepEqual(migrated.currentSession?.mindMapNotes, { 'node-1': 'luz + água + gás carbônico' });
+});
+
 test('learning project migration keeps valid progress and filters invalid messages', () => {
   const migrated = normalizeLearningProject({
     currentSession: {

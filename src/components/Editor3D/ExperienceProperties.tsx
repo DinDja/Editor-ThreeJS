@@ -1427,16 +1427,27 @@ function renderContentEditor(
   if (type === 'video') {
     return (
       <>
-        <Field label="Endereço do vídeo (URL)">
+          <Field label="Tipo de vídeo">
+            <SelectField
+              value={String(props.videoType ?? 'file')}
+              options={[
+                { value: 'file', label: 'Arquivo local (MP4, WebM, etc.)' },
+                { value: 'youtube', label: 'YouTube (URL ou ID)' },
+              ]}
+              onChange={(value) => setProp('videoType', value)}
+            />
+          </Field>
+          <Field label={props.videoType === 'youtube' ? 'URL ou ID do YouTube' : 'Endereço do vídeo (URL)'}>
           <input
             value={String(props.src ?? '')}
             onChange={(event) => setProp('src', event.target.value)}
-            placeholder="https://…"
+              placeholder={props.videoType === 'youtube' ? 'https://youtube.com/watch?v=... ou ID do vídeo' : 'https://…'}
             className={inputClass}
           />
         </Field>
-        {text('poster', 'Imagem de capa (URL)')}
+          {props.videoType === 'file' && text('poster', 'Imagem de capa (URL)')}
         <ToggleRow label="Mostrar controles" enabled={props.controls !== false} onChange={() => setProp('controls', props.controls === false)} />
+          <ToggleRow label="Reprodução automática" enabled={Boolean(props.autoplay)} onChange={() => setProp('autoplay', !Boolean(props.autoplay))} />
       </>
     );
   }

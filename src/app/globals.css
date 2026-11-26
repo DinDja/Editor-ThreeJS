@@ -311,6 +311,24 @@ input:disabled {
   to { opacity: 1; transform: translateX(0); }
 }
 
+@keyframes mindmap-node-in {
+  from { opacity: 0; transform: translateY(6px) scale(0.96); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+@keyframes mindmap-review-in {
+  from { opacity: 0; transform: translateY(10px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.mindmap-node-in {
+  animation: mindmap-node-in 280ms ease-out both;
+}
+
+.mindmap-review-in {
+  animation: mindmap-review-in 240ms ease-out both;
+}
+
 /* Responsive: two columns on desktop */
 @media (min-width: 768px) {
   .subject-tree-branches {
@@ -341,7 +359,9 @@ input:disabled {
   .subject-tree-trunk,
   .subject-tree-topic,
   .subject-tree-topic-dot,
-  .subject-tree-hint {
+  .subject-tree-hint,
+  .mindmap-node-in,
+  .mindmap-review-in {
     animation: none !important;
     opacity: 1 !important;
     transform: none !important;

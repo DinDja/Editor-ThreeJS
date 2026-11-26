@@ -1,8 +1,16 @@
-export const DEFAULT_TEACHER_MODEL_ID = 'nvidia/nemotron-3.5-super-vl-120b-a12b' as const;
+export const DEFAULT_TEACHER_MODEL_ID = 'nvidia/nemotron-3.5-bolt-e4b' as const;
 
 export const TEACHER_MODELS = [
   {
     id: DEFAULT_TEACHER_MODEL_ID,
+    provider: 'nvidia',
+    name: 'Nemotron 3.5 Bolt E4B',
+    description: 'Opção NVIDIA compacta para respostas rápidas e chat.',
+    badge: 'Padrão',
+    apiAvailable: true,
+  },
+  {
+    id: 'nvidia/nemotron-3.5-super-vl-120b-a12b',
     provider: 'nvidia',
     name: 'Nemotron 3.5 Super VL 120B',
     description: 'Equilíbrio recomendado para aulas, raciocínio e conteúdo multimodal.',
@@ -14,14 +22,6 @@ export const TEACHER_MODELS = [
     provider: 'nvidia',
     name: 'Nemotron 3.5 Lightning 30B A3B',
     description: 'Resposta rápida para conversa e feedback formativo.',
-    badge: 'Mais rápido',
-    apiAvailable: true,
-  },
-  {
-    id: 'nvidia/nemotron-3.5-bolt-e4b',
-    provider: 'nvidia',
-    name: 'Nemotron 3.5 Bolt E4B',
-    description: 'Opção NVIDIA compacta para respostas rápidas e chat.',
     badge: 'Mais rápido',
     apiAvailable: true,
   },

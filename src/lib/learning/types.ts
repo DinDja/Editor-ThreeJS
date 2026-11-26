@@ -75,10 +75,22 @@ export type TeacherActivity = {
   questionIds: string[];
 };
 
+export const TEACHER_MIND_MAP_KINDS = [
+  'concept',
+  'definition',
+  'example',
+  'application',
+  'contrast',
+  'memory',
+] as const;
+export type TeacherMindMapNodeKind = (typeof TEACHER_MIND_MAP_KINDS)[number];
+export type MindMapMark = 'review' | 'mastered';
+
 export type TeacherMindMapNode = {
   id: string;
   label: string;
   summary: string;
+  kind: TeacherMindMapNodeKind;
   children: TeacherMindMapNode[];
 };
 
@@ -160,6 +172,8 @@ export type LearningSession = {
   completedStepIds: string[];
   completedQuestionIds: string[];
   appliedActionIds: string[];
+  mindMapMarks: Record<string, MindMapMark>;
+  mindMapNotes: Record<string, string>;
   startedAt: string;
   updatedAt: string;
 };
@@ -268,6 +282,36 @@ type MindMapNormalizationState = {
   ids: Set<string>;
 };
 
+const mindMapKindAliases: Record<string, TeacherMindMapNodeKind> = {
+  concept: 'concept',
+  conceito: 'concept',
+  definition: 'definition',
+  definicao: 'definition',
+  definição: 'definition',
+  example: 'example',
+  exemplo: 'example',
+  application: 'application',
+  aplicacao: 'application',
+  aplicação: 'application',
+  contrast: 'contrast',
+  contraste: 'contrast',
+  confusion: 'contrast',
+  confusao: 'contrast',
+  confusão: 'contrast',
+  warning: 'contrast',
+  memory: 'memory',
+  memoria: 'memory',
+  memória: 'memory',
+  mnemonic: 'memory',
+  mnemônica: 'memory',
+};
+
+const normalizeMindMapKind = (value: unknown): TeacherMindMapNodeKind => {
+  if (typeof value !== 'string') return 'concept';
+  const normalized = value.trim().toLocaleLowerCase('pt-BR');
+  return mindMapKindAliases[normalized] ?? 'concept';
+};
+
 const normalizeMindMapNode = (
   value: unknown,
   fallbackId: string,
@@ -295,6 +339,7 @@ const normalizeMindMapNode = (
     id,
     label,
     summary: cleanText(value.summary ?? value.description, 'Conecte esta ideia ao tema central.', 320),
+    kind: normalizeMindMapKind(value.kind ?? value.type),
     children,
   };
 };
@@ -309,15 +354,18 @@ const createFallbackMindMap = (
   id: 'mind-map-root',
   label: topic || 'Mapa da aula',
   summary: objective || 'Visão geral dos conceitos estudados nesta aula.',
+  kind: 'concept',
   children: [
     ...(objectives.length > 0 ? [{
       id: 'mind-map-ideas',
       label: 'Ideias-chave',
       summary: 'Os pontos centrais que organizam a compreensão do tema.',
+      kind: 'definition' as const,
       children: objectives.slice(0, 5).map((item, index) => ({
         id: `mind-map-idea-${index + 1}`,
         label: item,
         summary: 'Retome esta ideia usando a explicação principal da aula.',
+        kind: 'definition' as const,
         children: [],
       })),
     }] : []),
@@ -325,10 +373,12 @@ const createFallbackMindMap = (
       id: 'mind-map-path',
       label: 'Roteiro de aprendizagem',
       summary: 'A sequência sugerida para transformar o conceito em compreensão e prática.',
+      kind: 'application' as const,
       children: steps.slice(0, 5).map((step) => ({
         id: `mind-map-${step.id}`,
         label: step.title,
         summary: step.content,
+        kind: 'application' as const,
         children: [],
       })),
     }] : []),
@@ -336,10 +386,12 @@ const createFallbackMindMap = (
       id: 'mind-map-prerequisites',
       label: 'Pré-requisitos',
       summary: 'Conhecimentos que ajudam a acompanhar a aula.',
+      kind: 'memory' as const,
       children: prerequisites.slice(0, 4).map((item, index) => ({
         id: `mind-map-prerequisite-${index + 1}`,
         label: item,
         summary: 'Se necessário, revise este ponto antes de avançar.',
+        kind: 'memory' as const,
         children: [],
       })),
     }] : []),
@@ -545,6 +597,29 @@ export const normalizeTeacherResponse = (value: unknown): TeacherApiResponse => 
 const normalizeLevel = (value: unknown): LearningLevel =>
   levels.includes(value as LearningLevel) ? (value as LearningLevel) : 'beginner';
 
+const MIND_MAP_MARK_VALUES = ['review', 'mastered'] as const;
+
+const normalizeMindMapMarks = (value: unknown): Record<string, MindMapMark> => {
+  if (!isRecord(value)) return {};
+  const entries = Object.entries(value).flatMap(([rawId, rawMark]) => {
+    const id = cleanText(rawId, '', 80);
+    if (!id || !MIND_MAP_MARK_VALUES.includes(rawMark as MindMapMark)) return [];
+    return [[id, rawMark as MindMapMark] as const];
+  });
+  return Object.fromEntries(entries.slice(-64));
+};
+
+const normalizeMindMapNotes = (value: unknown): Record<string, string> => {
+  if (!isRecord(value)) return {};
+  const entries = Object.entries(value).flatMap(([rawId, rawNote]) => {
+    const id = cleanText(rawId, '', 80);
+    const note = cleanText(rawNote, '', 360);
+    if (!id || !note) return [];
+    return [[id, note] as const];
+  });
+  return Object.fromEntries(entries.slice(-64));
+};
+
 export const createInitialLearningProject = (): LearningProjectState => ({
   schemaVersion: 2,
   modelId: DEFAULT_TEACHER_MODEL_ID,
@@ -584,6 +659,8 @@ export const normalizeLearningProject = (value: unknown): LearningProjectState =
         completedStepIds: cleanList(raw.completedStepIds, 30, 80),
         completedQuestionIds: cleanList(raw.completedQuestionIds, 20, 80),
         appliedActionIds: cleanList(raw.appliedActionIds, 8, 80),
+        mindMapMarks: normalizeMindMapMarks(raw.mindMapMarks),
+        mindMapNotes: normalizeMindMapNotes(raw.mindMapNotes),
         startedAt: cleanText(raw.startedAt, now, 40),
         updatedAt: cleanText(raw.updatedAt, now, 40),
       };

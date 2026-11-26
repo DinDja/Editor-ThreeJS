@@ -9,6 +9,20 @@ import { generateApiRouteFiles } from './generateApiRoutes';
 import { arrayBufferToBytes, buildZipBlob, stringToBytes, type ZipFile } from './zip';
 import type { ExportBundle, ExportFile } from './types';
 
+// Helper to extract YouTube video ID from various URL formats
+const extractYouTubeId = (url: string): string | null => {
+  if (!url) return null;
+  const patterns = [
+    /(?:youtube\.com\/watch\?v=|youtu\.be\/|youtube\.com\/embed\/|youtube\.com\/v\/)([^&\n?#]+)/,
+    /youtube\.com\/shorts\/([^&\n?#]+)/,
+  ];
+  for (const pattern of patterns) {
+    const match = url.match(pattern);
+    if (match && match[1]) return match[1];
+  }
+  return null;
+};
+
 const asJson = (value: unknown) => JSON.stringify(value, null, 2);
 
 export const createExperienceSnapshot = ({
@@ -221,7 +235,41 @@ function ExperienceNode({ node }) {
   }
   if (node.type === 'button') return <a {...dataAttrs} href={node.props?.href || '#'} style={style}>{bind(node.props?.label || 'Button')}</a>;
   if (node.type === 'image') return <img {...dataAttrs} src={node.props?.src || ''} alt={node.props?.alt || ''} style={style} />;
-  if (node.type === 'video') return <video {...dataAttrs} src={node.props?.src || ''} poster={node.props?.poster || ''} controls={node.props?.controls !== false} autoPlay={Boolean(node.props?.autoplay)} muted style={style} />;
+  if (node.type === 'video') {
+    const videoType = typeof node.props?.videoType === 'string' ? node.props.videoType : 'file';
+    const src = String(node.props?.src || '');
+    
+    if (videoType === 'youtube') {
+      const youtubeId = extractYouTubeId(src);
+      if (youtubeId) {
+            const params = new URLSearchParams({
+          autoplay: node.props?.autoplay ? '1' : '0',
+          controls: node.props?.controls !== false ? '1' : '0',
+          modestbranding: '1',
+          rel: '0',
+          playsinline: '1',
+            });
+            const embedUrl = \`https://www.youtube.com/embed/\${youtubeId}?\${params.toString()}\`;
+
+        return (
+          <iframe
+            {...dataAttrs}
+            src={embedUrl}
+            title="YouTube video player"
+            frameBorder="0"
+            allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+            allowFullScreen
+            style={{ ...style, borderRadius: 'inherit' }}
+          />
+        );
+      }
+      // Fallback to placeholder if no valid YouTube ID
+      return <div {...dataAttrs} style={{ ...style, display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#202427', color: '#71717a', fontSize: 10, textTransform: 'uppercase', letterSpacing: '0.16em' }}>Video</div>;
+    }
+    
+    // Default: local video file
+    return <video {...dataAttrs} src={src} poster={node.props?.poster || ''} controls={node.props?.controls !== false} autoPlay={Boolean(node.props?.autoplay)} muted style={style} />;
+  }
   if (node.type === 'input') return <div {...dataAttrs} style={style}><label>{node.props?.label}</label><input name={node.props?.name} type={node.props?.type || 'text'} placeholder={node.props?.placeholder} required={Boolean(node.props?.required)} /></div>;
   if (node.type === 'select') return <div {...dataAttrs} style={style}><label>{node.props?.label}</label><select name={node.props?.name}>{(node.props?.options || []).map((o) => <option key={o} value={o}>{o}</option>)}</select></div>;
   if (node.type === 'textarea') return <div {...dataAttrs} style={style}><label>{node.props?.label}</label><textarea name={node.props?.name} placeholder={node.props?.placeholder} rows={node.props?.rows || 4} /></div>;
@@ -382,12 +430,42 @@ const buildHtmlNode = (node: PageNode, snapshot: ProjectExperience): string => {
       attrs.push(`alt="${escapeHtml(String(props.alt || ''))}"`);
       attrs.push(`loading="lazy"`);
       return `<${tag} ${attrs.join(' ')} />`;
-    case 'video':
-      attrs.push(`src="${escapeHtml(String(props.src || ''))}"`);
+    case 'video': {
+          const videoType = typeof props.videoType === 'string' ? props.videoType : 'file';
+          const src = String(props.src || '');
+      
+          if (videoType === 'youtube') {
+            const youtubeId = extractYouTubeId(src);
+            if (youtubeId) {
+              const embedUrl = `https://www.youtube.com/embed/${youtubeId}?${new URLSearchParams({
+                autoplay: props.autoplay ? '1' : '0',
+                controls: props.controls !== false ? '1' : '0',
+                modestbranding: '1',
+                rel: '0',
+                playsinline: '1',
+              }).toString()}`;
+          
+              return `<iframe 
+                src="${escapeHtml(embedUrl)}" 
+                title="YouTube video player" 
+                frameborder="0" 
+                allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" 
+                allowfullscreen
+                class="video-iframe"
+                style="width: 100%; height: 100%; border-radius: inherit;"
+              ></iframe>`;
+            }
+            // Fallback to placeholder if no valid YouTube ID
+            return `<div class="video-placeholder" style="width: 100%; height: 100%; display: flex; align-items: center; justify-content: center; background: #202427; color: #71717a; font-size: 10px; text-transform: uppercase; letter-spacing: 0.16em;">Video</div>`;
+          }
+      
+          // Default: local video file
+          attrs.push(`src="${escapeHtml(src)}"`);
       if (props.poster) attrs.push(`poster="${escapeHtml(String(props.poster))}"`);
       if (props.controls !== false) attrs.push('controls');
       if (props.autoplay) { attrs.push('autoplay'); attrs.push('muted'); attrs.push('playsinline'); }
       return `<${tag} ${attrs.join(' ')}></${tag}>`;
+        }
     case 'sceneCanvas':
       attrs.push('class="scene-canvas"');
       return `<${tag} ${attrs.join(' ')}></${tag}>`;
