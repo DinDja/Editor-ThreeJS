@@ -1427,16 +1427,15 @@ function renderContentEditor(
   if (type === 'video') {
     return (
       <>
-          <Field label="Tipo de vídeo">
-            <SelectField
-              value={String(props.videoType ?? 'file')}
-              options={[
-                { value: 'file', label: 'Arquivo local (MP4, WebM, etc.)' },
-                { value: 'youtube', label: 'YouTube (URL ou ID)' },
-              ]}
-              onChange={(value) => setProp('videoType', value)}
-            />
-          </Field>
+        <SelectField
+          label="Tipo de vídeo"
+          value={String(props.videoType ?? 'file')}
+          options={[
+            { value: 'file', label: 'Arquivo local (MP4, WebM, etc.)' },
+            { value: 'youtube', label: 'YouTube (URL ou ID)' },
+          ]}
+          onChange={(value) => setProp('videoType', value)}
+        />
           <Field label={props.videoType === 'youtube' ? 'URL ou ID do YouTube' : 'Endereço do vídeo (URL)'}>
           <input
             value={String(props.src ?? '')}
