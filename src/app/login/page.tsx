@@ -2,7 +2,7 @@
 
 import { useState, type FormEvent } from 'react';
 import { useRouter } from 'next/navigation';
-import { ArrowRight, Eye, EyeOff, KeyRound, Mail, ShieldCheck, Sparkles } from 'lucide-react';
+import { ArrowRight, BrainCircuit, Eye, EyeOff, KeyRound, Mail, ShieldCheck } from 'lucide-react';
 import BrandMark from '@/components/auth/BrandMark';
 import TupiPattern from '@/components/auth/TupiPattern';
 import Button from '@/components/ui/Button';
@@ -81,7 +81,7 @@ export default function LoginPage() {
       >
         <div className="absolute -left-40 top-0 h-[640px] w-[640px] rounded-full bg-emerald-500/10 blur-[120px]" />
         <div className="absolute -right-32 bottom-0 h-[520px] w-[520px] rounded-full bg-cyan-500/5 blur-[120px]" />
-        <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top,_rgba(16,185,129,0.06),_transparent_55%)]" />
+        <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top,_rgba(227,29,46,0.06),_transparent_55%)]" />
       </div>
 
       <div className="grid h-dvh w-full lg:grid-cols-[1.1fr_1fr]">
@@ -108,7 +108,7 @@ export default function LoginPage() {
 
           <div className="relative z-10 max-w-xl">
             <div className="mb-14 inline-flex items-center gap-2 rounded-full border border-neutral-800/80 bg-neutral-900/60 px-3 py-1 text-[11px] font-medium uppercase tracking-[0.22em] text-emerald-300/90">
-              <span className="h-1.5 w-1.5 rounded-full bg-emerald-400 shadow-[0_0_8px_rgba(52,211,153,0.8)]" />
+              <span className="h-1.5 w-1.5 rounded-full bg-emerald-400 shadow-[0_0_8px_rgba(227,29,46,0.8)]" />
               Território · Conhecimento · Ação
             </div>
 
@@ -131,7 +131,7 @@ export default function LoginPage() {
                 <span>Acesso seguro com criptografia ponta a ponta.</span>
               </li>
               <li className="flex items-start gap-3">
-                <Sparkles size={16} className="mt-0.5 shrink-0 text-emerald-400" />
+                <BrainCircuit size={16} className="mt-0.5 shrink-0 text-emerald-400" />
                 <span>IA aplicada à modelagem e à curadoria de cena.</span>
               </li>
               <li className="flex items-start gap-3">

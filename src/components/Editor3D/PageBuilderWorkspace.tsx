@@ -1649,7 +1649,7 @@ export default function PageBuilderWorkspace() {
           <div className="absolute -bottom-6 left-0 flex max-w-full items-center gap-1 overflow-hidden text-[9px] text-neutral-500">
             {breadcrumb.map((item, index) => (
               <span key={item.id} className="flex shrink-0 items-center gap-1">
-                {index > 0 && <span className="text-neutral-700">/</span>}
+                {index > 0 && <span className="text-neutral-500">/</span>}
                 <span className="rounded bg-neutral-800/90 px-1.5 py-0.5">{item.name}</span>
               </span>
             ))}

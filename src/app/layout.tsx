@@ -22,7 +22,7 @@ export default function RootLayout({
   return (
     <html lang="pt-BR" className={`${geistSans.variable} ${geistMono.variable}`}>
       <head>
-        <meta name="theme-color" content="#0d0f10" />
+        <meta name="theme-color" content="#f3f6fb" />
         <JsonLd />
       </head>
       <body className="m-0 min-h-screen bg-[#0d0f10] text-neutral-100 antialiased">

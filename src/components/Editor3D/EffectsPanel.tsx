@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { ChevronDown, Eye, EyeOff, Palette, Plus, Sparkles, Trash2, Wand2 } from 'lucide-react';
+import { ChevronDown, Eye, EyeOff, Palette, Plus, Trash2, Wand2 } from 'lucide-react';
 import { EFFECT_LIST, EFFECT_REGISTRY, getEffectDefinition } from '@/lib/effects-system/registry';
 import type { EffectType, PageEffect } from '@/lib/effects-system/types';
 import { VISUAL_PRESETS, type VisualPresetId } from '@/lib/template-engine/presets';
@@ -158,7 +158,7 @@ export function EffectsPanel() {
   const intensity = page.effects?.intensity ?? 1;
 
   return (
-    <Section title="Efeitos da página" icon={<Sparkles size={11} />}>
+    <Section title="Efeitos da página" icon={<Palette size={11} />}>
       <label className="grid gap-1">
         <div className="flex items-center justify-between">
           <span className={labelClass}>Intensidade global</span>

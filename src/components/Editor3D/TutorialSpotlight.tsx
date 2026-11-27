@@ -558,7 +558,7 @@ export default function TutorialSpotlight({ open, scope = 'scene', onClose }: Tu
       {targetRect && (
         <>
           <div
-            className="pointer-events-none absolute z-[121] rounded-xl border-2 border-emerald-300 shadow-[0_0_0_9999px_rgba(0,0,0,0.72),0_0_0_1px_rgba(255,255,255,0.15),0_0_24px_rgba(16,185,129,0.35)]"
+            className="pointer-events-none absolute z-[121] rounded-xl border-2 border-emerald-300 shadow-[0_0_0_9999px_rgba(0,0,0,0.72),0_0_0_1px_rgba(255,255,255,0.15),0_0_24px_rgba(7,133,207,0.35)]"
             style={{
               top: targetRect.top - 6,
               left: targetRect.left - 6,
@@ -580,13 +580,13 @@ export default function TutorialSpotlight({ open, scope = 'scene', onClose }: Tu
           <button
             type="button"
             onClick={onClose}
-            className="rounded border border-neutral-700/80 px-2 py-1 text-[11px] uppercase tracking-[0.1em] text-neutral-300 transition hover:border-neutral-500 hover:text-white"
+            className="rounded border border-neutral-700/80 px-2 py-1 text-[11px] uppercase tracking-[0.1em] text-neutral-300 transition hover:border-neutral-500 hover:text-neutral-100"
           >
             Fechar
           </button>
         </div>
 
-        <h3 className="text-base font-semibold text-white">{currentStep.title}</h3>
+        <h3 className="text-base font-semibold text-neutral-100">{currentStep.title}</h3>
         <p className="mt-1 text-sm leading-relaxed text-neutral-300">{currentStep.description}</p>
 
         <ul className="mt-3 list-disc space-y-1 pl-4 text-xs leading-relaxed text-neutral-300">
@@ -609,7 +609,7 @@ export default function TutorialSpotlight({ open, scope = 'scene', onClose }: Tu
             <button
               type="button"
               onClick={onClose}
-              className="rounded border border-neutral-700/80 px-3 py-2 text-xs font-medium text-neutral-300 transition hover:border-neutral-500 hover:text-white"
+              className="rounded border border-neutral-700/80 px-3 py-2 text-xs font-medium text-neutral-300 transition hover:border-neutral-500 hover:text-neutral-100"
             >
               Sair tutorial
             </button>

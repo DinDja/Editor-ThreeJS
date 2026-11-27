@@ -1,6 +1,6 @@
 'use client';
 
-import { Download, RefreshCw, RotateCcw, Sparkles } from 'lucide-react';
+import { Box, Download, RefreshCw, RotateCcw } from 'lucide-react';
 import {
   MODEL_TYPE_LABELS,
   QUALITY_LABELS,
@@ -46,7 +46,7 @@ export default function ImageTo3DResultPreview({
       </div>
 
       <div className="flex items-center gap-2 rounded-lg border border-emerald-400/20 bg-emerald-400/5 px-3 py-2">
-        <Sparkles size={14} className="shrink-0 text-emerald-300" />
+        <Box size={14} className="shrink-0 text-emerald-300" />
         <p className="text-[11px] text-emerald-100">
           Modelo gerado: <span className="font-semibold">{result.displayName}</span>
         </p>

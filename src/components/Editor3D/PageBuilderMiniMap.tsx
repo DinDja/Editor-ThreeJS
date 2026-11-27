@@ -334,7 +334,7 @@ export default function PageBuilderMiniMap({ workspaceRef }: PageBuilderMiniMapP
                 top,
                 width: Math.max(1, width),
                 height: Math.max(1, height),
-                background: node.background ?? 'rgba(52, 211, 153, 0.08)',
+                background: node.background ?? 'rgba(7, 133, 207, 0.08)',
                 borderRadius: Math.min(node.borderRadius * mapScale, 8),
               }}
               title={node.name}

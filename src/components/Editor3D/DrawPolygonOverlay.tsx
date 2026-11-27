@@ -163,14 +163,14 @@ export default function DrawPolygonOverlay({ objectUuid }: DrawPolygonOverlayPro
       {lineGeometry && (
         <line>
           <primitive object={lineGeometry} attach="geometry" />
-          <lineBasicMaterial color={closeHint ? '#34d399' : '#fbbf24'} linewidth={2} />
+          <lineBasicMaterial color={closeHint ? '#0785cf' : '#fbbf24'} linewidth={2} />
         </line>
       )}
 
       {drawPolygonPoints.map((p, i) => (
         <mesh key={i} position={p}>
           <sphereGeometry args={[0.04, 16, 16]} />
-          <meshBasicMaterial color={i === 0 && closeHint ? '#34d399' : '#fbbf24'} />
+          <meshBasicMaterial color={i === 0 && closeHint ? '#0785cf' : '#fbbf24'} />
         </mesh>
       ))}
 

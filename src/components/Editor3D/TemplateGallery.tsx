@@ -1,7 +1,7 @@
 'use client';
 
 import { useMemo, useState } from 'react';
-import { Check, Cpu, Gauge, Sparkles, X, Zap } from 'lucide-react';
+import { Check, Cpu, Gauge, Layers, X, Zap } from 'lucide-react';
 import { EXPERIENCE_TEMPLATES, type ExperienceTemplate, type ExperienceTemplateId, type TemplateCategory } from '@/lib/template-engine/templates';
 import { getVisualPreset, VISUAL_PRESETS, type VisualPresetId } from '@/lib/template-engine/presets';
 import type { PageNode } from '@/lib/page-builder/types';
@@ -184,7 +184,7 @@ export default function TemplateGallery({ onClose }: { onClose: () => void }) {
       >
         <div className="flex items-center justify-between border-b border-neutral-800 px-5 py-4">
           <div className="flex items-center gap-2">
-            <Sparkles size={16} className="text-emerald-300" />
+            <Layers size={16} className="text-emerald-300" />
             <h2 className="text-sm font-semibold text-neutral-100">Galeria de Templates</h2>
             <span className="text-[11px] text-neutral-500">{EXPERIENCE_TEMPLATES.length} templates</span>
           </div>

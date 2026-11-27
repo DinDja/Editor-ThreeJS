@@ -86,19 +86,19 @@ type MindMapLayout = {
 type Side = 'left' | 'right';
 
 const BRANCH_PALETTES: BranchPalette[] = [
-  { stroke: '#e879f9', border: 'rgba(232,121,249,0.45)', tag: '#f0abfc', glow: 'rgba(217,70,239,0.22)' },
-  { stroke: '#818cf8', border: 'rgba(129,140,248,0.45)', tag: '#a5b4fc', glow: 'rgba(99,102,241,0.22)' },
-  { stroke: '#22d3ee', border: 'rgba(34,211,238,0.42)', tag: '#67e8f9', glow: 'rgba(6,182,212,0.2)' },
-  { stroke: '#34d399', border: 'rgba(52,211,153,0.42)', tag: '#6ee7b7', glow: 'rgba(16,185,129,0.2)' },
-  { stroke: '#fbbf24', border: 'rgba(251,191,36,0.42)', tag: '#fcd34d', glow: 'rgba(245,158,11,0.2)' },
-  { stroke: '#fb7185', border: 'rgba(251,113,133,0.42)', tag: '#fda4af', glow: 'rgba(244,63,94,0.2)' },
+  { stroke: '#e31d2e', border: 'rgba(227,29,46,0.28)', tag: '#a71928', glow: 'rgba(227,29,46,0.14)' },
+  { stroke: '#0369a1', border: 'rgba(3,105,161,0.32)', tag: '#075985', glow: 'rgba(3,105,161,0.14)' },
+  { stroke: '#c91c2b', border: 'rgba(201,28,43,0.25)', tag: '#991b2b', glow: 'rgba(201,28,43,0.12)' },
+  { stroke: '#0369a1', border: 'rgba(3,105,161,0.26)', tag: '#075985', glow: 'rgba(3,105,161,0.12)' },
+  { stroke: '#ef5964', border: 'rgba(239,89,100,0.28)', tag: '#a71928', glow: 'rgba(239,89,100,0.13)' },
+  { stroke: '#075985', border: 'rgba(7,89,133,0.28)', tag: '#075985', glow: 'rgba(7,89,133,0.13)' },
 ];
 
 const ROOT_PALETTE: BranchPalette = {
-  stroke: '#e879f9',
-  border: 'rgba(232,121,249,0.55)',
-  tag: '#f5d0fe',
-  glow: 'rgba(217,70,239,0.3)',
+  stroke: '#e31d2e',
+  border: 'rgba(227,29,46,0.38)',
+  tag: '#a71928',
+  glow: 'rgba(227,29,46,0.16)',
 };
 
 const KIND_META: Record<TeacherMindMapNodeKind, { label: string; icon: LucideIcon }> = {
@@ -363,9 +363,9 @@ function MindMapNodeCard({
   const KindIcon = isRoot ? Network : kind.icon;
   const hasChildren = node.node.children.length > 0;
   const statusBadge = mark === 'mastered'
-    ? <CircleCheck size={12} className="shrink-0 text-emerald-300" aria-label="Memorizado" />
+    ? <CircleCheck size={12} className="shrink-0 text-slate-900" aria-label="Memorizado" />
     : mark === 'review'
-      ? <RotateCcw size={11} className="shrink-0 text-amber-300" aria-label="Marcado para revisar" />
+      ? <RotateCcw size={11} className="shrink-0 text-amber-700" aria-label="Marcado para revisar" />
       : null;
 
   return (
@@ -387,18 +387,16 @@ function MindMapNodeCard({
         }}
         title={node.node.summary}
         aria-pressed={selected}
-        className={`group relative flex h-full w-full flex-col justify-center rounded-2xl border px-3 py-2 text-left transition duration-200 hover:z-10 hover:-translate-y-0.5 hover:brightness-110 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/80 ${
+        className={`group relative flex h-full w-full flex-col justify-center rounded-2xl border px-3 py-2 text-left transition duration-200 hover:z-10 hover:-translate-y-0.5 hover:brightness-[0.99] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-rose-300 ${
           isRoot ? 'rounded-3xl px-4' : ''
-        } ${matched ? 'ring-1 ring-lime-300/70' : ''}`}
+        } ${matched ? 'ring-1 ring-slate-600/70' : ''}`}
         style={{
-          borderColor: selected || matched ? (matched ? '#bef264' : '#ffffff') : palette.border,
-          background: isRoot
-            ? 'linear-gradient(140deg, rgba(217,70,239,0.25), rgba(99,102,241,0.18) 52%, rgba(13,17,23,0.98))'
-            : 'linear-gradient(145deg, rgba(23,28,36,0.98), rgba(12,15,20,0.98))',
+          borderColor: selected ? '#e31d2e' : matched ? '#0369a1' : palette.border,
+          backgroundColor: isRoot ? '#fff5f5' : '#ffffff',
           boxShadow: selected
-            ? `0 0 0 2px rgba(255,255,255,0.7), 0 0 34px ${palette.glow}`
+            ? `0 0 0 2px rgba(227,29,46,0.16), 0 8px 22px rgba(23,37,58,0.12)`
             : isRoot
-              ? `0 0 40px ${palette.glow}`
+              ? `0 8px 24px ${palette.glow}`
               : undefined,
         }}
       >
@@ -413,13 +411,13 @@ function MindMapNodeCard({
           {statusBadge && <span className="ml-auto">{statusBadge}</span>}
         </span>
         <span
-          className={`mt-1 line-clamp-2 font-semibold leading-tight text-neutral-50 ${
+          className={`mt-1 line-clamp-2 font-semibold leading-tight text-slate-900 ${
             isRoot ? 'text-sm sm:text-[15px]' : node.depth === 1 ? 'text-xs' : 'text-[11px]'
           }`}
         >
           {node.node.label}
         </span>
-        {isRoot && <span className="mt-1 line-clamp-1 text-[10px] leading-4 text-fuchsia-100/60">Clique para ver detalhes e revisar</span>}
+        {isRoot && <span className="mt-1 line-clamp-1 text-[10px] leading-4 text-slate-500">Clique para ver detalhes e revisar</span>}
       </button>
       {hasChildren && (
         <button
@@ -430,7 +428,7 @@ function MindMapNodeCard({
           }}
           aria-label={expanded ? `Recolher ramo de ${node.node.label}` : `Expandir ramo de ${node.node.label}`}
           title={expanded ? 'Recolher ramo' : 'Expandir ramo'}
-          className={`absolute top-1/2 z-20 flex size-5 -translate-y-1/2 items-center justify-center rounded-full border border-white/15 bg-[#171c24] text-neutral-400 shadow-lg shadow-black/40 transition hover:border-white/50 hover:text-white ${
+          className={`absolute top-1/2 z-20 flex size-5 -translate-y-1/2 items-center justify-center rounded-full border border-slate-200 bg-white text-slate-600 shadow-sm shadow-slate-900/10 transition hover:border-slate-300 hover:text-rose-700 ${
             node.side === 'right' ? '-right-2.5' : '-left-2.5'
           }`}
         >
@@ -461,7 +459,6 @@ function MindMapCanvas({
   onToggle: (id: string) => void;
 }) {
   const nodeById = useMemo(() => new Map(layout.nodes.map((node) => [node.node.id, node])), [layout.nodes]);
-  const rootNode = layout.nodes.find((node) => node.depth === 0);
 
   return (
     <div
@@ -474,24 +471,9 @@ function MindMapCanvas({
           width: layout.width,
           height: layout.height,
           transform: `scale(${zoom})`,
-          backgroundImage: 'radial-gradient(circle at 1px 1px, rgba(148,163,184,0.16) 1px, transparent 0)',
-          backgroundSize: '24px 24px',
+          backgroundColor: '#f8fafc',
         }}
       >
-        {rootNode && (
-          <div
-            className="pointer-events-none absolute rounded-full"
-            style={{
-              left: rootNode.x + rootNode.width / 2,
-              top: rootNode.y + rootNode.height / 2,
-              width: 460,
-              height: 340,
-              transform: 'translate(-50%, -50%)',
-              background: 'radial-gradient(closest-side, rgba(217,70,239,0.16), rgba(99,102,241,0.06), transparent)',
-            }}
-            aria-hidden="true"
-          />
-        )}
         <svg className="pointer-events-none absolute inset-0 overflow-visible" width={layout.width} height={layout.height} aria-hidden="true">
           {layout.edges.map((edge) => {
             const from = nodeById.get(edge.fromId);
@@ -557,16 +539,16 @@ function MindMapToolbar({
   return (
     <div className="flex flex-wrap items-center gap-2">
       <label className="relative flex min-w-44 flex-1 items-center sm:max-w-64">
-        <Search size={12} className="pointer-events-none absolute left-2.5 text-neutral-500" />
+        <Search size={12} className="pointer-events-none absolute left-2.5 text-slate-500" />
         <input
           value={query}
           onChange={(event) => onQueryChange(event.target.value)}
           placeholder="Buscar conceito, exemplo..."
           aria-label="Buscar conceito no mapa mental"
-          className="h-8 w-full rounded-lg border border-white/10 bg-black/25 pl-8 pr-16 text-[10px] text-neutral-200 outline-none placeholder:text-neutral-600 focus:border-fuchsia-400/60"
+          className="h-8 w-full rounded-lg border border-slate-300 bg-white pl-8 pr-16 text-[10px] text-slate-900 outline-none placeholder:text-slate-400 focus:border-rose-400 focus:ring-2 focus:ring-rose-100"
         />
         {queryActive ? (
-          <span className="pointer-events-none absolute right-8 text-[9px] font-semibold text-lime-200">
+          <span className="pointer-events-none absolute right-8 text-[9px] font-semibold text-rose-700">
             {resultCount}
           </span>
         ) : null}
@@ -575,30 +557,30 @@ function MindMapToolbar({
             type="button"
             onClick={() => onQueryChange('')}
             aria-label="Limpar busca"
-            className="absolute right-1.5 flex size-6 items-center justify-center rounded-md text-neutral-500 transition hover:bg-white/10 hover:text-white"
+            className="absolute right-1.5 flex size-6 items-center justify-center rounded-md text-slate-500 transition hover:bg-slate-100 hover:text-slate-900"
           >
             <X size={11} />
           </button>
         ) : null}
       </label>
-      <div className="flex items-center rounded-lg border border-white/10 bg-black/25">
-        <button type="button" onClick={() => onZoomChange(Math.max(0.45, Number((zoom - 0.1).toFixed(2))))} aria-label="Reduzir zoom" className="flex size-8 items-center justify-center text-neutral-400 transition hover:text-fuchsia-100">
+      <div className="flex items-center rounded-lg border border-slate-300 bg-white">
+        <button type="button" onClick={() => onZoomChange(Math.max(0.45, Number((zoom - 0.1).toFixed(2))))} aria-label="Reduzir zoom" className="flex size-8 items-center justify-center text-slate-600 transition hover:text-rose-700">
           <Minus size={12} />
         </button>
-        <button type="button" onClick={() => onZoomChange(1)} title="Voltar ao zoom 100%" className="min-w-10 text-center text-[10px] font-semibold text-neutral-400 transition hover:text-white">
+        <button type="button" onClick={() => onZoomChange(1)} title="Voltar ao zoom 100%" className="min-w-10 text-center text-[10px] font-semibold text-slate-600 transition hover:text-slate-900">
           {Math.round(zoom * 100)}%
         </button>
-        <button type="button" onClick={() => onZoomChange(Math.min(1.6, Number((zoom + 0.1).toFixed(2))))} aria-label="Aumentar zoom" className="flex size-8 items-center justify-center text-neutral-400 transition hover:text-fuchsia-100">
+        <button type="button" onClick={() => onZoomChange(Math.min(1.6, Number((zoom + 0.1).toFixed(2))))} aria-label="Aumentar zoom" className="flex size-8 items-center justify-center text-slate-600 transition hover:text-rose-700">
           <Plus size={12} />
         </button>
       </div>
-      <button type="button" onClick={onFit} title="Ajustar mapa à tela" aria-label="Ajustar mapa à tela" className="flex size-8 items-center justify-center rounded-lg border border-white/10 bg-black/25 text-neutral-400 transition hover:text-fuchsia-100">
+      <button type="button" onClick={onFit} title="Ajustar mapa à tela" aria-label="Ajustar mapa à tela" className="flex size-8 items-center justify-center rounded-lg border border-slate-300 bg-white text-slate-600 transition hover:border-rose-200 hover:text-rose-700">
         <Focus size={12} />
       </button>
-      <button type="button" onClick={onExpand} title="Expandir todos os ramos" aria-label="Expandir todos os ramos" className="flex size-8 items-center justify-center rounded-lg border border-white/10 bg-black/25 text-neutral-400 transition hover:text-fuchsia-100">
+      <button type="button" onClick={onExpand} title="Expandir todos os ramos" aria-label="Expandir todos os ramos" className="flex size-8 items-center justify-center rounded-lg border border-slate-300 bg-white text-slate-600 transition hover:border-rose-200 hover:text-rose-700">
         <Expand size={12} />
       </button>
-      <button type="button" onClick={onCollapse} title="Recolher todos os ramos" aria-label="Recolher todos os ramos" className="flex size-8 items-center justify-center rounded-lg border border-white/10 bg-black/25 text-neutral-400 transition hover:text-fuchsia-100">
+      <button type="button" onClick={onCollapse} title="Recolher todos os ramos" aria-label="Recolher todos os ramos" className="flex size-8 items-center justify-center rounded-lg border border-slate-300 bg-white text-slate-600 transition hover:border-rose-200 hover:text-rose-700">
         <Shrink size={12} />
       </button>
       {trailing}
@@ -637,14 +619,14 @@ function MindMapInspector({
   };
 
   return (
-    <div className={`mindmap-review-in rounded-2xl border border-white/10 bg-[#10141a]/95 ${compact ? 'p-3' : 'p-4'}`}>
+    <div className={`mindmap-review-in rounded-2xl border border-slate-200 bg-white shadow-sm shadow-slate-900/5 ${compact ? 'p-3' : 'p-4'}`}>
       <div className="flex items-start justify-between gap-2">
         <div className="min-w-0">
-          <div className="flex flex-wrap items-center gap-1 text-[9px] text-neutral-600">
+          <div className="flex flex-wrap items-center gap-1 text-[9px] text-slate-500">
             {path.map((item, index) => (
               <span key={item.id} className="contents">
                 {index > 0 && <span aria-hidden="true">›</span>}
-                <span className={index === path.length - 1 ? 'text-neutral-400' : 'truncate'}>{item.label}</span>
+                <span className={index === path.length - 1 ? 'text-slate-700' : 'truncate'}>{item.label}</span>
               </span>
             ))}
           </div>
@@ -655,20 +637,20 @@ function MindMapInspector({
             </span>
           </div>
         </div>
-        <button type="button" onClick={onClose} aria-label="Fechar detalhes do conceito" className="flex size-7 shrink-0 items-center justify-center rounded-lg text-neutral-500 transition hover:bg-white/10 hover:text-white">
+        <button type="button" onClick={onClose} aria-label="Fechar detalhes do conceito" className="flex size-7 shrink-0 items-center justify-center rounded-lg text-slate-500 transition hover:bg-slate-100 hover:text-slate-900">
           <X size={13} />
         </button>
       </div>
 
-      <h4 className="mt-2 text-sm font-semibold leading-5 text-white">{entry.node.label}</h4>
-      <LearningRichText className="mt-1 text-[11px] leading-5 text-neutral-300">{entry.node.summary}</LearningRichText>
+      <h4 className="mt-2 text-sm font-semibold leading-5 text-slate-900">{entry.node.label}</h4>
+      <LearningRichText className="mt-1 text-[11px] leading-5 text-slate-700">{entry.node.summary}</LearningRichText>
 
       <div className="mt-3">
         <div className="mb-1.5 flex items-center justify-between gap-2">
-          <label htmlFor={`mindmap-note-${entry.node.id}`} className="text-[9px] font-semibold uppercase tracking-[0.12em] text-neutral-500">
+          <label htmlFor={`mindmap-note-${entry.node.id}`} className="text-[9px] font-semibold uppercase tracking-[0.12em] text-slate-600">
             Sua mnemônica
           </label>
-          <span className="text-[9px] text-neutral-600">{draft.length}/360</span>
+          <span className="text-[9px] text-slate-500">{draft.length}/360</span>
         </div>
         <textarea
           id={`mindmap-note-${entry.node.id}`}
@@ -685,9 +667,9 @@ function MindMapInspector({
           rows={compact ? 2 : 3}
           maxLength={360}
           placeholder="Crie um gancho: uma frase, uma sigla, uma comparação..."
-          className="w-full resize-y rounded-xl border border-white/10 bg-black/30 p-2.5 text-[11px] leading-5 text-neutral-200 outline-none placeholder:text-neutral-600 focus:border-fuchsia-400/50"
+          className="w-full resize-y rounded-xl border border-slate-300 bg-slate-50 p-2.5 text-[11px] leading-5 text-slate-900 outline-none placeholder:text-slate-400 focus:border-rose-400 focus:ring-2 focus:ring-rose-100"
         />
-        <p className="mt-1 text-[9px] text-neutral-600">Salva automaticamente ao sair do campo.</p>
+        <p className="mt-1 text-[9px] text-slate-500">Salva automaticamente ao sair do campo.</p>
       </div>
 
       <div className="mt-3 grid gap-1.5 sm:grid-cols-2">
@@ -697,8 +679,8 @@ function MindMapInspector({
           aria-pressed={mark === 'mastered'}
           className={`flex items-center justify-center gap-1.5 rounded-lg border px-2.5 py-2 text-[10px] font-semibold transition ${
             mark === 'mastered'
-              ? 'border-emerald-400/60 bg-emerald-400/15 text-emerald-100'
-              : 'border-white/10 bg-white/[0.03] text-neutral-400 hover:border-emerald-400/40 hover:text-emerald-200'
+              ? 'border-slate-400 bg-slate-100 text-slate-900'
+              : 'border-slate-300 bg-white text-slate-600 hover:border-slate-400 hover:text-slate-900'
           }`}
         >
           <Check size={11} />
@@ -710,8 +692,8 @@ function MindMapInspector({
           aria-pressed={mark === 'review'}
           className={`flex items-center justify-center gap-1.5 rounded-lg border px-2.5 py-2 text-[10px] font-semibold transition ${
             mark === 'review'
-              ? 'border-amber-400/60 bg-amber-400/15 text-amber-100'
-              : 'border-white/10 bg-white/[0.03] text-neutral-400 hover:border-amber-400/40 hover:text-amber-200'
+              ? 'border-amber-300 bg-amber-50 text-amber-800'
+              : 'border-slate-300 bg-white text-slate-600 hover:border-amber-300 hover:text-amber-800'
           }`}
         >
           <RotateCcw size={11} />
@@ -802,61 +784,56 @@ function MindMapReview({
   };
 
   return (
-    <div role="dialog" aria-modal="true" aria-label="Revisão do mapa mental" className="fixed inset-0 z-[240] flex flex-col bg-[#080a10] text-white">
-      <div className="pointer-events-none absolute inset-0 overflow-hidden" aria-hidden="true">
-        <div className="absolute left-1/2 top-0 h-80 w-[42rem] -translate-x-1/2 rounded-full bg-fuchsia-500/10 blur-3xl" />
-        <div className="absolute bottom-0 left-0 h-64 w-64 rounded-full bg-emerald-500/10 blur-3xl" />
-      </div>
-
-      <header className="relative flex shrink-0 flex-wrap items-center justify-between gap-3 border-b border-white/10 bg-[#0e1119]/90 px-4 py-3 backdrop-blur sm:px-6">
+    <div role="dialog" aria-modal="true" aria-label="Revisão do mapa mental" className="fixed inset-0 z-[240] flex flex-col bg-slate-50 text-slate-900">
+      <header className="relative flex shrink-0 flex-wrap items-center justify-between gap-3 border-b border-slate-200 bg-white/95 px-4 py-3 backdrop-blur sm:px-6">
         <div className="flex min-w-0 items-center gap-3">
-          <span className="flex size-9 shrink-0 items-center justify-center rounded-xl border border-fuchsia-400/20 bg-fuchsia-400/10 text-fuchsia-200">
+          <span className="flex size-9 shrink-0 items-center justify-center rounded-xl border border-rose-200 bg-rose-50 text-rose-700">
             <Brain size={17} />
           </span>
           <div className="min-w-0">
-            <p className="text-sm font-semibold text-white">Revisão ativa</p>
-            <p className="text-[10px] uppercase tracking-[0.14em] text-neutral-500">
+            <p className="text-sm font-semibold text-slate-900">Revisão ativa</p>
+            <p className="text-[10px] uppercase tracking-[0.14em] text-slate-500">
               {finished ? 'Revisão concluída' : `${index + 1} de ${queue.length} conceitos`}
             </p>
           </div>
         </div>
         <div className="flex items-center gap-3">
           <div className="hidden items-center gap-2 sm:flex">
-            <span className="text-[10px] font-semibold text-emerald-300">{masteredInQueue}</span>
-            <span className="text-[9px] text-neutral-600">lembrados</span>
-            <span className="h-3 w-px bg-white/10" />
-            <span className="text-[10px] font-semibold text-amber-300">{reviewInQueue}</span>
-            <span className="text-[9px] text-neutral-600">a revisar</span>
+            <span className="text-[10px] font-semibold text-slate-900">{masteredInQueue}</span>
+            <span className="text-[9px] text-slate-500">lembrados</span>
+            <span className="h-3 w-px bg-slate-200" />
+            <span className="text-[10px] font-semibold text-amber-700">{reviewInQueue}</span>
+            <span className="text-[9px] text-slate-500">a revisar</span>
           </div>
-          <button type="button" onClick={onClose} className="flex items-center gap-1.5 rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-[11px] font-semibold text-neutral-300 transition hover:border-white/25 hover:text-white">
+          <button type="button" onClick={onClose} className="flex items-center gap-1.5 rounded-lg border border-slate-300 bg-white px-3 py-2 text-[11px] font-semibold text-slate-700 transition hover:border-rose-200 hover:text-rose-700">
             <X size={13} /> Sair
           </button>
         </div>
       </header>
 
-      <div className="relative h-1 shrink-0 bg-white/5">
-        <div className="h-full rounded-r-full bg-gradient-to-r from-fuchsia-400 via-violet-400 to-emerald-300 transition-all duration-300" style={{ width: `${progress}%` }} />
+      <div className="relative h-1 shrink-0 bg-slate-200">
+        <div className="h-full rounded-r-full bg-rose-600 transition-all duration-300" style={{ width: `${progress}%` }} />
       </div>
 
       <div className="relative min-h-0 flex-1 overflow-y-auto px-4 py-6 sm:px-8 sm:py-10">
         <div className="mx-auto max-w-3xl">
           {finished || !current ? (
-            <div className="mindmap-review-in rounded-3xl border border-white/10 bg-gradient-to-br from-[#171b26] via-[#11151d] to-[#0d1015] p-7 text-center shadow-2xl shadow-black/40 sm:p-10">
-              <span className="mx-auto flex size-16 items-center justify-center rounded-2xl border border-emerald-400/25 bg-emerald-400/10 text-emerald-200">
+            <div className="mindmap-review-in rounded-3xl border border-slate-200 bg-white p-7 text-center shadow-xl shadow-slate-900/10 sm:p-10">
+              <span className="mx-auto flex size-16 items-center justify-center rounded-2xl border border-slate-300 bg-slate-100 text-slate-900">
                 <CircleCheck size={30} />
               </span>
-              <h2 className="mt-5 text-2xl font-semibold tracking-tight text-white">Revisão concluída</h2>
-              <p className="mt-2 text-sm leading-6 text-neutral-400">
-                Você lembrou <strong className="text-emerald-200">{masteredInQueue}</strong> de {queue.length} conceitos desta rodada.
+              <h2 className="mt-5 text-2xl font-semibold tracking-tight text-slate-900">Revisão concluída</h2>
+              <p className="mt-2 text-sm leading-6 text-slate-600">
+                Você lembrou <strong className="text-slate-900">{masteredInQueue}</strong> de {queue.length} conceitos desta rodada.
               </p>
               <div className="mx-auto mt-6 grid max-w-md grid-cols-2 gap-2">
-                <div className="rounded-2xl border border-emerald-400/20 bg-emerald-400/5 p-3">
-                  <p className="text-2xl font-semibold text-emerald-200">{masteredInMap}</p>
-                  <p className="mt-1 text-[10px] uppercase tracking-[0.12em] text-emerald-300/70">memorizados no mapa</p>
+                <div className="rounded-2xl border border-slate-300 bg-slate-100 p-3">
+                  <p className="text-2xl font-semibold text-slate-900">{masteredInMap}</p>
+                  <p className="mt-1 text-[10px] uppercase tracking-[0.12em] text-slate-900">memorizados no mapa</p>
                 </div>
-                <div className="rounded-2xl border border-amber-400/20 bg-amber-400/5 p-3">
-                  <p className="text-2xl font-semibold text-amber-200">{reviewInQueue}</p>
-                  <p className="mt-1 text-[10px] uppercase tracking-[0.12em] text-amber-300/70">pedem nova revisão</p>
+                <div className="rounded-2xl border border-amber-200 bg-amber-50 p-3">
+                  <p className="text-2xl font-semibold text-amber-800">{reviewInQueue}</p>
+                  <p className="mt-1 text-[10px] uppercase tracking-[0.12em] text-amber-800">pedem nova revisão</p>
                 </div>
               </div>
               <div className="mx-auto mt-6 flex max-w-md flex-col gap-2 sm:flex-row">
@@ -864,7 +841,7 @@ function MindMapReview({
                   <button
                     type="button"
                     onClick={() => restart(queue.filter((entry) => marks[entry.node.id] === 'review'))}
-                    className="flex flex-1 items-center justify-center gap-2 rounded-xl border border-amber-400/30 bg-amber-400/10 px-4 py-3 text-xs font-semibold text-amber-100 transition hover:bg-amber-400/20"
+                    className="flex flex-1 items-center justify-center gap-2 rounded-xl border border-amber-300 bg-amber-50 px-4 py-3 text-xs font-semibold text-amber-900 transition hover:bg-amber-100"
                   >
                     <RotateCcw size={14} /> Revisar os {reviewInQueue} pendentes
                   </button>
@@ -872,58 +849,58 @@ function MindMapReview({
                 <button
                   type="button"
                   onClick={() => restart(entries)}
-                  className="flex flex-1 items-center justify-center gap-2 rounded-xl border border-white/10 bg-white/5 px-4 py-3 text-xs font-semibold text-neutral-300 transition hover:border-white/25 hover:text-white"
+                  className="flex flex-1 items-center justify-center gap-2 rounded-xl border border-slate-300 bg-white px-4 py-3 text-xs font-semibold text-slate-700 transition hover:border-slate-400 hover:bg-slate-50"
                 >
                   Revisar tudo
                 </button>
                 <button
                   type="button"
                   onClick={onClose}
-                  className="flex flex-1 items-center justify-center gap-2 rounded-xl bg-fuchsia-400 px-4 py-3 text-xs font-semibold text-neutral-950 transition hover:bg-fuchsia-300"
+                  className="flex flex-1 items-center justify-center gap-2 rounded-xl bg-rose-600 px-4 py-3 text-xs font-semibold text-white transition hover:bg-rose-700"
                 >
                   Voltar ao mapa
                 </button>
               </div>
             </div>
           ) : (
-            <div key={current.node.id} className="mindmap-review-in rounded-3xl border border-white/10 bg-gradient-to-br from-[#1a1424] via-[#13161f] to-[#0e1117] p-5 shadow-2xl shadow-black/40 sm:p-8">
+            <div key={current.node.id} className="mindmap-review-in rounded-3xl border border-slate-200 bg-white p-5 shadow-xl shadow-slate-900/10 sm:p-8">
               <div className="flex flex-wrap items-center justify-between gap-2">
-                <span className="flex items-center gap-1.5 rounded-full border border-fuchsia-400/20 bg-fuchsia-400/10 px-2.5 py-1 text-[9px] font-semibold uppercase tracking-[0.12em] text-fuchsia-200">
+                <span className="flex items-center gap-1.5 rounded-full border border-rose-200 bg-rose-50 px-2.5 py-1 text-[9px] font-semibold uppercase tracking-[0.12em] text-rose-800">
                   <ReviewKindIcon size={10} /> {kind.label}
                 </span>
-                <span className="truncate text-[10px] text-neutral-500">
+                <span className="truncate text-[10px] text-slate-500">
                   {current.depth === 0 ? 'Tema central' : `Ramo · ${current.branchLabel}`}
                 </span>
               </div>
-              <p className="mt-5 text-[10px] font-semibold uppercase tracking-[0.16em] text-neutral-500">Conceito para lembrar</p>
-              <h2 className="mt-1 text-2xl font-semibold leading-tight tracking-tight text-white sm:text-3xl">{current.node.label}</h2>
+              <p className="mt-5 text-[10px] font-semibold uppercase tracking-[0.16em] text-slate-500">Conceito para lembrar</p>
+              <h2 className="mt-1 text-2xl font-semibold leading-tight tracking-tight text-slate-900 sm:text-3xl">{current.node.label}</h2>
 
               {!revealed ? (
-                <div className="mt-6 rounded-2xl border border-dashed border-white/15 bg-black/20 p-6 text-center">
-                  <Brain size={26} className="mx-auto text-fuchsia-300" />
-                  <p className="mx-auto mt-3 max-w-md text-sm leading-6 text-neutral-300">
+                <div className="mt-6 rounded-2xl border border-dashed border-slate-300 bg-slate-50 p-6 text-center">
+                  <Brain size={26} className="mx-auto text-slate-900" />
+                  <p className="mx-auto mt-3 max-w-md text-sm leading-6 text-slate-700">
                     Tente explicar este conceito com suas palavras antes de ver a resposta. Recuperar de memória é o que fixa o aprendizado.
                   </p>
                   <button
                     type="button"
                     onClick={() => setRevealed(true)}
-                    className="mt-5 inline-flex items-center gap-2 rounded-xl bg-fuchsia-400 px-5 py-3 text-xs font-semibold text-neutral-950 transition hover:bg-fuchsia-300"
+                    className="mt-5 inline-flex items-center gap-2 rounded-xl bg-slate-900 px-5 py-3 text-xs font-semibold text-white transition hover:bg-slate-800"
                   >
                     <Eye size={15} /> Mostrar resposta
-                    <kbd className="ml-1 rounded border border-black/20 bg-black/10 px-1.5 py-0.5 text-[9px] font-medium">Espaço</kbd>
+                    <kbd className="ml-1 rounded border border-white/30 bg-white/15 px-1.5 py-0.5 text-[9px] font-medium">Espaço</kbd>
                   </button>
                 </div>
               ) : (
                 <>
-                  <div className="mt-6 rounded-2xl border border-white/10 bg-black/25 p-4 sm:p-5">
-                    <p className="text-[9px] font-semibold uppercase tracking-[0.14em] text-emerald-300/80">Resposta</p>
-                    <LearningRichText className="mt-2 text-sm leading-6 text-neutral-200">{current.node.summary}</LearningRichText>
+                  <div className="mt-6 rounded-2xl border border-slate-200 bg-slate-50 p-4 sm:p-5">
+                    <p className="text-[9px] font-semibold uppercase tracking-[0.14em] text-slate-900">Resposta</p>
+                    <LearningRichText className="mt-2 text-sm leading-6 text-slate-800">{current.node.summary}</LearningRichText>
                     {notes[current.node.id] && (
-                      <div className="mt-4 rounded-xl border border-fuchsia-400/20 bg-fuchsia-400/5 p-3">
-                        <p className="flex items-center gap-1.5 text-[9px] font-semibold uppercase tracking-[0.12em] text-fuchsia-300/80">
+                      <div className="mt-4 rounded-xl border border-rose-200 bg-rose-50 p-3">
+                        <p className="flex items-center gap-1.5 text-[9px] font-semibold uppercase tracking-[0.12em] text-rose-700">
                           <Lightbulb size={10} /> Sua mnemônica
                         </p>
-                        <p className="mt-1 text-xs leading-5 text-fuchsia-50/90">{notes[current.node.id]}</p>
+                        <p className="mt-1 text-xs leading-5 text-slate-800">{notes[current.node.id]}</p>
                       </div>
                     )}
                   </div>
@@ -931,18 +908,18 @@ function MindMapReview({
                     <button
                       type="button"
                       onClick={() => rate('review')}
-                      className="flex items-center justify-center gap-2 rounded-xl border border-amber-400/30 bg-amber-400/10 px-4 py-3 text-xs font-semibold text-amber-100 transition hover:bg-amber-400/20"
+                      className="flex items-center justify-center gap-2 rounded-xl border border-amber-300 bg-amber-50 px-4 py-3 text-xs font-semibold text-amber-900 transition hover:bg-amber-100"
                     >
                       <RotateCcw size={14} /> Preciso revisar
-                      <kbd className="ml-1 rounded border border-amber-300/20 bg-black/15 px-1.5 py-0.5 text-[9px]">1</kbd>
+                      <kbd className="ml-1 rounded border border-amber-300 bg-white/70 px-1.5 py-0.5 text-[9px]">1</kbd>
                     </button>
                     <button
                       type="button"
                       onClick={() => rate('mastered')}
-                      className="flex items-center justify-center gap-2 rounded-xl bg-emerald-400 px-4 py-3 text-xs font-semibold text-neutral-950 transition hover:bg-emerald-300"
+                      className="flex items-center justify-center gap-2 rounded-xl bg-rose-600 px-4 py-3 text-xs font-semibold text-white transition hover:bg-rose-700"
                     >
                       <Check size={14} /> Lembrei
-                      <kbd className="ml-1 rounded border border-black/20 bg-black/10 px-1.5 py-0.5 text-[9px]">2</kbd>
+                      <kbd className="ml-1 rounded border border-white/30 bg-white/15 px-1.5 py-0.5 text-[9px]">2</kbd>
                     </button>
                   </div>
                   <button
@@ -951,7 +928,7 @@ function MindMapReview({
                       setRevealed(false);
                       setIndex((currentIndex) => currentIndex + 1);
                     }}
-                    className="mx-auto mt-3 block text-[10px] font-medium text-neutral-500 transition hover:text-neutral-300"
+                    className="mx-auto mt-3 block text-[10px] font-medium text-slate-500 transition hover:text-slate-800"
                   >
                     Pular sem avaliar
                   </button>
@@ -962,11 +939,11 @@ function MindMapReview({
         </div>
       </div>
 
-      <footer className="relative hidden shrink-0 items-center justify-center gap-4 border-t border-white/10 px-4 py-2.5 text-[9px] text-neutral-600 sm:flex">
-        <span><kbd className="rounded border border-white/10 bg-white/5 px-1.5 py-0.5">Espaço</kbd> revela a resposta</span>
-        <span><kbd className="rounded border border-white/10 bg-white/5 px-1.5 py-0.5">1</kbd> revisar</span>
-        <span><kbd className="rounded border border-white/10 bg-white/5 px-1.5 py-0.5">2</kbd> lembrei</span>
-        <span><kbd className="rounded border border-white/10 bg-white/5 px-1.5 py-0.5">Esc</kbd> sair</span>
+      <footer className="relative hidden shrink-0 items-center justify-center gap-4 border-t border-slate-200 px-4 py-2.5 text-[9px] text-slate-500 sm:flex">
+        <span><kbd className="rounded border border-slate-200 bg-white px-1.5 py-0.5">Espaço</kbd> revela a resposta</span>
+        <span><kbd className="rounded border border-slate-200 bg-white px-1.5 py-0.5">1</kbd> revisar</span>
+        <span><kbd className="rounded border border-slate-200 bg-white px-1.5 py-0.5">2</kbd> lembrei</span>
+        <span><kbd className="rounded border border-slate-200 bg-white px-1.5 py-0.5">Esc</kbd> sair</span>
       </footer>
     </div>
   );
@@ -1110,7 +1087,7 @@ export default function LearningMindMap({ root, marks, notes, onMark, onNote }: 
   );
 
   const mapBody = (fullScreen: boolean) => (
-    <div className={`overflow-hidden rounded-2xl border border-white/10 bg-[#0b0e14] ${fullScreen ? 'flex min-h-0 flex-1' : ''}`}>
+    <div className={`overflow-hidden rounded-2xl border border-slate-200 bg-white ${fullScreen ? 'flex min-h-0 flex-1' : ''}`}>
       {layout ? (
         <MindMapViewport
           viewportRef={fullScreen ? fullScreenViewportRef : inlineViewportRef}
@@ -1129,16 +1106,16 @@ export default function LearningMindMap({ root, marks, notes, onMark, onNote }: 
         </MindMapViewport>
       ) : (
         <div className={`flex flex-col items-center justify-center gap-3 px-6 text-center ${fullScreen ? 'min-h-0 flex-1' : 'h-[420px] sm:h-[470px]'}`}>
-          <span className="flex size-11 items-center justify-center rounded-2xl border border-white/10 bg-white/5 text-neutral-500">
+          <span className="flex size-11 items-center justify-center rounded-2xl border border-slate-200 bg-slate-50 text-slate-500">
             <Search size={19} />
           </span>
           <div>
-            <p className="text-sm font-semibold text-neutral-300">Nenhum conceito encontrado</p>
-            <p className="mt-1 max-w-sm text-[11px] leading-5 text-neutral-500">
+            <p className="text-sm font-semibold text-slate-900">Nenhum conceito encontrado</p>
+            <p className="mt-1 max-w-sm text-[11px] leading-5 text-slate-600">
               Tente outro termo ou limpe a busca para voltar ao mapa completo.
             </p>
           </div>
-          <button type="button" onClick={() => setQuery('')} className="rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-[10px] font-semibold text-neutral-300 transition hover:border-white/25 hover:text-white">
+          <button type="button" onClick={() => setQuery('')} className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-[10px] font-semibold text-slate-700 transition hover:border-rose-200 hover:text-rose-700">
             Limpar busca
           </button>
         </div>
@@ -1148,58 +1125,68 @@ export default function LearningMindMap({ root, marks, notes, onMark, onNote }: 
 
   return (
     <>
-      <section className="relative overflow-hidden rounded-3xl border border-fuchsia-900/40 bg-gradient-to-br from-[#241329] via-[#14141f] to-[#101318] p-4 sm:p-5">
-        <div className="pointer-events-none absolute -left-20 -top-24 size-64 rounded-full bg-fuchsia-500/10 blur-3xl" aria-hidden="true" />
-        <div className="pointer-events-none absolute -bottom-24 right-0 size-64 rounded-full bg-indigo-500/10 blur-3xl" aria-hidden="true" />
-
+      <section className="relative overflow-hidden rounded-3xl border border-slate-200 bg-white p-4 shadow-sm shadow-slate-900/5 sm:p-5">
         <div className="relative">
           <div className="flex flex-wrap items-start justify-between gap-3">
             <div className="flex min-w-0 items-start gap-3">
-              <span className="flex size-10 shrink-0 items-center justify-center rounded-2xl border border-fuchsia-300/20 bg-fuchsia-400/10 text-fuchsia-200 shadow-lg shadow-fuchsia-950/30">
+              <span className="flex size-10 shrink-0 items-center justify-center rounded-2xl border border-rose-200 bg-rose-50 text-rose-700 shadow-sm shadow-slate-900/5">
                 <Network size={18} />
               </span>
               <div className="min-w-0">
-                <h3 className="flex items-center gap-2 text-sm font-semibold text-fuchsia-50">
+                <h3 className="flex items-center gap-2 text-sm font-semibold text-slate-900">
                   Mapa mental da aula
-                  <span className="rounded-full border border-fuchsia-400/20 bg-fuchsia-400/10 px-2 py-0.5 text-[9px] font-medium text-fuchsia-200/90">
+                  <span className="rounded-full border border-rose-200 bg-rose-50 px-2 py-0.5 text-[9px] font-medium text-rose-800">
                     memória ativa
                   </span>
                 </h3>
-                <p className="mt-1 max-w-xl text-[11px] leading-4 text-neutral-400">
+                <p className="mt-1 max-w-xl text-[11px] leading-4 text-slate-600">
                   Explore os ramos, crie ganchos de memória e teste o que lembra. O mapa agora é uma ferramenta de revisão, não só de leitura.
                 </p>
               </div>
             </div>
 
             <div className="flex flex-wrap items-center gap-2">
-              <div className="flex items-center gap-2 rounded-xl border border-white/10 bg-black/20 px-2.5 py-1.5" title={`${masteredCount} de ${reviewable.length} conceitos memorizados`}>
+              <div className="flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-2.5 py-1.5" title={`${masteredCount} de ${reviewable.length} conceitos memorizados`}>
                 <span
                   className="relative flex size-8 items-center justify-center rounded-full"
-                  style={{ background: `conic-gradient(#34d399 ${masteryPercent}%, rgba(255,255,255,0.08) 0)` }}
                   aria-hidden="true"
                 >
-                  <span className="flex size-6 items-center justify-center rounded-full bg-[#191525] text-[8px] font-semibold text-emerald-200">
+                  <svg className="absolute inset-0 size-full" viewBox="0 0 36 36" aria-hidden="true">
+                    <circle cx="18" cy="18" r="15" fill="none" stroke="#e2e8f0" strokeWidth="3" />
+                    <circle
+                      cx="18"
+                      cy="18"
+                      r="15"
+                      fill="none"
+                      stroke="#0369a1"
+                      strokeWidth="3"
+                      strokeDasharray={`${(masteryPercent / 100) * 94.25} 94.25`}
+                      strokeLinecap="round"
+                      transform="rotate(-90 18 18)"
+                    />
+                  </svg>
+                  <span className="relative flex size-6 items-center justify-center rounded-full bg-white text-[8px] font-semibold text-slate-900">
                     {masteryPercent}%
                   </span>
                 </span>
-                <span className="text-[10px] leading-4 text-neutral-400">
-                  <strong className="text-neutral-100">{masteredCount}</strong>/{reviewable.length}
-                  <span className="block text-[9px] text-neutral-600">memorizados</span>
+                <span className="text-[10px] leading-4 text-slate-600">
+                  <strong className="text-slate-900">{masteredCount}</strong>/{reviewable.length}
+                  <span className="block text-[9px] text-slate-500">memorizados</span>
                 </span>
               </div>
               {reviewCount > 0 && (
-                <span className="rounded-full border border-amber-400/20 bg-amber-400/10 px-2 py-1 text-[9px] font-medium text-amber-200">
+                <span className="rounded-full border border-amber-200 bg-amber-50 px-2 py-1 text-[9px] font-medium text-amber-900">
                   {reviewCount} para revisar
                 </span>
               )}
               <button
                 type="button"
                 onClick={openReview}
-                className="flex items-center gap-1.5 rounded-xl bg-fuchsia-400 px-3 py-2 text-[10px] font-semibold text-neutral-950 transition hover:bg-fuchsia-300"
+                className="flex items-center gap-1.5 rounded-xl bg-rose-600 px-3 py-2 text-[10px] font-semibold text-white transition hover:bg-rose-700"
               >
                 <Brain size={13} />
                 Revisar
-                <span className="rounded-full bg-black/15 px-1.5 py-0.5 text-[9px]">
+                <span className="rounded-full bg-white/20 px-1.5 py-0.5 text-[9px]">
                   {pendingCount > 0 ? pendingCount : <Check size={9} />}
                 </span>
               </button>
@@ -1207,7 +1194,7 @@ export default function LearningMindMap({ root, marks, notes, onMark, onNote }: 
                 type="button"
                 onClick={openFullScreen}
                 aria-label="Abrir mapa mental em tela cheia"
-                className="flex items-center gap-1.5 rounded-xl border border-fuchsia-400/25 bg-fuchsia-400/10 px-2.5 py-2 text-[10px] font-semibold text-fuchsia-100 transition hover:bg-fuchsia-400/20"
+                className="flex items-center gap-1.5 rounded-xl border border-slate-300 bg-slate-100 px-2.5 py-2 text-[10px] font-semibold text-slate-900 transition hover:border-slate-400 hover:bg-slate-200"
               >
                 <Maximize2 size={12} />
                 Tela cheia
@@ -1215,13 +1202,13 @@ export default function LearningMindMap({ root, marks, notes, onMark, onNote }: 
             </div>
           </div>
 
-          <div className="mt-4 border-t border-white/5 pt-3">
+          <div className="mt-4 border-t border-slate-200 pt-3">
             {toolbar}
           </div>
 
           <div className="mt-3">
             {queryActive && matchIds.size > 0 && (
-              <p className="mb-2 text-[10px] text-lime-200/80">
+              <p className="mb-2 text-[10px] font-medium text-slate-900">
                 {matchIds.size} conceito{matchIds.size === 1 ? '' : 's'} encontrado{matchIds.size === 1 ? '' : 's'} para “{query.trim()}”.
               </p>
             )}
@@ -1242,35 +1229,31 @@ export default function LearningMindMap({ root, marks, notes, onMark, onNote }: 
               />
             </div>
           ) : (
-            <div className="mt-3 flex items-center gap-2 rounded-xl border border-white/5 bg-black/20 px-3 py-2.5 text-[10px] leading-4 text-neutral-500">
-              <Lightbulb size={13} className="shrink-0 text-fuchsia-300/70" />
-              Clique em um nó para ver a explicação completa, escrever uma mnemônica e marcar o que já lembra. Use <span className="rounded border border-white/10 bg-white/5 px-1 text-[9px] text-neutral-300">Revisar</span> para se testar.
+            <div className="mt-3 flex items-center gap-2 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-[10px] leading-4 text-slate-600">
+              <Lightbulb size={13} className="shrink-0 text-slate-900" />
+              Clique em um nó para ver a explicação completa, escrever uma mnemônica e marcar o que já lembra. Use <span className="rounded border border-slate-200 bg-white px-1 text-[9px] text-slate-700">Revisar</span> para se testar.
             </div>
           )}
 
-          <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-2 text-[9px] text-neutral-600">
-            <span className="flex items-center gap-1.5"><span className="size-1.5 rounded-full bg-fuchsia-300" /> ramos coloridos</span>
-            <span className="flex items-center gap-1.5"><CircleCheck size={10} className="text-emerald-300" /> memorizado</span>
-            <span className="flex items-center gap-1.5"><RotateCcw size={9} className="text-amber-300" /> revisar depois</span>
+          <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-2 text-[9px] text-slate-500">
+            <span className="flex items-center gap-1.5"><span className="size-1.5 rounded-full bg-rose-500" /> ramos coloridos</span>
+            <span className="flex items-center gap-1.5"><CircleCheck size={10} className="text-slate-900" /> memorizado</span>
+            <span className="flex items-center gap-1.5"><RotateCcw size={9} className="text-amber-700" /> revisar depois</span>
             <span className="ml-auto hidden sm:flex">Clique duas vezes em um nó para expandir ou recolher o ramo.</span>
           </div>
         </div>
       </section>
 
       {isFullScreen && (
-        <div role="dialog" aria-modal="true" aria-label="Mapa mental em tela cheia" className="fixed inset-0 z-[220] flex flex-col bg-[#080a10] text-white">
-          <div className="pointer-events-none absolute inset-0 overflow-hidden" aria-hidden="true">
-            <div className="absolute -left-40 top-0 h-96 w-96 rounded-full bg-fuchsia-500/10 blur-3xl" />
-            <div className="absolute bottom-0 right-0 h-96 w-96 rounded-full bg-indigo-500/10 blur-3xl" />
-          </div>
-          <header className="relative flex shrink-0 flex-wrap items-center justify-between gap-3 border-b border-white/10 bg-[#0e1119]/90 px-4 py-3 backdrop-blur sm:px-6">
+        <div role="dialog" aria-modal="true" aria-label="Mapa mental em tela cheia" className="fixed inset-0 z-[220] flex flex-col bg-slate-50 text-slate-900">
+          <header className="relative flex shrink-0 flex-wrap items-center justify-between gap-3 border-b border-slate-200 bg-white/95 px-4 py-3 backdrop-blur sm:px-6">
             <div className="flex min-w-0 items-center gap-3">
-              <span className="flex size-9 shrink-0 items-center justify-center rounded-xl border border-fuchsia-400/20 bg-fuchsia-400/10 text-fuchsia-200">
+              <span className="flex size-9 shrink-0 items-center justify-center rounded-xl border border-rose-200 bg-rose-50 text-rose-700">
                 <Network size={17} />
               </span>
               <div className="min-w-0">
-                <p className="truncate text-sm font-semibold text-white">{root.label}</p>
-                <p className="text-[10px] uppercase tracking-[0.14em] text-neutral-500">
+                <p className="truncate text-sm font-semibold text-slate-900">{root.label}</p>
+                <p className="text-[10px] uppercase tracking-[0.14em] text-slate-500">
                   Mapa mental · {reviewable.length} conceitos · {masteredCount} memorizados
                 </p>
               </div>
@@ -1279,22 +1262,22 @@ export default function LearningMindMap({ root, marks, notes, onMark, onNote }: 
               <button
                 type="button"
                 onClick={openReview}
-                className="flex items-center gap-1.5 rounded-xl bg-fuchsia-400 px-3 py-2 text-[10px] font-semibold text-neutral-950 transition hover:bg-fuchsia-300"
+                className="flex items-center gap-1.5 rounded-xl bg-rose-600 px-3 py-2 text-[10px] font-semibold text-white transition hover:bg-rose-700"
               >
                 <Brain size={13} /> Revisar
               </button>
-              <button type="button" onClick={closeFullScreen} className="flex shrink-0 items-center gap-2 rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-[11px] font-semibold text-neutral-300 transition hover:border-fuchsia-400/50 hover:text-fuchsia-100">
+              <button type="button" onClick={closeFullScreen} className="flex shrink-0 items-center gap-2 rounded-lg border border-slate-300 bg-white px-3 py-2 text-[11px] font-semibold text-slate-700 transition hover:border-rose-200 hover:text-rose-700">
                 <Minimize2 size={13} /> Sair
               </button>
             </div>
           </header>
 
-          <div className="relative shrink-0 border-b border-white/5 px-4 py-2.5 sm:px-6">
+          <div className="relative shrink-0 border-b border-slate-200 px-4 py-2.5 sm:px-6">
             <div className="flex flex-wrap items-center gap-3">
               {toolbar}
-              <span className="ml-auto hidden items-center gap-3 text-[9px] text-neutral-600 sm:flex">
-                <span className="flex items-center gap-1.5"><CircleCheck size={10} className="text-emerald-300" /> memorizado</span>
-                <span className="flex items-center gap-1.5"><RotateCcw size={9} className="text-amber-300" /> revisar</span>
+              <span className="ml-auto hidden items-center gap-3 text-[9px] text-slate-500 sm:flex">
+                <span className="flex items-center gap-1.5"><CircleCheck size={10} className="text-slate-900" /> memorizado</span>
+                <span className="flex items-center gap-1.5"><RotateCcw size={9} className="text-amber-700" /> revisar</span>
               </span>
             </div>
           </div>
@@ -1321,8 +1304,8 @@ export default function LearningMindMap({ root, marks, notes, onMark, onNote }: 
           </div>
 
           {!selectedEntry && (
-            <div className="relative shrink-0 pb-4 text-center text-[10px] text-neutral-600">
-              <Lightbulb size={11} className="mr-1 inline text-fuchsia-300/70" />
+            <div className="relative shrink-0 pb-4 text-center text-[10px] text-slate-500">
+              <Lightbulb size={11} className="mr-1 inline text-slate-900" />
               Selecione um conceito para ver detalhes, criar uma mnemônica e marcar o que já lembra.
             </div>
           )}

@@ -9,7 +9,6 @@ import {
   FileCode,
   LayoutTemplate,
   Search,
-  Sparkles,
   Square,
   X,
 } from 'lucide-react';
@@ -193,7 +192,7 @@ export default function BlockLibrary({ onClose }: { onClose: () => void }) {
       >
         <div className="flex items-center justify-between border-b border-neutral-800 px-5 py-4">
           <div className="flex items-center gap-2">
-            <Sparkles size={16} className="text-emerald-300" />
+            <LayoutTemplate size={16} className="text-emerald-300" />
             <h2 className="text-sm font-semibold text-neutral-100">Biblioteca de Blocos</h2>
             <span className="text-[11px] text-neutral-500">{BLOCK_LIBRARY.length} blocos · preset {preset.name}</span>
           </div>

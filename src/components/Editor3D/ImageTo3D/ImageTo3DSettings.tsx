@@ -2,12 +2,13 @@
 
 import {
   Boxes,
+  Camera,
   Cpu,
   Gem,
   Leaf,
   Palette,
   Settings2,
-  Sparkles,
+  UserRound,
   Wand2,
   Zap,
 } from 'lucide-react';
@@ -28,13 +29,13 @@ import { isProviderConfigured } from '@/lib/imageTo3D/providers/imageTo3DProvide
 
 const modelTypeIcons: Record<ImageTo3DModelType, typeof Boxes> = {
   human: Boxes,
-  head: Sparkles,
+  head: UserRound,
   object: Cpu,
   prop: Gem,
 };
 
 const styleIcons: Record<ImageTo3DStyle, typeof Palette> = {
-  realistic: Sparkles,
+  realistic: Camera,
   gameReady: Cpu,
   stylized: Palette,
   lowPoly: Leaf,

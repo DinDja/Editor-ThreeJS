@@ -15,7 +15,7 @@ type Scene3DSelectionProps = {
   setOrbitEnabled: Dispatch<SetStateAction<boolean>>;
 };
 
-const HIGHLIGHT_COLOR = '#34d399';
+const HIGHLIGHT_COLOR = '#0785cf';
 const HIGHLIGHT_OPACITY = 0.5;
 const OUTLINE_PULSE_SPEED = 1.8;
 

@@ -5,13 +5,14 @@ import {
   AlertTriangle,
   ArrowLeft,
   ArrowRight,
+  Box,
   Camera,
   Image as ImageIcon,
   Info,
   Loader2,
+  RefreshCw,
   Settings2,
   ShieldCheck,
-  Sparkles,
   Square,
   Trash2,
   Wand2,
@@ -116,7 +117,7 @@ function ImageTo3DModalContent() {
     { label: 'Imagens', icon: ImageIcon },
     { label: 'Configurar', icon: Settings2 },
     { label: 'Gerar', icon: Wand2 },
-    { label: 'Resultado', icon: Sparkles },
+    { label: 'Resultado', icon: Box },
   ];
 
   return (
@@ -206,7 +207,7 @@ function ImageTo3DModalContent() {
                   onClick={handleRegenerate}
                   className="inline-flex h-9 cursor-pointer items-center gap-2 rounded-lg bg-emerald-500 px-4 text-xs font-semibold text-neutral-950 transition hover:bg-emerald-400"
                 >
-                  <Sparkles size={13} />
+                  <RefreshCw size={13} />
                   Tentar novamente
                 </button>
                 <button
@@ -352,7 +353,7 @@ function ImageTo3DModalContent() {
             <div className="flex items-center gap-1.5 text-[11px] text-neutral-500">
               {importedRootId ? (
                 <span className="flex items-center gap-1 text-emerald-300">
-                  <Sparkles size={12} /> Modelo importado na cena
+                  <ShieldCheck size={12} /> Modelo importado na cena
                 </span>
               ) : (
                 <span>Pronto para importar</span>

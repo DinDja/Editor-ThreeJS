@@ -577,7 +577,7 @@ function PageNodeView({
             )}
           </label>
         ))}
-        <button type="submit" style={{ height: 38, border: 0, borderRadius: 8, background: '#34d399', color: '#06231b', fontWeight: 700 }}>
+        <button type="submit" style={{ height: 38, border: 0, borderRadius: 8, background: '#e31d2e', color: '#ffffff', fontWeight: 700 }}>
           {String(node.props.submitLabel ?? 'Salvar')}
         </button>
       </form>
@@ -614,7 +614,7 @@ function PageNodeView({
           const height = Math.max(12, (values[index] / max) * 100);
           return (
             <div key={String(record.id ?? index)} style={{ flex: 1, display: 'grid', alignItems: 'end', gap: 6 }}>
-              <div title={displayDataValue(record[labelField])} style={{ height: `${height}%`, minHeight: 18, borderRadius: 6, background: 'linear-gradient(180deg, #34d399, #38bdf8)' }} />
+              <div title={displayDataValue(record[labelField])} style={{ height: `${height}%`, minHeight: 18, borderRadius: 6, background: 'linear-gradient(180deg, #e31d2e, #0785cf)' }} />
               <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', fontSize: 10, color: '#a3a3a3' }}>{displayDataValue(record[labelField])}</span>
             </div>
           );
@@ -954,7 +954,7 @@ export default function PageExperience({
         <div
           className="fixed bottom-5 right-5 z-[999] rounded-md border px-4 py-3 text-sm shadow-2xl"
           style={{
-            borderColor: toast.tone === 'error' ? 'rgba(248,113,113,0.45)' : 'rgba(52,211,153,0.45)',
+            borderColor: toast.tone === 'error' ? 'rgba(248,113,113,0.45)' : 'rgba(7,133,207,0.45)',
             background: toast.tone === 'error' ? 'rgba(69,10,10,0.92)' : 'rgba(6,35,27,0.92)',
             color: '#f5f5f4',
           }}

@@ -305,7 +305,7 @@ export default function AssetBrowserModal({ open, onClose }: AssetBrowserModalPr
                         style={{ backgroundImage: `url(${asset.thumbnailUrl})` }}
                       />
                     ) : (
-                      <div className="flex h-full items-center justify-center text-neutral-700">
+                      <div className="flex h-full items-center justify-center text-neutral-500">
                         <Box size={28} />
                       </div>
                     )}

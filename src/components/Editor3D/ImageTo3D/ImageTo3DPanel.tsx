@@ -4,10 +4,10 @@ import {
   Calendar,
   Database,
   Layers,
+  Palette,
   RefreshCw,
   RotateCcw,
   Settings2,
-  Sparkles,
   Triangle,
 } from 'lucide-react';
 import type { SceneObject } from '@/store/types';
@@ -71,12 +71,12 @@ export default function ImageTo3DPanel({ object }: { object: SceneObject }) {
   return (
     <CollapsibleSection
       title="Image to 3D"
-      icon={<Sparkles size={11} className="text-emerald-400" />}
+      icon={<Layers size={11} className="text-emerald-400" />}
       defaultOpen
     >
       <div className="grid gap-1.5">
         <div className="flex items-center gap-2 rounded-lg border border-emerald-400/20 bg-emerald-400/5 px-2.5 py-2">
-          <Sparkles size={13} className="shrink-0 text-emerald-300" />
+          <Layers size={13} className="shrink-0 text-emerald-300" />
           <p className="text-[11px] text-emerald-100">
             {generatedDisplayName}
           </p>
@@ -84,7 +84,7 @@ export default function ImageTo3DPanel({ object }: { object: SceneObject }) {
 
         <Row icon={<Database size={11} />} label="Origem" value="Image to 3D" />
         <Row icon={<Layers size={11} />} label="Tipo" value={MODEL_TYPE_LABELS[meta.modelType]} />
-        <Row icon={<Sparkles size={11} />} label="Estilo" value={STYLE_LABELS[meta.style]} />
+        <Row icon={<Palette size={11} />} label="Estilo" value={STYLE_LABELS[meta.style]} />
         <Row icon={<Settings2 size={11} />} label="Qualidade" value={QUALITY_LABELS[meta.quality]} />
         <Row icon={<Calendar size={11} />} label="Gerado em" value={formatDate(meta.createdAt)} />
         {stats && (
@@ -96,7 +96,7 @@ export default function ImageTo3DPanel({ object }: { object: SceneObject }) {
             />
             <Row icon={<Layers size={11} />} label="Meshes" value={String(stats.meshCount)} />
             <Row
-              icon={<Sparkles size={11} />}
+              icon={<Layers size={11} />}
               label="Texturas"
               value={String(stats.textureCount)}
             />

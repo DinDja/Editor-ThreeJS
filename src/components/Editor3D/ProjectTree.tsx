@@ -629,7 +629,7 @@ export default function ProjectTree() {
                 onClick={() => setActiveTab(tab.id)}
                 className={`flex h-7 min-w-0 flex-1 items-center justify-center gap-1 rounded-md px-1.5 text-[9px] font-semibold uppercase tracking-[0.08em] transition ${
                   activeTab === tab.id
-                    ? 'bg-emerald-400/12 text-emerald-200 shadow-[inset_0_0_0_1px_rgba(52,211,153,0.3)]'
+                    ? 'bg-emerald-400/12 text-emerald-200 shadow-[inset_0_0_0_1px_rgba(227,29,46,0.3)]'
                     : 'text-neutral-500 hover:bg-neutral-800 hover:text-neutral-200'
                 }`}
                 title={tab.label}

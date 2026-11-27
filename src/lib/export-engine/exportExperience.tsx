@@ -222,7 +222,7 @@ function ExperienceNode({ node }) {
   if (node.type === 'dataChart') {
     const collection = collectionFor(node.props?.collectionId);
     const records = sampleRecords(collection, node.props?.limit || 5);
-    return <div {...dataAttrs} style={style}>{records.map((r, i) => <div key={i} style={{ flex: 1, height: ((i + 1) * 18) + '%', background: '#34d399', borderRadius: 6 }} title={display(r[node.props?.labelField || 'name'])} />)}</div>;
+    return <div {...dataAttrs} style={style}>{records.map((r, i) => <div key={i} style={{ flex: 1, height: ((i + 1) * 18) + '%', background: '#e31d2e', borderRadius: 6 }} title={display(r[node.props?.labelField || 'name'])} />)}</div>;
   }
   if (node.type === 'dataStat') {
     const collection = collectionFor(node.props?.collectionId);
@@ -540,7 +540,7 @@ const buildHtmlNode = (node: PageNode, snapshot: ProjectExperience): string => {
       const collection = collectionForExport(String(props.collectionId), snapshot.dataSchema);
       const records = sampleRecordsForExport(collection, Number(props.limit) || 5);
       records.forEach((_r, i) => {
-        inner += `<div class="chart-bar" style="flex:1;height:${(i + 1) * 18}%;background:#34d399;border-radius:6px"></div>`;
+        inner += `<div class="chart-bar" style="flex:1;height:${(i + 1) * 18}%;background:#e31d2e;border-radius:6px"></div>`;
       });
       break;
     }

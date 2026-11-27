@@ -88,7 +88,7 @@ export const createDefaultDataSchema = (name = 'App Data'): DataSchema => ({
     createDataCollection('Leads', {
       name: 'leads',
       description: 'Contatos enviados pelo site ou landing page.',
-      config: { timestamps: true, publicRead: false, publicWrite: true, color: '#34d399', icon: 'users' },
+      config: { timestamps: true, publicRead: false, publicWrite: true, color: '#0785cf', icon: 'users' },
       fields: [
         createSystemField('id', 'ID', 'string'),
         createDataField('Nome', 'string', { name: 'name', required: true, uiHint: 'input' }),

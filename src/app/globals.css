@@ -17,8 +17,8 @@ html {
   width: 100%;
   height: 100%;
   overflow: hidden;
-  background: #1a1a1a;
-  color-scheme: dark;
+  background: #f3f6fb;
+  color-scheme: light;
   -webkit-text-size-adjust: 100%;
   overscroll-behavior: none;
 }
@@ -27,7 +27,7 @@ body {
   width: 100%;
   height: 100%;
   overflow: hidden;
-  background: #1a1a1a;
+  background: #f3f6fb;
   overscroll-behavior: none;
 }
 
@@ -103,26 +103,159 @@ input:disabled {
  * Centralized here so every panel/toolbar/canvas shares the same look.
  */
 :root {
-  --ed-surface-0: #0b0d0e;       /* deepest (canvas page) */
-  --ed-surface-1: #101214;       /* canvas frame */
-  --ed-surface-2: #151719;       /* panels */
-  --ed-surface-3: #1a1d20;       /* toolbar / hover */
-  --ed-surface-4: #212529;       /* raised */
-  --ed-border: #2a2e33;          /* default border */
-  --ed-border-soft: #1f2327;     /* subtle border */
-  --ed-accent: #34d399;          /* emerald */
-  --ed-accent-soft: rgba(52, 211, 153, 0.14);
-  --ed-accent-line: rgba(52, 211, 153, 0.45);
-  --ed-hint: #59c3ff;            /* hover hint blue */
-  --ed-hint-soft: rgba(89, 195, 255, 0.16);
-  --ed-danger: #fb7185;
-  --ed-warn: #fbbf24;
-  --ed-text: #f5f5f4;
-  --ed-text-dim: #a1a1aa;
-  --ed-text-mute: #71717a;
-  --ed-grid: rgba(255, 255, 255, 0.035);
+  --ed-surface-0: #f3f6fb;       /* app background */
+  --ed-surface-1: #edf2f8;       /* canvas frame */
+  --ed-surface-2: #ffffff;       /* panels */
+  --ed-surface-3: #f8fafc;       /* toolbar / hover */
+  --ed-surface-4: #e8eef5;       /* raised */
+  --ed-border: #d3deea;          /* default border */
+  --ed-border-soft: #e2e8f0;     /* subtle border */
+  --ed-accent: #e31d2e;          /* brand red */
+  --ed-accent-soft: rgba(227, 29, 46, 0.1);
+  --ed-accent-line: rgba(227, 29, 46, 0.42);
+  --ed-hint: #0785cf;            /* brand blue */
+  --ed-hint-soft: rgba(7, 133, 207, 0.12);
+  --ed-danger: #c91c2b;
+  --ed-warn: #b76e00;
+  --ed-text: #17253a;
+  --ed-text-dim: #53677e;
+  --ed-text-mute: #6f8195;
+  --ed-grid: rgba(23, 37, 58, 0.08);
 }
 
+:root {
+  --app-bg: #f3f6fb;
+  --app-surface: #ffffff;
+  --app-surface-muted: #f8fafc;
+  --app-border: #d8e1ec;
+  --app-text: #17253a;
+  --app-muted: #5d7087;
+  --brand-red: #ff111b;
+  --brand-blue: #0785cf;
+
+  --color-neutral-50: #13243a;
+  --color-neutral-100: #1a2c43;
+  --color-neutral-200: #2b3e55;
+  --color-neutral-300: #40536a;
+  --color-neutral-400: #566a81;
+  --color-neutral-500: #64758b;
+  --color-neutral-600: #738399;
+  --color-neutral-700: #c2cdda;
+  --color-neutral-800: #dce4ed;
+  --color-neutral-900: #f0f4f8;
+  --color-neutral-950: #f8fafc;
+
+  --color-emerald-50: #991b2b;
+  --color-emerald-100: #a51d2d;
+  --color-emerald-200: #b21d30;
+  --color-emerald-300: #c51d32;
+  --color-emerald-400: #e31d2e;
+  --color-emerald-500: #e31d2e;
+  --color-emerald-600: #c91c2b;
+  --color-emerald-700: #f5aeb6;
+  --color-emerald-800: #f9c9ce;
+  --color-emerald-900: #fde3e6;
+  --color-emerald-950: #fff1f2;
+
+  --color-red-100: #b42332;
+  --color-red-200: #b42332;
+  --color-red-300: #c51d32;
+  --color-red-400: #d91d31;
+  --color-red-500: #e31d2e;
+  --color-red-600: #c91c2b;
+  --color-red-700: #a71928;
+  --color-red-800: #f9c9ce;
+  --color-red-900: #fde3e6;
+  --color-red-950: #fff1f2;
+
+  --color-sky-100: #075985;
+  --color-sky-200: #075985;
+  --color-sky-300: #0369a1;
+  --color-sky-400: #087fb6;
+  --color-sky-500: #0785cf;
+  --color-sky-600: #0369a1;
+  --color-sky-700: #bae6fd;
+  --color-sky-800: #d6f0fc;
+  --color-sky-900: #e0f2fe;
+  --color-sky-950: #f0f9ff;
+
+  --color-fuchsia-50: #075985;
+  --color-fuchsia-100: #075985;
+  --color-fuchsia-200: #075985;
+  --color-fuchsia-300: #0369a1;
+  --color-fuchsia-400: #0785cf;
+  --color-fuchsia-500: #0785cf;
+  --color-fuchsia-600: #0369a1;
+  --color-fuchsia-700: #bae6fd;
+  --color-fuchsia-800: #d6f0fc;
+  --color-fuchsia-900: #e0f2fe;
+  --color-fuchsia-950: #f0f9ff;
+  --color-violet-200: #075985;
+  --color-violet-300: #0369a1;
+  --color-violet-400: #0785cf;
+  --color-violet-500: #0785cf;
+  --color-violet-600: #0369a1;
+  --color-violet-700: #bae6fd;
+  --color-violet-800: #d6f0fc;
+  --color-violet-900: #e0f2fe;
+  --color-violet-950: #f0f9ff;
+  --color-cyan-200: #075985;
+  --color-cyan-300: #0369a1;
+  --color-cyan-400: #087fb6;
+  --color-cyan-500: #0785cf;
+  --color-cyan-600: #0369a1;
+  --color-cyan-700: #bae6fd;
+  --color-cyan-800: #d6f0fc;
+  --color-cyan-900: #e0f2fe;
+  --color-cyan-950: #f0f9ff;
+  --color-lime-300: #c51d32;
+  --color-lime-400: #e31d2e;
+  --color-lime-500: #e31d2e;
+  --color-lime-600: #c91c2b;
+  --color-lime-700: #f5aeb6;
+  --color-lime-800: #f9c9ce;
+  --color-lime-900: #fde3e6;
+  --color-lime-950: #fff1f2;
+  --color-blue-300: #0369a1;
+  --color-blue-400: #087fb6;
+  --color-blue-500: #0785cf;
+  --color-blue-600: #0369a1;
+  --color-blue-700: #bae6fd;
+  --color-blue-800: #d6f0fc;
+  --color-blue-900: #e0f2fe;
+  --color-blue-950: #f0f9ff;
+
+}
+
+/* Shift the existing dark utility surfaces into the light brand palette. */
+:where([class*="bg-[#"]) {
+  background-color: var(--app-surface) !important;
+}
+:where(
+  [class~="bg-[#080a10]"],
+  [class~="bg-[#080c0a]"],
+  [class~="bg-[#0a0b0c]"],
+  [class~="bg-[#0a0c0d]"],
+  [class~="bg-[#0b0e14]"],
+  [class~="bg-[#0d0f10]"],
+  [class~="bg-[#0e1119]"]
+) {
+  background-color: var(--app-bg) !important;
+}
+:where(
+  [class~="bg-[#0f1113]"],
+  [class~="bg-[#101214]"],
+  [class~="bg-[#101414]"],
+  [class~="bg-[#10141a]"],
+  [class~="bg-[#111315]"],
+  [class~="bg-[#111516]"],
+  [class~="bg-[#111816]"],
+  [class~="bg-[#121416]"],
+  [class~="bg-[#131517]"],
+  [class~="bg-[#131618]"]
+) {
+  background-color: var(--app-surface-muted) !important;
+}
 /* Dotted reference backdrop for the page canvas (editor-only) */
 .ed-canvas-backdrop {
   background-color: var(--ed-surface-0);
@@ -163,8 +296,8 @@ input:disabled {
 
 /* Animated selection pulse for the canvas selection box */
 @keyframes ed-select-pulse {
-  0%, 100% { box-shadow: 0 0 0 1px var(--ed-accent-line), 0 0 22px rgba(52, 211, 153, 0.18); }
-  50% { box-shadow: 0 0 0 1px var(--ed-accent-line), 0 0 30px rgba(52, 211, 153, 0.30); }
+  0%, 100% { box-shadow: 0 0 0 1px var(--ed-accent-line), 0 0 22px rgba(227, 29, 46, 0.18); }
+  50% { box-shadow: 0 0 0 1px var(--ed-accent-line), 0 0 30px rgba(227, 29, 46, 0.3); }
 }
 .ed-select-glow { animation: ed-select-pulse 2.6s ease-in-out infinite; }
 
@@ -203,7 +336,7 @@ input:disabled {
   top: 0;
   bottom: 0;
   width: 2px;
-  background: linear-gradient(to bottom, var(--ed-accent), var(--ed-accent-soft));
+  background: var(--ed-accent);
   border-radius: 1px;
   animation: trunk-grow 0.6s ease-out forwards;
   transform-origin: top;
@@ -360,6 +493,7 @@ input:disabled {
   .subject-tree-topic,
   .subject-tree-topic-dot,
   .subject-tree-hint,
+  .learning-radial-enter,
   .mindmap-node-in,
   .mindmap-review-in {
     animation: none !important;
@@ -378,4 +512,19 @@ input:disabled {
   .subject-tree-topic:hover {
     transform: none !important;
   }
+}
+
+@keyframes learning-radial-enter {
+  from {
+    opacity: 0;
+    transform: scale(0.86);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+.learning-radial-enter {
+  animation: learning-radial-enter 520ms cubic-bezier(0.22, 1, 0.36, 1) both;
 }

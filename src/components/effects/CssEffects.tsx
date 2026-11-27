@@ -19,7 +19,7 @@ export function CursorGlow({ effect, profile }: { effect: PageEffect; profile: P
   const ref = useRef<HTMLDivElement>(null);
   const target = useRef({ x: 0, y: 0 });
   const current = useRef({ x: 0, y: 0 });
-  const color = str(effect, 'color', '#34d399');
+  const color = str(effect, 'color', '#0785cf');
   const size = num(effect, 'size', 320);
   const opacity = num(effect, 'opacity', 0.35);
   const smooth = num(effect, 'smooth', 0.14);
@@ -120,7 +120,7 @@ export function GradientMesh({ effect, profile }: { effect: PageEffect; profile:
 /* -------------------------------- Aurora Background -------------------------------- */
 
 export function AuroraBackground({ effect, profile }: { effect: PageEffect; profile: PerformanceProfile }) {
-  const colorA = str(effect, 'color', '#34d399');
+  const colorA = str(effect, 'color', '#0785cf');
   const colorB = str(effect, 'colorB', '#22d3ee');
   const colorC = str(effect, 'colorC', '#a78bfa');
   const opacity = num(effect, 'opacity', 0.6);

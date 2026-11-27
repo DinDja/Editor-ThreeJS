@@ -28,7 +28,6 @@ import {
   Scale3D,
   ScanLine,
   Scissors,
-  Sparkles,
   Type,
   Upload,
   Undo2,
@@ -110,7 +109,7 @@ const selectionModes = Object.keys(selectionModeLabels) as ObjectSelectionMode[]
 const btnBase = 'inline-flex items-center justify-center shrink-0 h-8 w-8 rounded-md text-neutral-400 transition-colors hover:bg-neutral-800 hover:text-neutral-100 disabled:opacity-30 disabled:cursor-not-allowed';
 
 const btnTool = 'inline-flex items-center justify-center shrink-0 h-8 w-8 rounded-md text-xs font-medium transition-colors hover:bg-neutral-800';
-const btnToolActive = 'bg-emerald-400/10 text-emerald-300 shadow-[inset_0_-2px_0_0_rgb(52,211,153)]';
+const btnToolActive = 'bg-emerald-400/10 text-emerald-300 shadow-[inset_0_-2px_0_0_rgb(227,29,46)]';
 const btnToolInactive = 'text-neutral-400 hover:text-neutral-100';
 
 const btnToggle = 'inline-flex items-center justify-center shrink-0 h-8 w-8 rounded-md text-neutral-500 transition-colors hover:bg-neutral-800 hover:text-neutral-100';
@@ -929,7 +928,6 @@ export default function Toolbar({ sceneRootRef, onOpenTutorial }: ToolbarProps) 
         disabled={generatingAi}
         className="inline-flex items-center justify-center shrink-0 h-8 gap-1.5 rounded-md border border-fuchsia-600/40 bg-fuchsia-950/30 px-3 text-[11px] font-semibold text-fuchsia-300 transition-colors hover:border-fuchsia-500/60 hover:bg-fuchsia-900/40 hover:text-fuchsia-200 disabled:opacity-50 disabled:cursor-not-allowed"
       >
-        <Sparkles size={12} />
         <span>{generatingAi ? '...' : 'Gerar IA'}</span>
       </button> */}
 

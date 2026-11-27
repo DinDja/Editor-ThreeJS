@@ -377,7 +377,7 @@ export function SegmentedControl<T extends string>({
               size === 'sm' ? 'h-7 px-2.5 text-[10px]' : 'h-8 px-3 text-[11px]'
             } ${
               active
-                ? 'bg-emerald-400/15 text-emerald-200 shadow-[inset_0_0_0_1px_rgba(52,211,153,0.35)]'
+                ? 'bg-emerald-400/15 text-emerald-200 shadow-[inset_0_0_0_1px_rgba(227,29,46,0.35)]'
                 : 'text-neutral-500 hover:bg-neutral-800 hover:text-neutral-200'
             }`}
           >

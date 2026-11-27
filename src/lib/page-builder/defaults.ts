@@ -94,10 +94,10 @@ const defaultNodeData: Record<PageNodeType, Omit<PageNode, 'id'>> = {
       alignItems: 'center',
       justifyContent: 'center',
       borderRadius: 8,
-      background: '#34d399',
+      background: '#0785cf',
       color: '#06231b',
       fontWeight: 700,
-      boxShadow: '0 16px 42px rgba(52, 211, 153, 0.24)',
+      boxShadow: '0 16px 42px rgba(227, 29, 46, 0.24)',
     }),
   },
   image: {
@@ -174,7 +174,7 @@ const defaultNodeData: Record<PageNodeType, Omit<PageNode, 'id'>> = {
       minHeight: 360,
       borderRadius: 8,
       overflow: 'hidden',
-      background: 'radial-gradient(circle at 50% 35%, rgba(52, 211, 153, 0.12), rgba(12, 14, 16, 0.2) 45%, rgba(12, 14, 16, 0.72))',
+      background: 'radial-gradient(circle at 50% 35%, rgba(227, 29, 46, 0.12), rgba(12, 14, 16, 0.2) 45%, rgba(12, 14, 16, 0.72))',
     }, {
       height: 340,
       minHeight: 300,

@@ -1,7 +1,7 @@
 'use client';
 
 import { useMemo, useState } from 'react';
-import { Brush, Check, Copy, Crosshair, FlipHorizontal2, Grid3X3, Layers, RotateCcw, Sparkles, Trash2 } from 'lucide-react';
+import { Brush, Check, Copy, Crosshair, FlipHorizontal2, Grid3X3, Layers, RotateCcw, Trash2 } from 'lucide-react';
 import { applyScaleToPrimitiveGeometry, mergePrimitiveGeometry } from '@/lib/geometryOps';
 import {
   bevelEdge,
@@ -920,7 +920,7 @@ export default function ModelingTools({ object, material }: ModelingToolsProps) 
                 Flip
               </button>
               <button type="button" onClick={handleRecalculateNormals} disabled={!object.editableMesh} className={buttonClass} title="Recalcular normais para fora">
-                <Sparkles size={13} />
+                <RotateCcw size={13} />
                 Recalc
               </button>
               <button

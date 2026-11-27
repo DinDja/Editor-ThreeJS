@@ -492,25 +492,25 @@ export function PhysicsColliderDebug({
       {physics.colliderType === 'box' && (
         <mesh position={center}>
           <boxGeometry args={[size.x, size.y, size.z]} />
-          <meshBasicMaterial color="#34d399" wireframe transparent opacity={0.38} depthWrite={false} />
+          <meshBasicMaterial color="#0785cf" wireframe transparent opacity={0.38} depthWrite={false} />
         </mesh>
       )}
       {physics.colliderType === 'sphere' && (
         <mesh position={center}>
           <sphereGeometry args={[sphereRadius, 24, 12]} />
-          <meshBasicMaterial color="#34d399" wireframe transparent opacity={0.38} depthWrite={false} />
+          <meshBasicMaterial color="#0785cf" wireframe transparent opacity={0.38} depthWrite={false} />
         </mesh>
       )}
       {physics.colliderType === 'capsule' && (
         <mesh position={center}>
           <cylinderGeometry args={[radius, radius, Math.max(size.y, 0.001), 24, 1, true]} />
-          <meshBasicMaterial color="#34d399" wireframe transparent opacity={0.38} depthWrite={false} />
+          <meshBasicMaterial color="#0785cf" wireframe transparent opacity={0.38} depthWrite={false} />
         </mesh>
       )}
       {physics.colliderType === 'cylinder' && (
         <mesh position={center}>
           <cylinderGeometry args={[radius, radius, Math.max(size.y, 0.001), 24, 1, true]} />
-          <meshBasicMaterial color="#34d399" wireframe transparent opacity={0.38} depthWrite={false} />
+          <meshBasicMaterial color="#0785cf" wireframe transparent opacity={0.38} depthWrite={false} />
         </mesh>
       )}
       {(physics.colliderType === 'mesh' || physics.colliderType === 'convexHull') && geometryData.vertices.length > 0 ? (

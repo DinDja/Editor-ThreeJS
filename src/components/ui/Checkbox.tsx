@@ -20,7 +20,7 @@ const Checkbox = forwardRef<HTMLInputElement, CheckboxProps>(function Checkbox(
           ref={ref}
           id={checkboxId}
           type="checkbox"
-          className={`peer absolute inset-0 h-full w-full cursor-pointer appearance-none rounded border border-neutral-700 bg-[#0f1113] outline-none transition checked:border-emerald-500 checked:bg-emerald-500 focus-visible:ring-2 focus-visible:ring-emerald-400/60 focus-visible:ring-offset-2 focus-visible:ring-offset-[#0d0f10] ${className}`}
+          className={`peer absolute inset-0 h-full w-full cursor-pointer appearance-none rounded border border-neutral-700 bg-[#0f1113] outline-none transition checked:border-emerald-500 checked:bg-emerald-500 focus-visible:ring-2 focus-visible:ring-emerald-400/60 focus-visible:ring-offset-2 focus-visible:ring-offset-[#f3f6fb] ${className}`}
           {...rest}
         />
         <Check

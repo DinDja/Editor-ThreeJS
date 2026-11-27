@@ -471,8 +471,8 @@ export default function MeshEditOverlay({ object }: MeshEditOverlayProps) {
             <svg className="absolute inset-0 h-full w-full">
               <polyline
                 points={boxVisual.points.map((p) => `${p.x},${p.y}`).join(' ')}
-                fill="rgba(52,211,153,0.12)"
-                stroke="#34d399"
+                fill="rgba(7,133,207,0.12)"
+                stroke="#0785cf"
                 strokeWidth={1.5}
                 strokeDasharray="4 3"
               />
@@ -817,7 +817,7 @@ export default function MeshEditOverlay({ object }: MeshEditOverlayProps) {
           <mesh position={[0, 0, 0.001]}>
             <circleGeometry args={[sculptRadius * 0.08, 16]} />
             <meshBasicMaterial
-              color={sculptPressureStrength ? '#34d399' : '#f87171'}
+              color={sculptPressureStrength ? '#0785cf' : '#f87171'}
               transparent
               opacity={0.9}
               depthTest={false}

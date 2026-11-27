@@ -57,7 +57,7 @@ function CursorCell({
       onClick={onClick}
       className={`group relative flex flex-col items-center gap-0.5 rounded-md border p-1 transition ${
         active
-          ? 'border-emerald-400/50 bg-emerald-400/10 shadow-[0_0_8px_rgba(52,211,153,0.15)]'
+          ? 'border-emerald-400/50 bg-emerald-400/10 shadow-[0_0_8px_rgba(7,133,207,0.15)]'
           : 'border-neutral-800 bg-neutral-950/50 hover:border-neutral-600'
       }`}
       title={`Cursor ${index}`}

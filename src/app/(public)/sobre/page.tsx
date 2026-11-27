@@ -1,6 +1,6 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
-import { ArrowRight, Box, Code, Globe, Layers, Sparkles, Zap } from 'lucide-react';
+import { ArrowRight, Box, BrainCircuit, Code, Globe, Layers, Zap } from 'lucide-react';
 import { SITE } from '@/lib/seo';
 import Button from '@/components/ui/Button';
 
@@ -37,7 +37,7 @@ const highlights = [
     desc: 'Tecnologia com identidade nacional. Suporte em portugues, documentacao em PT-BR e foco no mercado brasileiro.',
   },
   {
-    icon: <Sparkles size={22} />,
+    icon: <BrainCircuit size={22} />,
     title: 'IA Integrada',
     desc: 'Recursos de inteligencia artificial para geracao de modelos 3D a partir de imagens e otimizacao de cenas.',
   },

@@ -476,9 +476,59 @@ const insertRepresentativeWikipediaImage = (excerpt: string, pageImage: string) 
   return `${excerpt.slice(0, firstParagraphEnd)}\n\n${marker}\n\n${excerpt.slice(firstParagraphEnd + 2)}`;
 };
 
+const wikipediaTableCellToMarkdown = (html: string) => replaceWikipediaImagesWithMarkers(cleanWikipediaArticleHtml(html))
+  .replace(/<(?:b|strong)\b[^>]*>([^]*?)<\/(?:b|strong)>/gi, '**$1**')
+  .replace(/<(?:i|em)\b[^>]*>([^]*?)<\/(?:i|em)>/gi, '*$1*')
+  .replace(/<sup\b[^>]*>([^]*?)<\/sup>/gi, '^$1')
+  .replace(/<sub\b[^>]*>([^]*?)<\/sub>/gi, '$1')
+  .replace(/<a\b[^>]*>([^]*?)<\/a>/gi, '$1')
+  .replace(/<br\s*\/?>/gi, ' ')
+  .replace(/<li\b[^>]*>/gi, '; ')
+  .replace(/<[^>]+>/g, ' ')
+  .replace(/\s+/g, ' ')
+  .replace(/\|/g, '\\|')
+  .trim();
+
+const wikipediaTableToMarkdown = (tableHtml: string) => {
+  const rows = Array.from(tableHtml.matchAll(/<tr\b[^>]*>([\s\S]*?)<\/tr>/gi))
+    .map((rowMatch) => ({
+      cells: Array.from(rowMatch[1].matchAll(/<(th|td)\b[^>]*>([\s\S]*?)<\/\1>/gi))
+        .map((cellMatch) => ({
+          header: cellMatch[1].toLowerCase() === 'th',
+          value: wikipediaTableCellToMarkdown(cellMatch[2]),
+        })),
+    }))
+    .filter((row) => row.cells.length > 0);
+
+  if (rows.length === 0) return tableHtml;
+
+  const columnCount = Math.max(...rows.map((row) => row.cells.length));
+  const headerRowIndex = rows.findIndex((row) => row.cells.length === columnCount && row.cells.some((cell) => cell.header));
+  const resolvedHeaderIndex = headerRowIndex >= 0 ? headerRowIndex : 0;
+  const headerCells = rows[resolvedHeaderIndex].cells;
+  const captionMatch = tableHtml.match(/<caption\b[^>]*>([^]*?)<\/caption>/i);
+  const caption = captionMatch ? wikipediaTableCellToMarkdown(captionMatch[1]) : '';
+  const formatRow = (cells: typeof headerCells, isHeader = false) => {
+    const values = Array.from({ length: columnCount }, (_, index) => {
+      const value = cells[index]?.value ?? '';
+      return value || (isHeader ? `Coluna ${index + 1}` : '');
+    });
+    return `| ${values.join(' | ')} |`;
+  };
+  const markdownRows = [
+    formatRow(headerCells, true),
+    `| ${Array.from({ length: columnCount }, () => '---').join(' | ')} |`,
+    ...rows.filter((_, index) => index !== resolvedHeaderIndex).map((row) => formatRow(row.cells)),
+  ];
+
+  return `\n\n${caption ? `**${caption}**\n\n` : ''}${markdownRows.join('\n')}\n\n`;
+};
+
 const wikiHtmlToMarkdown = (value: unknown, maxLength = MAX_WIKIPEDIA_EXCERPT_CHARS) => {
   if (typeof value !== 'string') return '';
-  return decodeWikiEntities(replaceWikipediaImagesWithMarkers(cleanWikipediaArticleHtml(value.slice(0, MAX_WIKIPEDIA_PARSE_RESPONSE_CHARS)))
+  const articleHtml = replaceWikipediaImagesWithMarkers(cleanWikipediaArticleHtml(value.slice(0, MAX_WIKIPEDIA_PARSE_RESPONSE_CHARS)))
+    .replace(/<table\b[^>]*>[\s\S]*?<\/table>/gi, wikipediaTableToMarkdown);
+  return decodeWikiEntities(articleHtml
     .replace(/<h([2-6])\b[^>]*>([^]*?)<\/h\1>/gi, (_, level: string, content: string) => `\n\n${'#'.repeat(Math.min(Number(level), 5))} ${content}\n\n`)
     .replace(/<(?:b|strong)\b[^>]*>([^]*?)<\/(?:b|strong)>/gi, '**$1**')
     .replace(/<(?:i|em)\b[^>]*>([^]*?)<\/(?:i|em)>/gi, '*$1*')

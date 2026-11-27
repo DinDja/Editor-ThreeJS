@@ -38,7 +38,6 @@ import {
   RectangleHorizontal,
   Settings,
   SlidersHorizontal,
-  Sparkles,
   Square,
   Trash2,
   Type,
@@ -357,9 +356,9 @@ function BackgroundField({ value, onChange }: { value: string; onChange: (v: str
               key={tab}
               type="button"
               onClick={() => {
-                if (tab === 'Cor' && !isColor) onChange('#34d399');
+                if (tab === 'Cor' && !isColor) onChange('#0785cf');
                 else if (tab === 'Gradiente' && !value.startsWith('linear-gradient')) {
-                  onChange('linear-gradient(135deg, #34d399 0%, #38bdf8 100%)');
+                  onChange('linear-gradient(135deg, #e31d2e 0%, #0785cf 100%)');
                 } else if (tab === 'Imagem' && !value.startsWith('url(')) {
                   onChange('url(https://images.unsplash.com/photo-1518770660439-4636190af475?w=1280)');
                 }
@@ -423,7 +422,7 @@ function SegmentedIcons<T extends string>({
             aria-pressed={active}
             className={`grid h-7 w-7 place-items-center rounded transition ${
               active
-                ? 'bg-emerald-400/15 text-emerald-200 shadow-[inset_0_0_0_1px_rgba(52,211,153,0.35)]'
+                ? 'bg-emerald-400/15 text-emerald-200 shadow-[inset_0_0_0_1px_rgba(7,133,207,0.35)]'
                 : 'text-neutral-500 hover:bg-neutral-800 hover:text-neutral-200'
             }`}
           >
@@ -460,7 +459,7 @@ function QuickPresets({
       label: 'Botão primário',
       icon: <Box size={11} />,
       patch: {
-        background: '#34d399',
+        background: '#0785cf',
         color: '#06231b',
         padding: '12px 24px',
         borderRadius: 8,
@@ -797,7 +796,7 @@ function WebNodeProperties() {
         {renderContentEditor(node.type, node.props, setProp)}
       </Section>
 
-      <Section title="Estilo rápido" icon={<Sparkles size={11} />} defaultOpen={true}>
+      <Section title="Estilo rápido" icon={<Palette size={11} />} defaultOpen={true}>
         <QuickPresets
           node={node}
           onApply={(patch) => updatePageNodeStyle(node.id, patch, 'base')}

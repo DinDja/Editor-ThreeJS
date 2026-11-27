@@ -487,7 +487,7 @@ export default function Draw3DOverlay() {
       {lineGeometry && (
         <line>
           <primitive object={lineGeometry} attach="geometry" />
-          <lineBasicMaterial color={closeHint ? '#34d399' : '#fbbf24'} linewidth={2} />
+          <lineBasicMaterial color={closeHint ? '#0785cf' : '#fbbf24'} linewidth={2} />
         </line>
       )}
 
@@ -505,7 +505,7 @@ export default function Draw3DOverlay() {
       {draw3DPoints.map((p, i) => (
         <mesh key={i} position={p}>
           <sphereGeometry args={[0.04, 16, 16]} />
-          <meshBasicMaterial color={i === 0 && closeHint ? '#34d399' : '#fbbf24'} />
+          <meshBasicMaterial color={i === 0 && closeHint ? '#0785cf' : '#fbbf24'} />
         </mesh>
       ))}
 
@@ -532,11 +532,11 @@ function DrawPlaneVisual({ plane, origin, mode }: { plane: THREE.Plane; origin: 
 
   const planeColor = useMemo(() => {
     switch (mode) {
-      case 'xz': return '#34d399';
+      case 'xz': return '#0785cf';
       case 'xy': return '#f87171';
       case 'yz': return '#60a5fa';
       case 'camera': return '#fbbf24';
-      default: return '#34d399';
+      default: return '#0785cf';
     }
   }, [mode]);
 

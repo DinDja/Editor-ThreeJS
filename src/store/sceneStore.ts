@@ -27,7 +27,7 @@ import {
 const DEFAULT_LAYER_ID = 'layer-default';
 
 const DEFAULT_LAYERS: Layer[] = [
-  { id: DEFAULT_LAYER_ID, name: 'Layer 1', visible: true, locked: false, color: '#34d399', order: 0 },
+  { id: DEFAULT_LAYER_ID, name: 'Layer 1', visible: true, locked: false, color: '#0785cf', order: 0 },
 ];
 
 type SceneState = {

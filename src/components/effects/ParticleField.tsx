@@ -85,7 +85,7 @@ export default function ParticleField({
   count = 1800,
   size = 0.08,
   speed = 0.4,
-  color = '#34d399',
+  color = '#0785cf',
   colorB = '#22d3ee',
   opacity = 0.9,
   connectLines = true,

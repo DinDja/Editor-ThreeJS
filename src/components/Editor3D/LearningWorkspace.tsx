@@ -5,35 +5,25 @@ import { type FormEvent, useEffect, useRef, useState } from 'react';
 import {
   AlertTriangle,
   ArrowRight,
-  Atom,
   BookOpen,
-  Calculator,
   Check,
   ChevronDown,
   ClipboardCheck,
   CircleCheck,
   Clock3,
-  Code2,
-  Dna,
   ExternalLink,
   FlaskConical,
   FolderOpen,
   Globe2,
   GraduationCap,
-  Landmark,
-  Languages,
   Lightbulb,
   LoaderCircle,
   MessageCircle,
-  Network,
-  Palette,
   Pause,
   Play,
   Rocket,
-  Search,
   Send,
   Sprout,
-  X,
   type LucideIcon,
 } from 'lucide-react';
 import {
@@ -61,6 +51,7 @@ import {
   type LearningWikipediaArticle,
 } from '@/lib/learning/types';
 import LearningMindMap from './LearningMindMap';
+import LearningSubjectRadialSelector from './LearningSubjectRadialSelector';
 import { LearningRichText } from './LearningRichText';
 import { useEditorStore } from '@/store/editorStore';
 import { useExperienceStore } from '@/store/experienceStore';
@@ -175,20 +166,20 @@ const parseGeneratedMeshes = (value: unknown): GeneratedMesh[] => {
 };
 
 const levelLabels: Record<LearningLevel, string> = {
-  beginner: 'Iniciante',
-  intermediate: 'Intermediário',
-  advanced: 'Avançado',
+  beginner: '1ª ano',
+  intermediate: '2º ano',
+  advanced: '3º ano',
 };
 
 const levelDetails: Record<LearningLevel, { description: string; tone: string; icon: LucideIcon }> = {
   beginner: {
     description: 'Primeiros contatos, com linguagem simples e exemplos do dia a dia.',
-    tone: 'text-emerald-300',
+    tone: 'text-rose-700',
     icon: Sprout,
   },
   intermediate: {
     description: 'Para quem já conhece o básico e quer aprofundar conceitos.',
-    tone: 'text-sky-300',
+    tone: 'text-slate-900',
     icon: GraduationCap,
   },
   advanced: {
@@ -212,19 +203,6 @@ const stepKindLabels: Record<string, string> = {
   reflection: 'Refletir',
 };
 
-const subjectIcons: Record<string, LucideIcon> = {
-  mathematics: Calculator,
-  physics: Atom,
-  chemistry: FlaskConical,
-  biology: Dna,
-  geography: Globe2,
-  history: Landmark,
-  'arts-design': Palette,
-  computing: Code2,
-  languages: Languages,
-  interdisciplinary: Network,
-};
-
 type TeacherModelSelectorProps = {
   modelId: AvailableTeacherModelId;
   onModelChange: (modelId: AvailableTeacherModelId) => void;
@@ -245,7 +223,7 @@ const TeacherModelSelector = ({ modelId, onModelChange }: TeacherModelSelectorPr
   };
   const providerColor: Record<TeacherProvider, string> = {
     nvidia: 'text-[#76b900]',
-    zai: 'text-sky-300',
+    zai: 'text-slate-900',
   };
 
   useEffect(() => {
@@ -262,23 +240,23 @@ const TeacherModelSelector = ({ modelId, onModelChange }: TeacherModelSelectorPr
     <details ref={detailsRef} className="relative">
       <summary
         aria-label={`Modelo do Coru: ${providerName[selectedModel.provider]} ${selectedModel.name}`}
-        className="flex max-w-64 cursor-pointer list-none items-center gap-2 rounded-lg border border-neutral-800 bg-neutral-950/50 px-2.5 py-1.5 outline-none transition hover:border-neutral-700 focus-visible:ring-2 focus-visible:ring-emerald-500 [&::-webkit-details-marker]:hidden"
+        className="flex max-w-64 cursor-pointer list-none items-center gap-2 rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 outline-none transition hover:border-slate-300 focus-visible:ring-2 focus-visible:ring-rose-300 [&::-webkit-details-marker]:hidden"
       >
         <AIModelBrandMark provider={selectedModel.provider} className="size-5 shrink-0" />
         <span className="min-w-0 text-left">
           <span className={`block text-[9px] font-semibold uppercase tracking-[0.12em] ${providerColor[selectedModel.provider]}`}>
             {providerName[selectedModel.provider]}
           </span>
-          <span className="block truncate text-[11px] font-medium text-neutral-200">{selectedModel.name}</span>
+          <span className="block truncate text-[11px] font-medium text-slate-800">{selectedModel.name}</span>
         </span>
         <ChevronDown size={14} className="shrink-0 text-neutral-500" aria-hidden="true" />
       </summary>
       <div
         role="group"
         aria-label="Modelos de IA disponíveis para o Coru"
-        className="absolute right-0 top-full z-[80] mt-2 max-h-[18rem] w-[min(20rem,calc(100vw-2rem))] overflow-y-auto overflow-x-hidden rounded-xl border border-neutral-700 bg-[#17191b] p-1.5 shadow-2xl shadow-black/50"
+        className="absolute right-0 top-full z-[80] mt-2 max-h-[18rem] w-[min(20rem,calc(100vw-2rem))] overflow-y-auto overflow-x-hidden rounded-xl border border-slate-200 bg-white p-1.5 shadow-xl shadow-slate-900/10"
       >
-        <p className="px-2.5 pb-1.5 pt-2 text-[10px] font-semibold uppercase tracking-[0.14em] text-neutral-500">
+        <p className="px-2.5 pb-1.5 pt-2 text-[10px] font-semibold uppercase tracking-[0.14em] text-slate-500">
           Escolha o modelo
         </p>
         {models.map((model) => (
@@ -292,7 +270,7 @@ const TeacherModelSelector = ({ modelId, onModelChange }: TeacherModelSelectorPr
               onModelChange(model.id);
               if (detailsRef.current) detailsRef.current.open = false;
             }}
-            className="flex w-full items-start gap-2.5 rounded-lg px-2 py-2 text-left transition hover:bg-neutral-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500 disabled:cursor-not-allowed disabled:opacity-45"
+            className="flex w-full items-start gap-2.5 rounded-lg px-2 py-2 text-left transition hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-rose-300 disabled:cursor-not-allowed disabled:opacity-45"
           >
             <AIModelBrandMark provider={model.provider} className="mt-0.5 size-6 shrink-0" />
             <span className="min-w-0 flex-1">
@@ -300,10 +278,10 @@ const TeacherModelSelector = ({ modelId, onModelChange }: TeacherModelSelectorPr
                 <span className={`text-[9px] font-semibold uppercase tracking-[0.1em] ${providerColor[model.provider]}`}>
                   {providerDetailName[model.provider]}
                 </span>
-                <span className="rounded-full border border-neutral-700 px-1.5 py-0.5 text-[9px] text-neutral-400">{model.badge}</span>
+                <span className="rounded-full border border-slate-200 px-1.5 py-0.5 text-[9px] text-slate-600">{model.badge}</span>
               </span>
-              <span className="mt-1 block text-xs font-semibold text-neutral-100">{model.name}</span>
-              <span className="mt-1 block text-[11px] leading-4 text-neutral-400">{model.description}</span>
+              <span className="mt-1 block text-xs font-semibold text-slate-900">{model.name}</span>
+              <span className="mt-1 block text-[11px] leading-4 text-slate-600">{model.description}</span>
             </span>
             {model.id === selectedModel.id && <Check size={15} className="mt-1 shrink-0 text-emerald-300" aria-label="Selecionado" />}
           </button>
@@ -336,23 +314,23 @@ const LearningLevelSelector = ({ level, onLevelChange }: LearningLevelSelectorPr
     <details ref={detailsRef} className="relative w-full">
       <summary
         aria-label={`Nível do estudo: ${levelLabels[level]}`}
-        className="flex h-11 w-full cursor-pointer list-none items-center gap-2 rounded-lg border border-neutral-800 bg-neutral-950/50 px-2.5 outline-none transition hover:border-neutral-700 focus-visible:ring-2 focus-visible:ring-emerald-500 [&::-webkit-details-marker]:hidden"
+        className="flex h-11 w-full cursor-pointer list-none items-center gap-2 rounded-lg border border-slate-200 bg-white px-2.5 outline-none transition hover:border-slate-300 focus-visible:ring-2 focus-visible:ring-rose-300 [&::-webkit-details-marker]:hidden"
       >
-        <span className={`flex size-6 shrink-0 items-center justify-center rounded-md border border-neutral-800 bg-neutral-900 ${levelDetails[level].tone}`}>
+        <span className={`flex size-6 shrink-0 items-center justify-center rounded-md border border-slate-200 bg-slate-50 ${levelDetails[level].tone}`}>
           <SelectedIcon size={14} aria-hidden="true" />
         </span>
         <span className="min-w-0 flex-1 text-left">
-          <span className="block text-[9px] font-semibold uppercase tracking-[0.12em] text-neutral-500">Nível</span>
-          <span className="block truncate text-[11px] font-medium text-neutral-200">{levelLabels[level]}</span>
+          <span className="block text-[9px] font-semibold uppercase tracking-[0.12em] text-slate-500">Nível</span>
+          <span className="block truncate text-[11px] font-medium text-slate-800">{levelLabels[level]}</span>
         </span>
         <ChevronDown size={14} className="shrink-0 text-neutral-500" aria-hidden="true" />
       </summary>
       <div
         role="group"
         aria-label="Níveis de estudo disponíveis"
-        className="absolute left-0 top-full z-[80] mt-2 w-[min(20rem,calc(100vw-2rem))] overflow-hidden rounded-xl border border-neutral-700 bg-[#17191b] p-1.5 shadow-2xl shadow-black/50"
+        className="absolute left-0 top-full z-[80] mt-2 w-[min(20rem,calc(100vw-2rem))] overflow-hidden rounded-xl border border-slate-200 bg-white p-1.5 shadow-xl shadow-slate-900/10"
       >
-        <p className="px-2.5 pb-1.5 pt-2 text-[10px] font-semibold uppercase tracking-[0.14em] text-neutral-500">
+        <p className="px-2.5 pb-1.5 pt-2 text-[10px] font-semibold uppercase tracking-[0.14em] text-slate-500">
           Escolha o nível
         </p>
         {(Object.keys(levelDetails) as LearningLevel[]).map((option) => {
@@ -367,14 +345,14 @@ const LearningLevelSelector = ({ level, onLevelChange }: LearningLevelSelectorPr
                 onLevelChange(option);
                 if (detailsRef.current) detailsRef.current.open = false;
               }}
-              className="flex w-full items-start gap-2.5 rounded-lg px-2 py-2 text-left transition hover:bg-neutral-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500"
+              className="flex w-full items-start gap-2.5 rounded-lg px-2 py-2 text-left transition hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-rose-300"
             >
-              <span className={`mt-0.5 flex size-6 shrink-0 items-center justify-center rounded-md border border-neutral-700 bg-neutral-900 ${meta.tone}`}>
+              <span className={`mt-0.5 flex size-6 shrink-0 items-center justify-center rounded-md border border-slate-200 bg-slate-50 ${meta.tone}`}>
                 <OptionIcon size={14} aria-hidden="true" />
               </span>
               <span className="min-w-0 flex-1">
-                <span className="block text-xs font-semibold text-neutral-100">{levelLabels[option]}</span>
-                <span className="mt-1 block text-[11px] leading-4 text-neutral-400">{meta.description}</span>
+                <span className="block text-xs font-semibold text-slate-900">{levelLabels[option]}</span>
+                <span className="mt-1 block text-[11px] leading-4 text-slate-600">{meta.description}</span>
               </span>
               {option === level && <Check size={15} className="mt-1 shrink-0 text-emerald-300" aria-label="Selecionado" />}
             </button>
@@ -509,9 +487,9 @@ const addPrimitive = (
 
 const createGeometryDemo = () => {
   const items = [
-    addPrimitive('Cubo · faces planas', 'box', [-3.2, 0.55, 0], '#38bdf8'),
+    addPrimitive('Cubo · faces planas', 'box', [-3.2, 0.55, 0], '#0369a1'),
     addPrimitive('Esfera · superfície curva', 'sphere', [-1.1, 0.55, 0], '#a78bfa'),
-    addPrimitive('Cilindro · duas bases', 'cylinder', [1.1, 0.55, 0], '#34d399'),
+    addPrimitive('Cilindro · duas bases', 'cylinder', [1.1, 0.55, 0], '#0369a1'),
     addPrimitive('Cone · base circular', 'cone', [3.2, 0.55, 0], '#fbbf24'),
   ];
   return items[0];
@@ -531,7 +509,7 @@ const physicsConfig = (bodyType: 'static' | 'dynamic', colliderType: 'box' | 'sp
 
 const createGravityExperiment = () => {
   addPrimitive('Piso estático do experimento', 'box', [0, -0.25, 0], '#64748b', [12, 0.5, 10], physicsConfig('static', 'box'));
-  const sphere = addPrimitive('Esfera · massa 1', 'sphere', [-1.2, 4.5, 0], '#38bdf8', [1, 1, 1], physicsConfig('dynamic', 'sphere'));
+  const sphere = addPrimitive('Esfera · massa 1', 'sphere', [-1.2, 4.5, 0], '#0369a1', [1, 1, 1], physicsConfig('dynamic', 'sphere'));
   addPrimitive('Cubo · massa 1', 'box', [1.2, 4.5, 0], '#fb923c', [1, 1, 1], physicsConfig('dynamic', 'box'));
   return sphere;
 };
@@ -553,9 +531,9 @@ function WikipediaImageFigure({
   className?: string;
 }) {
   return (
-    <figure className={'min-w-0 overflow-hidden rounded-xl border border-neutral-800 bg-black/20 ' + className}>
+    <figure className={'min-w-0 overflow-hidden rounded-xl border border-slate-200 bg-slate-50 ' + className}>
       <a href={image.filePageUrl} target="_blank" rel="noreferrer" aria-label={'Abrir cr\u00e9ditos da imagem: ' + image.caption}>
-        <div className="relative aspect-[16/10] bg-neutral-900">
+        <div className="relative aspect-[16/10] bg-slate-100">
           <Image
             src={image.thumbnailUrl}
             alt={image.caption}
@@ -571,11 +549,11 @@ function WikipediaImageFigure({
         <div className="mt-1 flex flex-wrap gap-x-2 gap-y-0.5 text-[9px] text-neutral-600">
           {image.artist && <span>Autor: {image.artist}</span>}
           {image.licenseUrl ? (
-            <a href={image.licenseUrl} target="_blank" rel="noreferrer" className="hover:text-sky-200">
+            <a href={image.licenseUrl} target="_blank" rel="noreferrer" className="hover:text-slate-900">
               {image.license || 'Licen\u00e7a'}
             </a>
           ) : image.license ? <span>{image.license}</span> : null}
-          <a href={image.filePageUrl} target="_blank" rel="noreferrer" className="hover:text-sky-200">{'Cr\u00e9ditos'}</a>
+          <a href={image.filePageUrl} target="_blank" rel="noreferrer" className="hover:text-slate-900">{'Cr\u00e9ditos'}</a>
         </div>
       </figcaption>
     </figure>
@@ -632,21 +610,21 @@ function WikipediaCuration({ articles }: { articles: LearningWikipediaArticle[] 
 
   return (
     <section className="mt-4 overflow-hidden rounded-2xl" aria-label="Curadoria">
-      <header className="flex items-center gap-3  px-3 py-3">
-        <span className="flex size-8 shrink-0 items-center justify-center rounded-xl bg-sky-400/10 "><BookOpen size={15} /></span>
+      <header className="flex items-center gap-3 px-3 py-3">
+        {/* <span className="flex size-8 shrink-0 items-center justify-center rounded-xl bg-slate-100 text-slate-900"><BookOpen size={15} /></span>
         <div className="min-w-0">
-          <p className="text-xs font-semibold text-sky-100">Curadoria</p>
-        </div>
+          <p className="text-xs font-semibold text-slate-900">Curadoria</p>
+        </div> */}
       </header>
       <div className="grid gap-3 p-3 sm:p-4">
         {articles.map((article) => (
-          <article key={article.url} className="min-w-0 rounded-xl border border-neutral-800 bg-neutral-950/45 p-3">
+          <article key={article.url} className="min-w-0 rounded-xl  bg-white p-3">
             <div className="flex flex-wrap items-center justify-between gap-2">
-              <a href={article.url} target="_blank" rel="noreferrer" className="inline-flex max-w-full items-center gap-1 text-[10px] font-medium text-neutral-500 transition hover:text-sky-200">
+              <a href={article.url} target="_blank" rel="noreferrer" className="inline-flex max-w-full items-center gap-1 text-[10px] font-medium text-slate-600 transition hover:text-slate-900">
                 Ver artigo <ExternalLink size={11} />
               </a>
             </div>
-            <h3 className="mt-2 text-sm font-semibold text-neutral-100">{article.title}</h3>
+            <h3 className="mt-2 text-sm font-semibold text-slate-900">{article.title}</h3>
             <WikipediaArticleContent article={article} />
           </article>
         ))}
@@ -669,21 +647,21 @@ function MessageBubble({
   const modelInfo = isTeacher ? message.modelInfo : undefined;
   const failedModels = modelInfo?.failedAttempts.map((attempt) => attempt.modelName).filter(Boolean) ?? [];
   const assessmentTone = assessment?.result === 'correct'
-    ? 'border-emerald-500/30 bg-emerald-500/5 text-emerald-200'
+    ? 'border-slate-300 bg-slate-100 text-slate-900'
     : assessment?.result === 'incorrect'
-      ? 'border-amber-500/30 bg-amber-500/5 text-amber-100'
-      : 'border-sky-500/30 bg-sky-500/5 text-sky-100';
+      ? 'border-amber-200 bg-amber-50 text-amber-900'
+      : 'border-slate-300 bg-slate-100 text-slate-900';
   return (
     <article ref={messageRef} className={`flex gap-3 ${isTeacher ? '' : 'flex-row-reverse'}`}>
-      <div className={`mt-0.5 flex size-8 shrink-0 items-center justify-center overflow-hidden rounded-xl ${isTeacher ? 'bg-emerald-400/10 text-emerald-300' : 'bg-sky-400/10 text-sky-300'}`}>
+      <div className={`mt-0.5 flex size-8 shrink-0 items-center justify-center overflow-hidden rounded-xl ${isTeacher ? 'bg-rose-50 text-rose-700' : 'bg-slate-100 text-slate-900'}`}>
         {isTeacher ? <CoruAvatar className="size-8" /> : <MessageCircle size={15} />}
       </div>
-      <div className={`max-w-[min(100%,720px)] rounded-2xl border px-4 py-3 ${isTeacher ? 'border-neutral-800 bg-[#171a1d]' : 'border-sky-900/50 bg-sky-950/25'}`}>
+      <div className={`max-w-[min(100%,720px)] rounded-2xl border px-4 py-3 ${isTeacher ? 'border-slate-200 bg-white shadow-sm shadow-slate-900/5' : 'border-slate-300 bg-slate-100/70'}`}>
         <div className="mb-1.5 flex flex-wrap items-center justify-between gap-2 text-[10px] font-semibold uppercase tracking-[0.15em] text-neutral-500">
           <span className="flex flex-wrap items-center gap-2">
             <span>{isTeacher ? 'Coru' : 'Você'}</span>
             {modelInfo?.respondedModelName && (
-              <span className="rounded-full border border-emerald-900/60 bg-emerald-950/40 px-2 py-0.5 text-[9px] font-medium normal-case tracking-normal text-emerald-200" title={`Modelo que respondeu: ${modelInfo.respondedModelName}`}>
+              <span className="flex items-center gap-1.5 rounded-lg border border-slate-300 bg-white px-3 py-2 text-[11px] font-medium text-slate-700 hover:bg-slate-50" title={`Modelo que respondeu: ${modelInfo.respondedModelName}`}>
                 {modelInfo.respondedModelName}
               </span>
             )}
@@ -691,10 +669,10 @@ function MessageBubble({
           <time>{new Date(message.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</time>
         </div>
         {modelInfo?.didFailover && (
-          <div className="mb-3 flex items-start gap-2 rounded-xl border border-amber-500/25 bg-amber-500/5 px-3 py-2 text-[11px] leading-4 text-amber-100" role="status">
-            <AlertTriangle size={14} className="mt-0.5 shrink-0 text-amber-300" />
+          <div className="mb-3 flex items-start gap-2 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-[11px] leading-4 text-amber-900" role="status">
+            <AlertTriangle size={14} className="mt-0.5 shrink-0 text-amber-700" />
             <span>
-              Modelo escolhido falhou: <strong>{failedModels.join(', ') || modelInfo.requestedModelName}</strong>.
+              {/* Modelo escolhido falhou: <strong>{failedModels.join(', ') || modelInfo.requestedModelName}</strong>. */}
               {' '}Resposta gerada por <strong>{modelInfo.respondedModelName}</strong>.
             </span>
           </div>
@@ -709,16 +687,16 @@ function MessageBubble({
             </div>
             <LearningRichText className="text-xs leading-5">{assessment.feedback}</LearningRichText>
             {assessment.hint && (
-              <div className="mt-2 text-xs leading-5 text-neutral-300">
+              <div className="mt-2 text-xs leading-5 text-slate-700">
                 <strong>Pista:</strong>
                 <LearningRichText className="text-xs leading-5">{assessment.hint}</LearningRichText>
               </div>
             )}
             {assessment.understood.length > 0 && (
-              <LearningRichText className="mt-2 text-[11px] text-neutral-400">Já entendeu: {assessment.understood.join(' · ')}</LearningRichText>
+              <LearningRichText className="mt-2 text-[11px] text-slate-600">Já entendeu: {assessment.understood.join(' · ')}</LearningRichText>
             )}
             {assessment.revisit.length > 0 && (
-              <LearningRichText className="mt-1 text-[11px] text-neutral-400">Vale revisar: {assessment.revisit.join(' · ')}</LearningRichText>
+              <LearningRichText className="mt-1 text-[11px] text-slate-600">Vale revisar: {assessment.revisit.join(' · ')}</LearningRichText>
             )}
           </div>
         )}
@@ -765,7 +743,7 @@ function LearningResourceCard({
   const hasThumbnail = Boolean(resource.thumbnailUrl && !imageError);
   const content = (
     <>
-      <span className={`relative block aspect-[16/8] overflow-hidden ${isVideo ? 'bg-gradient-to-br from-red-950 via-neutral-900 to-neutral-950' : 'bg-gradient-to-br from-sky-950 via-neutral-900 to-neutral-950'}`}>
+      <span className={`relative block aspect-[16/8] overflow-hidden ${isVideo ? 'bg-rose-50' : 'bg-slate-100'}`}>
         {hasThumbnail ? (
           <Image
             src={resource.thumbnailUrl as string}
@@ -777,24 +755,23 @@ function LearningResourceCard({
             onError={() => setImageError(true)}
           />
         ) : (
-          <span className={`absolute inset-0 flex flex-col items-center justify-center gap-2 ${isVideo ? 'text-red-200' : 'text-sky-200'}`}>
-            <span className={`flex size-11 items-center justify-center rounded-2xl border ${isVideo ? 'border-red-300/20 bg-red-400/15' : 'border-sky-300/20 bg-sky-400/15'}`}>
+          <span className={`absolute inset-0 flex flex-col items-center justify-center gap-2 ${isVideo ? 'text-rose-700' : 'text-slate-900'}`}>
+            <span className={`flex size-11 items-center justify-center rounded-2xl border ${isVideo ? 'border-rose-200 bg-rose-100' : 'border-slate-300 bg-slate-100'}`}>
               {isVideo ? <Play size={20} fill="currentColor" /> : <Globe2 size={20} />}
             </span>
-            <span className="max-w-[80%] truncate text-[10px] font-medium text-neutral-400">{isVideo ? 'Prévia do vídeo' : host}</span>
+            <span className="max-w-[80%] truncate text-[10px] font-medium text-slate-600">{isVideo ? 'Prévia do vídeo' : host}</span>
           </span>
         )}
-        <span className="pointer-events-none absolute inset-0 bg-gradient-to-t from-black/80 via-black/10 to-black/10" />
-        <span className="absolute left-2.5 top-2.5 rounded-full border border-white/10 bg-black/55 px-2 py-1 text-[9px] font-semibold uppercase tracking-[0.1em] text-white/80 backdrop-blur-sm">{resource.provider}</span>
-        <span className="absolute bottom-2.5 right-2.5 flex items-center gap-1 rounded-full bg-black/65 px-2 py-1 text-[9px] font-semibold text-white/85 backdrop-blur-sm">
+        <span className="absolute left-2.5 top-2.5 rounded-full border border-white/70 bg-white/90 px-2 py-1 text-[9px] font-semibold uppercase tracking-[0.1em] text-slate-700 backdrop-blur-sm">{resource.provider}</span>
+        <span className="absolute bottom-2.5 right-2.5 flex items-center gap-1 rounded-full bg-white/90 px-2 py-1 text-[9px] font-semibold text-slate-800 backdrop-blur-sm">
           {isVideo ? <Play size={10} fill="currentColor" /> : <ExternalLink size={10} />}
           {isVideo ? 'Assistir' : 'Abrir fonte'}
         </span>
       </span>
       <span className="block min-w-0 p-3">
-        <span className="block line-clamp-2 text-xs font-semibold leading-4 text-neutral-200 group-hover:text-emerald-100">{resource.title}</span>
-        <span className="mt-1 block truncate text-[10px] text-neutral-600">{resource.author || host}</span>
-        <span className="mt-1.5 block line-clamp-2 text-[11px] leading-4 text-neutral-500">{resource.description}</span>
+        <span className="block line-clamp-2 text-xs font-semibold leading-4 text-slate-900 group-hover:text-rose-700">{resource.title}</span>
+        <span className="mt-1 block truncate text-[10px] text-slate-500">{resource.author || host}</span>
+        <span className="mt-1.5 block line-clamp-2 text-[11px] leading-4 text-slate-600">{resource.description}</span>
       </span>
     </>
   );
@@ -804,7 +781,7 @@ function LearningResourceCard({
         type="button"
         onClick={() => onPlayVideo?.(resource)}
         aria-pressed={isSelected}
-        className={`group min-w-0 w-full overflow-hidden rounded-2xl border bg-neutral-950/45 text-left transition hover:border-emerald-700/60 hover:bg-neutral-900/80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-400/70 ${isSelected ? 'border-emerald-400/70 ring-1 ring-emerald-400/30' : 'border-neutral-800'}`}
+        className={`group min-w-0 w-full overflow-hidden rounded-2xl border bg-white text-left transition hover:border-rose-300 hover:bg-rose-50/30 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-rose-300 ${isSelected ? 'border-rose-400 ring-1 ring-rose-200' : 'border-slate-200'}`}
       >
         {content}
       </button>
@@ -815,7 +792,7 @@ function LearningResourceCard({
       href={resource.url}
       target="_blank"
       rel="noreferrer"
-      className="group min-w-0 overflow-hidden rounded-2xl border border-neutral-800 bg-neutral-950/45 transition hover:border-emerald-700/60 hover:bg-neutral-900/80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-400/70"
+      className="group min-w-0 overflow-hidden rounded-2xl border border-slate-200 bg-white transition hover:border-rose-300 hover:bg-rose-50/30 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-rose-300"
     >
       {content}
     </a>
@@ -849,7 +826,7 @@ function LessonDetails({
   const [selectedVideoUrl, setSelectedVideoUrl] = useState<string | null>(null);
   if (!lesson) {
     return (
-      <div className="rounded-2xl border border-neutral-800 bg-[#15181b] p-5 text-sm text-neutral-400">
+      <div className="rounded-2xl border border-slate-200 bg-white p-5 text-sm text-slate-600">
         A aula está sendo preparada. O plano e as atividades aparecerão aqui.
       </div>
     );
@@ -877,59 +854,58 @@ function LessonDetails({
   });
   return (
     <div className="space-y-4">
-      <section className="relative overflow-hidden rounded-3xl border border-emerald-800/50 bg-gradient-to-br from-[#172820] via-[#121a17] to-[#15181b] p-4 shadow-lg shadow-emerald-950/10 sm:p-5">
-        <div className="pointer-events-none absolute -right-12 -top-12 size-36 rounded-full bg-emerald-400/10 blur-3xl" aria-hidden="true" />
+      <section className="relative overflow-hidden rounded-3xl border border-slate-200 bg-white p-4 shadow-sm shadow-slate-900/5 sm:p-5">
         <div className="relative">
           <div className="flex items-start gap-3">
-            <div className="flex size-11 shrink-0 items-center justify-center overflow-hidden rounded-2xl border border-emerald-300/20 bg-emerald-400/10 shadow-lg shadow-emerald-950/30">
+            <div className="flex size-11 shrink-0 items-center justify-center overflow-hidden rounded-2xl border border-rose-200 bg-rose-50 shadow-sm shadow-slate-900/5">
               <CoruAvatar className="size-11" />
             </div>
             <div className="min-w-0">
-              <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-emerald-300">Trilha guiada · {lesson.subjectName}</p>
-              <LearningRichText className="mt-1 text-xl font-semibold tracking-tight text-white">{lesson.title}</LearningRichText>
-              <p className="mt-1 truncate text-[11px] text-neutral-500">{lesson.topic} · nível {levelLabels[lesson.level].toLowerCase()}</p>
+              <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-rose-700">Trilha guiada · {lesson.subjectName}</p>
+              <LearningRichText className="mt-1 text-xl font-semibold tracking-tight text-slate-900">{lesson.title}</LearningRichText>
+              <p className="mt-1 truncate text-[11px] text-slate-600">{lesson.topic} · nível {levelLabels[lesson.level].toLowerCase()}</p>
             </div>
           </div>
 
-          <div className="mt-5 rounded-2xl border border-white/10 bg-black/20 p-3">
+          <div className="mt-5 rounded-2xl border border-slate-200 bg-slate-50 p-3">
             <div className="flex items-center justify-between gap-3">
               <div>
-                <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-neutral-500">Seu progresso</p>
-                <p className="mt-1 text-xs text-neutral-300">{progressDone} de {progressTotal} desafios concluídos</p>
+                <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-slate-500">Seu progresso</p>
+                <p className="mt-1 text-xs text-slate-700">{progressDone} de {progressTotal} desafios concluídos</p>
               </div>
-              <span className="text-lg font-semibold text-emerald-200">{progressPercent}%</span>
+              <span className="text-lg font-semibold text-rose-600">{progressPercent}%</span>
             </div>
-            <div className="mt-3 h-2 overflow-hidden rounded-full bg-neutral-900/80" role="progressbar" aria-label={`${progressPercent}% da aula concluída`} aria-valuemin={0} aria-valuemax={100} aria-valuenow={progressPercent}>
-              <div className="h-full rounded-full bg-gradient-to-r from-emerald-500 to-lime-300 transition-all duration-500" style={{ width: `${progressPercent}%` }} />
+            <div className="mt-3 h-2 overflow-hidden rounded-full bg-slate-200" role="progressbar" aria-label={`${progressPercent}% da aula concluída`} aria-valuemin={0} aria-valuemax={100} aria-valuenow={progressPercent}>
+              <div className="h-full rounded-full bg-rose-600 transition-all duration-500" style={{ width: `${progressPercent}%` }} />
             </div>
           </div>
 
-          <div className="mt-3 rounded-2xl border border-emerald-900/50 bg-emerald-950/25 p-3">
-            <p className="flex items-center gap-2 text-[10px] font-semibold uppercase tracking-[0.14em] text-emerald-300"><Lightbulb size={13} /> Ao final, você vai conseguir</p>
-            <LearningRichText className="mt-1 text-sm leading-6 text-neutral-100">{lesson.objective}</LearningRichText>
+          <div className="mt-3 rounded-2xl border border-slate-300 bg-slate-100 p-3">
+            <p className="flex items-center gap-2 text-[10px] font-semibold uppercase tracking-[0.14em] text-slate-900"><Lightbulb size={13} /> Ao final, você vai conseguir</p>
+            <LearningRichText className="mt-1 text-sm leading-6 text-slate-800">{lesson.objective}</LearningRichText>
           </div>
 
           {lesson.prerequisites.length > 0 && (
             <div className="mt-3 flex flex-wrap items-center gap-2">
-              <span className="text-[10px] font-semibold uppercase tracking-[0.12em] text-neutral-600">Antes de começar:</span>
+              <span className="text-[10px] font-semibold uppercase tracking-[0.12em] text-slate-500">Antes de começar:</span>
               {lesson.prerequisites.map((item) => (
-                <span key={item} className="rounded-full border border-neutral-800 bg-neutral-950/40 px-2.5 py-1 text-[10px] text-neutral-400">{item}</span>
+                <span key={item} className="rounded-full border border-slate-200 bg-white px-2.5 py-1 text-[10px] text-slate-600">{item}</span>
               ))}
             </div>
           )}
         </div>
       </section>
 
-      <section className="rounded-2xl border border-neutral-800 bg-[#15181b] p-4 sm:p-5">
+      <section className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm shadow-slate-900/5 sm:p-5">
         <div className="mb-3 flex items-center justify-between gap-3">
           <div>
-            <h3 className="flex items-center gap-2 text-sm font-semibold text-neutral-100"><BookOpen size={15} className="text-emerald-300" /> Conteúdo principal</h3>
-            <p className="mt-1 text-[11px] text-neutral-500">Leia no seu ritmo; depois avance pelo roteiro.</p>
+            <h3 className="flex items-center gap-2 text-sm font-semibold text-slate-900"><BookOpen size={15} className="text-rose-600" /> Conteúdo principal</h3>
+            <p className="mt-1 text-[11px] text-slate-600">Leia no seu ritmo; depois avance pelo roteiro.</p>
           </div>
-          <span className="rounded-full border border-neutral-800 bg-neutral-950/50 px-2 py-1 text-[10px] text-neutral-500">Leitura guiada</span>
+          <span className="rounded-full border border-slate-200 bg-slate-50 px-2 py-1 text-[10px] text-slate-600">Leitura guiada</span>
         </div>
-        <div className="rounded-2xl border border-emerald-900/40 bg-neutral-950/55 p-4 sm:p-5">
-          <LearningRichText className="text-sm leading-7 text-neutral-200">{lesson.explanation}</LearningRichText>
+        <div className="rounded-2xl border border-slate-100 bg-slate-50/70 p-4 sm:p-5">
+          <LearningRichText className="text-sm leading-7 text-slate-800">{lesson.explanation}</LearningRichText>
         </div>
       </section>
 
@@ -943,18 +919,18 @@ function LessonDetails({
       />
 
       {researchResources.length > 0 && (
-        <section className="rounded-2xl border border-violet-900/40 bg-gradient-to-br from-violet-950/20 to-[#15181b] p-4 sm:p-5">
+        <section className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm shadow-slate-900/5 sm:p-5">
           <div className="mb-4 flex items-start justify-between gap-3">
             <div>
-              <h3 className="flex items-center gap-2 text-sm font-semibold text-violet-100"><Globe2 size={15} className="text-violet-300" /> Materiais para continuar</h3>
-              <p className="mt-1 text-[11px] leading-4 text-neutral-500">Pesquisados antes da aula e usados como apoio para montar esta explicação.</p>
+              <h3 className="flex items-center gap-2 text-sm font-semibold text-slate-900"><Globe2 size={15} className="text-slate-900" /> Materiais para continuar</h3>
+              <p className="mt-1 text-[11px] leading-4 text-slate-600">Pesquisados antes da aula e usados como apoio para montar esta explicação.</p>
             </div>
-            <span className="shrink-0 rounded-full border border-violet-900/50 bg-violet-950/30 px-2 py-1 text-[10px] text-violet-200">{researchResources.length} fontes</span>
+            <span className="shrink-0 rounded-full border border-slate-300 bg-slate-100 px-2 py-1 text-[10px] text-slate-900">{researchResources.length} fontes</span>
           </div>
 
           {selectedVideoId && selectedVideo && (
-            <div className="mb-4 overflow-hidden rounded-2xl border border-red-900/50 bg-black/40">
-              <div className="aspect-video w-full bg-black">
+            <div className="mb-4 overflow-hidden rounded-2xl border border-slate-200 bg-white">
+              <div className="aspect-video w-full bg-slate-950">
                 <iframe
                   key={selectedVideoId}
                   src={`https://www.youtube-nocookie.com/embed/${selectedVideoId}?rel=0&modestbranding=1`}
@@ -965,15 +941,15 @@ function LessonDetails({
                 />
               </div>
               <div className="flex flex-wrap items-center justify-between gap-2 px-3 py-2.5">
-                <p className="min-w-0 truncate text-xs font-medium text-neutral-200">{selectedVideo.title}</p>
-                <a href={selectedVideo.url} target="_blank" rel="noreferrer" className="shrink-0 text-[10px] text-neutral-500 underline-offset-2 hover:text-neutral-300 hover:underline">Abrir no YouTube</a>
+                <p className="min-w-0 truncate text-xs font-medium text-slate-800">{selectedVideo.title}</p>
+                <a href={selectedVideo.url} target="_blank" rel="noreferrer" className="shrink-0 text-[10px] text-slate-900 underline-offset-2 hover:text-slate-900 hover:underline">Abrir no YouTube</a>
               </div>
             </div>
           )}
 
           {resourceGroups.map((group, index) => (
             <div key={group.provider} className={index > 0 ? 'mt-4' : ''}>
-              <p className={`mb-2 text-[10px] font-semibold uppercase tracking-[0.14em] ${group.provider.toLocaleLowerCase('pt-BR').includes('youtube') ? 'text-red-300/80' : 'text-sky-300/80'}`}>{group.provider}</p>
+                <p className={`mb-2 text-[10px] font-semibold uppercase tracking-[0.14em] ${group.provider.toLocaleLowerCase('pt-BR').includes('youtube') ? 'text-rose-700' : 'text-slate-900'}`}>{group.provider}</p>
               <div className="grid gap-2 sm:grid-cols-2">
                 {group.resources.map((resource) => (
                   <LearningResourceCard
@@ -989,13 +965,13 @@ function LessonDetails({
         </section>
       )}
 
-      <section className="rounded-2xl border border-neutral-800 bg-[#15181b] p-4 sm:p-5">
+      <section className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm shadow-slate-900/5 sm:p-5">
         <div className="mb-3 flex items-end justify-between gap-3">
           <div>
-            <h3 className="flex items-center gap-2 text-sm font-semibold text-neutral-100"><CircleCheck size={15} className="text-emerald-300" /> Roteiro para estudar</h3>
-            <p className="mt-1 text-[11px] text-neutral-500">Pequenos passos para transformar leitura em prática.</p>
+            <h3 className="flex items-center gap-2 text-sm font-semibold text-slate-900"><CircleCheck size={15} className="text-rose-600" /> Roteiro para estudar</h3>
+            <p className="mt-1 text-[11px] text-slate-600">Pequenos passos para transformar leitura em prática.</p>
           </div>
-          <span className="shrink-0 text-[10px] font-semibold text-emerald-300">{doneSteps.size}/{lesson.steps.length}</span>
+          <span className="shrink-0 text-[10px] font-semibold text-rose-700">{doneSteps.size}/{lesson.steps.length}</span>
         </div>
         <div className="space-y-2">
           {lesson.steps.map((step, index) => {
@@ -1007,21 +983,21 @@ function LessonDetails({
                 key={step.id}
                 onClick={() => useLearningStore.getState().markStepComplete(step.id)}
                 aria-pressed={completed}
-                className={`group flex w-full gap-3 rounded-2xl border p-3 text-left transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-400/70 ${completed ? 'border-emerald-900/60 bg-emerald-950/20' : isNext ? 'border-emerald-500/50 bg-emerald-400/5 shadow-[0_0_0_1px_rgba(52,211,153,0.08)]' : 'border-neutral-800 bg-neutral-900/40 hover:border-neutral-700'}`}
+                className={`group flex w-full gap-3 rounded-2xl border p-3 text-left transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-400/70 ${completed ? 'border-rose-100 bg-rose-50/60' : isNext ? 'border-slate-300 bg-slate-50 shadow-[0_0_0_1px_rgba(15,23,42,0.05)]' : 'border-slate-200 bg-white hover:border-slate-300'}`}
               >
-                <span className={`mt-0.5 flex size-7 shrink-0 items-center justify-center rounded-xl text-[10px] font-semibold ${completed ? 'bg-emerald-400 text-neutral-950' : isNext ? 'bg-emerald-400/15 text-emerald-200 ring-1 ring-emerald-400/30' : 'border border-neutral-700 text-neutral-500'}`}>
+                <span className={`mt-0.5 flex size-7 shrink-0 items-center justify-center rounded-xl text-[10px] font-semibold ${completed ? 'bg-rose-500 text-white' : isNext ? 'bg-slate-100 text-slate-900 ring-1 ring-slate-300' : 'border border-slate-200 text-slate-500'}`}>
                   {completed ? <Check size={12} /> : <span className="text-[10px]">{index + 1}</span>}
                 </span>
                 <div className="min-w-0 flex-1">
                   <div className="flex flex-wrap items-center gap-2">
-                    <LearningRichText className="text-xs font-semibold text-neutral-100">{step.title}</LearningRichText>
-                    <span className={`rounded-full px-2 py-0.5 text-[9px] font-semibold uppercase tracking-[0.1em] ${completed ? 'bg-emerald-400/10 text-emerald-300' : isNext ? 'bg-emerald-400/10 text-emerald-200' : 'bg-neutral-800 text-neutral-500'}`}>
+                    <LearningRichText className="text-xs font-semibold text-slate-900">{step.title}</LearningRichText>
+                    <span className={`rounded-full px-2 py-0.5 text-[9px] font-semibold uppercase tracking-[0.1em] ${completed ? 'bg-rose-50 text-rose-700' : isNext ? 'bg-slate-100 text-slate-900' : 'bg-slate-100 text-slate-600'}`}>
                       {completed ? 'Concluído' : isNext ? 'Próximo passo' : stepKindLabels[step.kind] ?? step.kind}
                     </span>
                   </div>
-                  <LearningRichText className="mt-1 text-xs leading-5 text-neutral-400">{step.content}</LearningRichText>
+                  <LearningRichText className="mt-1 text-xs leading-5 text-slate-600">{step.content}</LearningRichText>
                 </div>
-                {!completed && <ArrowRight size={14} className="mt-1 shrink-0 text-neutral-700 transition group-hover:translate-x-0.5 group-hover:text-emerald-300" />}
+                {!completed && <ArrowRight size={14} className="mt-1 shrink-0 text-slate-500 transition group-hover:translate-x-0.5 group-hover:text-rose-600" />}
               </button>
             );
           })}
@@ -1029,36 +1005,36 @@ function LessonDetails({
       </section>
 
       {lesson.actions.length > 0 && (
-        <section className="rounded-2xl border border-emerald-900/50 bg-gradient-to-br from-emerald-950/30 to-[#15181b] p-4 sm:p-5">
+        <section className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm shadow-slate-900/5 sm:p-5">
           <div className="mb-3 flex items-start justify-between gap-3">
             <div>
-              <h3 className="flex items-center gap-2 text-sm font-semibold text-emerald-100"><FlaskConical size={15} /> Aprender no editor</h3>
-              <p className="mt-1 text-[11px] text-neutral-500">Experimente o conceito na cena quando fizer sentido.</p>
+              <h3 className="flex items-center gap-2 text-sm font-semibold text-slate-900"><FlaskConical size={15} className="text-slate-900" /> Aprender no editor</h3>
+              <p className="mt-1 text-[11px] text-slate-600">Experimente o conceito na cena quando fizer sentido.</p>
             </div>
-            <span className="rounded-full border border-emerald-900/60 bg-emerald-950/40 px-2 py-1 text-[10px] text-emerald-300">3D</span>
+            <span className="rounded-full border border-slate-300 bg-slate-100 px-2 py-1 text-[10px] text-slate-900">3D</span>
           </div>
           <div className="space-y-2">
             {lesson.actions.map((action) => {
               const applied = appliedActions.has(action.id);
               const prepared = preparedActionId === action.id;
               return (
-                <div key={action.id} className="rounded-2xl border border-emerald-900/50 bg-[#111816] p-3.5">
+                <div key={action.id} className="rounded-2xl border border-slate-200 bg-white p-3.5">
                   <div className="flex items-start justify-between gap-3">
-                    <LearningRichText className="text-xs font-semibold text-neutral-100">{action.label}</LearningRichText>
-                    {applied && <CircleCheck size={15} className="shrink-0 text-emerald-300" />}
+                    <LearningRichText className="text-xs font-semibold text-slate-900">{action.label}</LearningRichText>
+                    {applied && <CircleCheck size={15} className="shrink-0 text-rose-600" />}
                   </div>
-                  <LearningRichText className="mt-1 text-xs leading-5 text-neutral-400">{action.description}</LearningRichText>
-                  {action.type === 'gravity_experiment' && <p className="mt-2 text-[10px] text-neutral-500">Prévia: piso estático, esfera e cubo na mesma altura, gravidade do Rapier habilitada.</p>}
-                  {action.type === 'geometry_demo' && <p className="mt-2 text-[10px] text-neutral-500">Prévia: quatro sólidos com materiais coloridos e nomes visíveis na árvore da cena.</p>}
+                  <LearningRichText className="mt-1 text-xs leading-5 text-slate-600">{action.description}</LearningRichText>
+                  {action.type === 'gravity_experiment' && <p className="mt-2 text-[10px] text-slate-500">Prévia: piso estático, esfera e cubo na mesma altura, gravidade do Rapier habilitada.</p>}
+                  {action.type === 'geometry_demo' && <p className="mt-2 text-[10px] text-slate-500">Prévia: quatro sólidos com materiais coloridos e nomes visíveis na árvore da cena.</p>}
                   {applied ? (
-                    <div className="mt-3 flex items-center gap-1.5 text-[11px] font-semibold text-emerald-300">Criada na cena</div>
+                    <div className="mt-3 flex items-center gap-1.5 text-[11px] font-semibold text-rose-700">Criada na cena</div>
                   ) : prepared ? (
                     <div className="mt-3 flex flex-wrap gap-2">
-                      <button type="button" onClick={() => onApplyAction(action)} className="rounded-lg bg-emerald-400 px-3 py-2 text-[11px] font-semibold text-neutral-950 hover:bg-emerald-300">Confirmar e criar</button>
-                      <button type="button" onClick={onCancelAction} className="rounded-lg border border-neutral-700 px-3 py-2 text-[11px] text-neutral-300 hover:bg-neutral-800">Cancelar</button>
+                      <button type="button" onClick={() => onApplyAction(action)} className="rounded-lg bg-rose-600 px-3 py-2 text-[11px] font-semibold text-white hover:bg-rose-700">Confirmar e criar</button>
+                      <button type="button" onClick={onCancelAction} className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-[11px] text-slate-700 hover:bg-slate-50">Cancelar</button>
                     </div>
                   ) : (
-                    <button type="button" onClick={() => onPrepareAction(action.id)} className="mt-3 flex items-center gap-1.5 rounded-lg border border-emerald-700/60 px-3 py-2 text-[11px] font-semibold text-emerald-200 hover:bg-emerald-400/10">Preparar demonstração <ArrowRight size={12} /></button>
+                    <button type="button" onClick={() => onPrepareAction(action.id)} className="mt-3 flex items-center gap-1.5 rounded-lg border border-slate-300 bg-slate-100 px-3 py-2 text-[11px] font-semibold text-slate-900 transition hover:border-slate-400 hover:bg-slate-200">Preparar demonstração <ArrowRight size={12} /></button>
                   )}
                 </div>
               );
@@ -1068,44 +1044,44 @@ function LessonDetails({
       )}
 
       {lesson.activities.length > 0 && (
-        <section className="rounded-2xl border border-amber-900/40 bg-gradient-to-br from-amber-950/20 to-[#15181b] p-4 sm:p-5">
+        <section className="rounded-2xl border border-amber-200 bg-amber-50 p-4 shadow-sm shadow-slate-900/5 sm:p-5">
         <div className="mb-3 flex items-start justify-between gap-3">
           <div>
-            <h3 className="flex items-center gap-2 text-sm font-semibold text-amber-100"><ClipboardCheck size={15} className="text-amber-300" /> Atividade prática</h3>
-            <p className="mt-1 text-[11px] text-neutral-500">Agora é sua vez de testar a ideia.</p>
+            <h3 className="flex items-center gap-2 text-sm font-semibold text-slate-900"><ClipboardCheck size={15} className="text-amber-700" /> Atividade prática</h3>
+            <p className="mt-1 text-[11px] text-slate-600">Agora é sua vez de testar a ideia.</p>
           </div>
-          <span className="rounded-full border border-amber-900/50 bg-amber-950/30 px-2 py-1 text-[10px] text-amber-200">Mão na massa</span>
+          <span className="rounded-full border border-amber-200 bg-amber-50 px-2 py-1 text-[10px] text-amber-800">Mão na massa</span>
         </div>
           {lesson.activities.map((activity) => (
-            <div key={activity.id} className="mb-3 rounded-2xl border border-amber-900/30 bg-neutral-950/30 p-3 last:mb-0">
-              <LearningRichText className="text-xs font-semibold text-neutral-200">{activity.title}</LearningRichText>
-              <LearningRichText className="mt-1 text-xs leading-5 text-neutral-400">{activity.instructions}</LearningRichText>
+            <div key={activity.id} className="mb-3 rounded-2xl border border-amber-100 bg-white p-3 last:mb-0">
+              <LearningRichText className="text-xs font-semibold text-slate-900">{activity.title}</LearningRichText>
+              <LearningRichText className="mt-1 text-xs leading-5 text-slate-600">{activity.instructions}</LearningRichText>
             </div>
           ))}
         </section>
       )}
 
       {lesson.questions.length > 0 && (
-        <section className="rounded-2xl border border-sky-900/40 bg-gradient-to-br from-sky-950/20 to-[#15181b] p-4 sm:p-5">
+        <section className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm shadow-slate-900/5 sm:p-5">
           <div className="mb-4 flex items-start justify-between gap-3">
             <div>
-              <h3 className="flex items-center gap-2 text-sm font-semibold text-sky-100"><Lightbulb size={15} className="text-sky-300" /> Verifique o que aprendeu</h3>
-              <p className="mt-1 text-[11px] text-neutral-500">Responda com suas palavras; o Coru ajuda a ajustar o raciocínio.</p>
+              <h3 className="flex items-center gap-2 text-sm font-semibold text-slate-900"><Lightbulb size={15} className="text-slate-900" /> Verifique o que aprendeu</h3>
+              <p className="mt-1 text-[11px] text-slate-600">Responda com suas palavras; o Coru ajuda a ajustar o raciocínio.</p>
             </div>
-            <span className="rounded-full border border-sky-900/50 bg-sky-950/30 px-2 py-1 text-[10px] text-sky-200">Desafio</span>
+            <span className="rounded-full border border-slate-300 bg-slate-100 px-2 py-1 text-[10px] text-slate-900">Desafio</span>
           </div>
           <div className="space-y-4">
             {lesson.questions.map((question, index) => {
               const completed = doneQuestions.has(question.id);
               const busy = busyQuestionId === question.id;
               return (
-                <div key={question.id} className="rounded-2xl border border-sky-900/30 bg-neutral-950/35 p-3.5">
-                  <div className="flex gap-3 text-xs leading-5 text-neutral-200">
-                    <span className={`mt-0.5 flex size-6 shrink-0 items-center justify-center rounded-lg text-[10px] font-semibold ${completed ? 'bg-emerald-400 text-neutral-950' : 'bg-sky-400/10 text-sky-200'}`}>
+                <div key={question.id} className="rounded-2xl border border-slate-200 bg-white p-3.5">
+                  <div className="flex gap-3 text-xs leading-5 text-slate-800">
+                    <span className={`mt-0.5 flex size-6 shrink-0 items-center justify-center rounded-lg text-[10px] font-semibold ${completed ? 'bg-rose-500 text-white' : 'bg-slate-100 text-slate-900'}`}>
                       {completed ? <Check size={12} /> : index + 1}
                     </span>
                     <div className="min-w-0">
-                      <LearningRichText className="inline text-xs leading-5 text-neutral-200">{question.prompt}</LearningRichText>
+                      <LearningRichText className="inline text-xs leading-5 text-slate-800">{question.prompt}</LearningRichText>
                     </div>
                   </div>
                   <textarea
@@ -1114,13 +1090,13 @@ function LessonDetails({
                     onChange={(event) => setAnswer(question.id, event.target.value)}
                     placeholder="Escreva seu raciocínio..."
                     rows={3}
-                    className="mt-2 w-full resize-y rounded-xl border border-neutral-800 bg-neutral-950/70 p-3 text-xs leading-5 text-neutral-200 outline-none placeholder:text-neutral-600 focus:border-emerald-500/60"
+                    className="mt-2 w-full resize-y rounded-xl border border-slate-300 bg-white p-3 text-xs leading-5 text-slate-800 outline-none placeholder:text-slate-400 focus:border-rose-400 focus:ring-2 focus:ring-rose-100"
                   />
                   <button
                     type="button"
                     onClick={() => onAskAssessment(question)}
                     disabled={busy || !answers[question.id]?.trim()}
-                    className="mt-2 flex items-center gap-2 rounded-lg bg-neutral-800 px-3 py-2 text-[11px] font-semibold text-neutral-200 transition hover:bg-neutral-700 disabled:cursor-not-allowed disabled:opacity-40"
+                    className="mt-2 flex items-center gap-2 rounded-lg bg-slate-900 px-3 py-2 text-[11px] font-semibold text-white transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:bg-slate-200 disabled:text-slate-600 disabled:opacity-100"
                   >
                     {busy ? <LoaderCircle size={13} className="animate-spin" /> : <Check size={13} />}
                     {busy ? 'Analisando resposta' : completed ? 'Responder novamente' : 'Receber feedback'}
@@ -1131,71 +1107,6 @@ function LessonDetails({
           </div>
         </section>
       )}
-    </div>
-  );
-}
-
-function SubjectTree({
-  subjectId,
-  selectedTopic,
-  onTopicSelect,
-}: {
-  subjectId: string;
-  selectedTopic: string;
-  onTopicSelect: (topic: string) => void;
-}) {
-  const subject = LEARNING_SUBJECTS.find((s) => s.id === subjectId);
-  if (!subject) return null;
-
-  return (
-    <div className="rounded-2xl border border-emerald-900/50 bg-emerald-950/15 p-3 sm:p-4" role="listbox" aria-label={`Temas de ${subject.name}`}>
-      <div className="mb-3 flex items-center justify-between gap-3">
-        <div>
-          <p className="text-xs font-semibold text-emerald-100">Escolha um tema para começar</p>
-          <p className="mt-1 text-[11px] text-neutral-500">Você poderá ajustar o foco durante a aula.</p>
-        </div>
-        <span className="shrink-0 rounded-full border border-emerald-900/60 bg-emerald-950/40 px-2 py-1 text-[10px] text-emerald-200">
-          {subject.topics.length} opções
-        </span>
-      </div>
-      <div className="grid gap-2 sm:grid-cols-2">
-        {subject.topics.map((topic, index) => {
-          const isSelected = selectedTopic === topic;
-          return (
-          <button
-            key={topic}
-            type="button"
-            onClick={() => onTopicSelect(topic)}
-            className={`group flex min-w-0 items-start gap-3 rounded-xl border px-3 py-3 text-left transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-400/70 ${isSelected ? 'border-emerald-400/60 bg-emerald-400/10 shadow-[0_0_0_1px_rgba(52,211,153,0.12)]' : 'border-neutral-800 bg-neutral-950/45 hover:border-emerald-800/70 hover:bg-neutral-900/80'}`}
-            role="option"
-            aria-selected={isSelected}
-          >
-            <span className={`mt-0.5 flex size-5 shrink-0 items-center justify-center rounded-full text-[10px] font-semibold ${isSelected ? 'bg-emerald-300 text-neutral-950' : 'bg-neutral-800 text-neutral-500 group-hover:bg-emerald-950 group-hover:text-emerald-300'}`}>
-              {index + 1}
-            </span>
-            <span className="min-w-0 flex-1">
-              <span className={`block truncate text-xs font-medium ${isSelected ? 'text-emerald-100' : 'text-neutral-200'}`}>{topic}</span>
-              <span className="mt-1 block text-[10px] text-neutral-600">{isSelected ? 'Tema selecionado' : 'Clique para estudar'}</span>
-            </span>
-            {isSelected && <Check size={15} className="mt-0.5 shrink-0 text-emerald-300" aria-hidden="true" />}
-          </button>
-          );
-        })}
-      </div>
-      <div className="mt-4 flex flex-col gap-3 border-t border-emerald-900/40 pt-3 sm:flex-row sm:items-center sm:justify-between">
-        <p className="text-[11px] leading-4 text-neutral-500">
-          {selectedTopic ? 'Tema escolhido. Você já pode iniciar sua aula.' : 'Selecione um tema para continuar.'}
-        </p>
-        <button
-          type="submit"
-          form="learning-start-form"
-          disabled={!selectedTopic.trim()}
-          className="flex h-10 items-center justify-center gap-2 rounded-xl bg-emerald-400 px-4 text-xs font-semibold text-neutral-950 transition hover:bg-emerald-300 disabled:cursor-not-allowed disabled:opacity-40"
-        >
-          <BookOpen size={14} />
-          Começar com este tema
-        </button>
-      </div>
     </div>
   );
 }
@@ -1212,16 +1123,17 @@ function LearningHistoryPanel({
   onUseTopic: (item: LearningSessionSummary) => void;
 }) {
   return (
-    <aside className="h-fit rounded-2xl border border-neutral-800 bg-[#111516]/95 p-4 shadow-xl shadow-black/10 lg:sticky lg:top-8">
+    <>
+     <aside className="max-h-[250px] overflow-y-auto lg:overflow-y-visible h-fit rounded-2xl border border-slate-200 bg-white/95 p-4 shadow-sm shadow-slate-900/5 lg:sticky lg:top-8">
       <div className="flex items-start justify-between gap-3">
         <div className="flex items-start gap-3">
-          <span className="flex size-9 shrink-0 items-center justify-center rounded-xl border border-amber-400/20 bg-amber-400/10 text-amber-200"><FolderOpen size={17} /></span>
+          <span className="flex size-9 shrink-0 items-center justify-center rounded-xl border border-slate-300 bg-slate-100 text-slate-900"><FolderOpen size={17} /></span>
           <div>
-            <h2 className="text-sm font-semibold text-neutral-100">Minhas aulas</h2>
-            <p className="mt-1 text-[11px] leading-4 text-neutral-500">Seus estudos salvos neste projeto.</p>
+            <h2 className="text-sm font-semibold text-slate-900">Minhas aulas</h2>
+            <p className="mt-1 text-[11px] leading-4 text-slate-600">Seus estudos salvos neste projeto.</p>
           </div>
         </div>
-        <span className="rounded-full border border-neutral-800 bg-neutral-950/60 px-2 py-1 text-[10px] text-neutral-500">{history.length + (currentSession ? 1 : 0)}</span>
+        <span className="rounded-full border border-slate-200 bg-slate-50 px-2 py-1 text-[10px] text-slate-600">{history.length + (currentSession ? 1 : 0)}</span>
       </div>
 
       <div className="mt-4 space-y-2">
@@ -1229,43 +1141,44 @@ function LearningHistoryPanel({
           <button
             type="button"
             onClick={onResume}
-            className="flex w-full items-center gap-3 rounded-xl border border-emerald-800/60 bg-emerald-950/25 p-3 text-left transition hover:border-emerald-500/50 hover:bg-emerald-950/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-400/70"
+            className="flex w-full items-center gap-3 rounded-xl border border-rose-200 bg-rose-50/60 p-3 text-left transition hover:border-rose-300 hover:bg-rose-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-rose-300"
           >
-            <span className="flex size-7 shrink-0 items-center justify-center rounded-lg bg-emerald-400/10 text-emerald-300"><BookOpen size={14} /></span>
+            <span className="flex size-7 shrink-0 items-center justify-center rounded-lg bg-white text-rose-700"><BookOpen size={14} /></span>
             <span className="min-w-0 flex-1">
-              <span className="block truncate text-xs font-semibold text-emerald-100">{currentSession.topic}</span>
-              <span className="mt-1 block text-[10px] text-emerald-300/70">{currentSession.lesson ? 'Continuar aula' : 'Preparar aula'}</span>
+              <span className="block truncate text-xs font-semibold text-rose-800">{currentSession.topic}</span>
+              <span className="mt-1 block text-[10px] text-rose-700">{currentSession.lesson ? 'Continuar aula' : 'Preparar aula'}</span>
             </span>
-            <ArrowRight size={14} className="shrink-0 text-emerald-300" />
+            <ArrowRight size={14} className="shrink-0 text-rose-700" />
           </button>
         )}
 
-        {[...history].reverse().slice(0, 6).map((item) => (
+        {/* {[...history].reverse().slice(0, 6).map((item) => (
           <button
             key={item.id}
             type="button"
             onClick={() => onUseTopic(item)}
-            className="group flex w-full items-center gap-3 rounded-xl border border-neutral-800 bg-neutral-950/35 p-3 text-left transition hover:border-neutral-700 hover:bg-neutral-900/80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-400/70"
+            className="group flex w-full items-center gap-3 rounded-xl border border-slate-200 bg-white p-3 text-left transition hover:border-slate-300 hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-rose-300"
           >
-            <span className="flex size-7 shrink-0 items-center justify-center rounded-lg bg-neutral-800 text-neutral-500 group-hover:text-emerald-300"><BookOpen size={13} /></span>
+            <span className="flex size-7 shrink-0 items-center justify-center rounded-lg bg-slate-100 text-slate-900 group-hover:text-rose-700"><BookOpen size={13} /></span>
             <span className="min-w-0 flex-1">
-              <span className="block truncate text-xs font-medium text-neutral-300">{item.topic}</span>
-              <span className="mt-1 block truncate text-[10px] text-neutral-600">{item.subjectName} · {item.status === 'completed' ? 'Concluída' : 'Pausada'}</span>
-              <span className="mt-1 block text-[10px] text-emerald-300/60">Clique para usar este tema</span>
+              <span className="block truncate text-xs font-medium text-slate-800">{item.topic}</span>
+              <span className="mt-1 block truncate text-[10px] text-slate-500">{item.subjectName} · {item.status === 'completed' ? 'Concluída' : 'Pausada'}</span>
+              <span className="mt-1 block text-[10px] text-slate-900">Clique para usar este tema</span>
             </span>
-            <ArrowRight size={13} className="shrink-0 text-neutral-700 transition group-hover:translate-x-0.5 group-hover:text-emerald-300" />
+            <ArrowRight size={13} className="shrink-0 text-slate-500 transition group-hover:translate-x-0.5 group-hover:text-rose-600" />
           </button>
-        ))}
+        ))} */}
 
         {!currentSession && history.length === 0 && (
           <div className="rounded-xl border border-dashed border-neutral-800 px-3 py-5 text-center">
-            <FolderOpen size={18} className="mx-auto mb-2 text-neutral-700" />
+            <FolderOpen size={18} className="mx-auto mb-2 text-neutral-500" />
             <p className="text-xs text-neutral-500">Sua primeira aula aparecerá aqui.</p>
-            <p className="mt-1 text-[10px] text-neutral-700">Escolha um tema ao lado para começar.</p>
+            <p className="mt-1 text-[10px] text-neutral-500">Escolha um tema ao lado para começar.</p>
           </div>
         )}
       </div>
     </aside>
+    </>
   );
 }
 
@@ -1645,35 +1558,35 @@ export default function LearningWorkspace() {
 
   return (
     <div
-      className="relative flex h-full min-h-0 flex-col bg-[#0d0f10] text-neutral-100"
+      className="relative flex h-full min-h-0 flex-col bg-slate-50 text-slate-900"
       data-tutorial="learning-workspace"
       style={{
-        backgroundImage: "linear-gradient(rgba(5, 10, 7, 0.74), rgba(5, 10, 7, 0.90)), url('/background_leaning.png')",
+        backgroundImage: "url('/background_leaning.png')",
         backgroundSize: 'cover',
         backgroundPosition: 'center',
         backgroundAttachment: 'fixed',
       }}
     >
-      <header className="flex shrink-0 flex-wrap items-center justify-between gap-3 border-b border-neutral-800/80 bg-[#151719] px-4 py-3 lg:px-6">
+      <header className="flex shrink-0 flex-wrap items-center justify-between gap-3 border-b border-slate-200/80 bg-white/95 px-4 py-3 backdrop-blur lg:px-6">
         <div className="flex items-center gap-3">
-          <div className="flex size-10 items-center justify-center overflow-hidden rounded-xl border border-emerald-400/20 bg-emerald-400/10"><CoruAvatar className="size-10" /></div>
+          <div className="flex size-10 items-center justify-center overflow-hidden rounded-xl border border-rose-200 bg-rose-50"><CoruAvatar className="size-10" /></div>
           <div>
-            <p className="text-sm font-semibold text-neutral-100">Coru</p>
-            <p className="text-[11px] text-neutral-500">Aprender construindo · várias áreas do conhecimento</p>
+            <p className="text-sm font-semibold text-slate-900">Coru</p>
+            <p className="text-[11px] text-slate-600">Aprender construindo · várias áreas do conhecimento</p>
           </div>
         </div>
         <div className="flex items-center gap-2">
           <TeacherModelSelector modelId={project.modelId} onModelChange={setModelId} />
-          {session && (
+          {/* {session && (
             <>
-              <span className="hidden max-w-64 truncate rounded-full border border-neutral-800 px-3 py-1.5 text-[11px] text-neutral-400 sm:block">{session.subjectName} · {session.topic}</span>
-              <button type="button" onClick={() => setSessionStatus(session.status === 'paused' ? 'active' : 'paused')} className="flex items-center gap-1.5 rounded-lg border border-neutral-700 px-3 py-2 text-[11px] font-medium text-neutral-300 hover:bg-neutral-800">
+              <span className="flex max-w-64 cursor-pointer list-none items-center gap-2 rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 outline-none transition hover:border-slate-300 focus-visible:ring-2 focus-visible:ring-rose-300 [&::-webkit-details-marker]:hidden">{session.subjectName} · {session.topic}</span>
+              <button type="button" onClick={() => setSessionStatus(session.status === 'paused' ? 'active' : 'paused')} className="flex items-center gap-1.5 rounded-lg border border-slate-300 bg-white px-3 py-2 text-[11px] font-medium text-slate-700 hover:bg-slate-50">
                 {session.status === 'paused' ? <Play size={12} /> : <Pause size={12} />}
                 {session.status === 'paused' ? 'Retomar' : 'Pausar'}
               </button>
-              <button type="button" onClick={startNewStudy} className="rounded-lg border border-neutral-700 px-3 py-2 text-[11px] font-medium text-neutral-300 hover:bg-neutral-800">Novo estudo</button>
+              <button type="button" onClick={startNewStudy} className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-[11px] font-medium text-slate-700 hover:bg-slate-50">Novo estudo</button>
             </>
-          )}
+          )} */}
         </div>
       </header>
 
@@ -1682,18 +1595,18 @@ export default function LearningWorkspace() {
           <div className="mx-auto max-w-6xl">
             <div className="mb-8 max-w-2xl">
               {/* <div className="mb-3 inline-flex items-center gap-2 rounded-full border border-emerald-900/50 bg-emerald-950/20 px-3 py-1.5 text-[11px] font-medium text-emerald-200"><Lightbulb size={13} /> Aprender fazendo</div> */}
-              <h1 className="text-3xl font-semibold tracking-tight text-white sm:text-4xl">O que você quer aprender hoje?</h1>
-              <p className="mt-3 text-sm leading-6 text-neutral-400">Comece pelo tema. O Coru organiza uma aula, propõe atividades e, quando ajudar, prepara uma demonstração dentro do editor.</p>
+              <h1 className="text-3xl font-semibold tracking-tight text-slate-900 sm:text-4xl">O que você quer aprender hoje?</h1>
+              <p className="mt-3 text-sm leading-6 text-slate-700">Comece pelo tema. O Coru organiza uma aula, propõe atividades e, quando ajudar, prepara uma demonstração dentro do editor.</p>
             </div>
 
             {project.currentSession && (
-              <button type="button" onClick={handleResumeRequest} className="mb-5 flex w-full items-center justify-between rounded-2xl border border-emerald-800/50 bg-emerald-950/20 p-4 text-left transition hover:bg-emerald-950/35">
-                <span className="flex items-center gap-3"><Clock3 size={18} className="text-emerald-300" /><span><span className="block text-xs font-semibold text-emerald-100">Retomar estudo</span><span className="mt-1 block text-xs text-neutral-400">{project.currentSession.subjectName} · {project.currentSession.topic}</span></span></span>
-                <ArrowRight size={16} className="text-emerald-300" />
+              <button type="button" onClick={handleResumeRequest} className="mb-5 flex w-full items-center justify-between rounded-2xl border border-rose-200 bg-white p-4 text-left shadow-sm shadow-slate-900/5 transition hover:bg-rose-50/50">
+                <span className="flex items-center gap-3"><Clock3 size={18} className="text-rose-600" /><span><span className="block text-xs font-semibold text-rose-700">Retomar estudo</span><span className="mt-1 block text-xs text-slate-600">{project.currentSession.subjectName} · {project.currentSession.topic}</span></span></span>
+                <ArrowRight size={16} className="text-rose-600" />
               </button>
             )}
 
-            <div className="grid items-start gap-10 lg:grid-cols-[17rem_minmax(0,1fr)]">
+            <div className="grid items-start gap-10 lg:grid-cols-[17rem_minmax(0,1fr)] ">
               <LearningHistoryPanel
                 history={project.history}
                 currentSession={project.currentSession}
@@ -1706,171 +1619,78 @@ export default function LearningWorkspace() {
                   setTopicSearch('');
                 }}
               />
-              <form id="learning-start-form" onSubmit={handleStartLesson} className="min-w-0 rounded-2xl border border-neutral-800 bg-[#15181b] p-4 shadow-xl shadow-black/10 sm:p-6">
-              <label htmlFor="learning-topic" className="mb-2 block text-xs font-semibold uppercase tracking-[0.14em] text-neutral-400">Tema de estudo</label>
+              <form id="learning-start-form" onSubmit={handleStartLesson} className="min-w-0 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm shadow-slate-900/5 sm:p-6">
+              <label htmlFor="learning-topic" className="mb-2 block text-xs font-semibold uppercase tracking-[0.14em] text-slate-700">Tema de estudo</label>
               <input
                 id="learning-topic"
                 value={topic}
                 onChange={(event) => setTopic(event.target.value)}
                 maxLength={180}
                 placeholder="Ex.: quero entender como funciona a gravidade"
-                className="h-12 w-full rounded-xl border border-neutral-700 bg-neutral-950/70 px-4 text-sm text-white outline-none placeholder:text-neutral-600 focus:border-emerald-500/70"
+                className="h-12 w-full rounded-xl border border-slate-300 bg-white px-4 text-sm text-slate-900 outline-none placeholder:text-slate-400 focus:border-rose-500/70 focus:ring-2 focus:ring-rose-100"
                 required
               />
               <div className="mt-4 flex flex-wrap items-end gap-4">
                 <div className="flex w-full flex-col gap-2 sm:grid sm:grid-cols-2">
                   <LearningLevelSelector level={level} onLevelChange={setLevel} />
-                  <button type="submit" disabled={isSending || !topic.trim()} className="flex h-11 w-full items-center justify-center gap-2 rounded-xl bg-emerald-400 px-4 text-sm font-semibold text-neutral-950 transition hover:bg-emerald-300 disabled:cursor-wait disabled:opacity-60">
+                  <button type="submit" disabled={isSending || !topic.trim()} className="flex h-11 w-full items-center justify-center gap-2 rounded-xl bg-rose-600 px-4 text-sm font-semibold text-white transition hover:bg-rose-700 disabled:cursor-wait disabled:opacity-60">
                 {isSending ? <LoaderCircle size={16} className="animate-spin" /> : <BookOpen size={16} />}
                 {isSending ? (isResearching ? 'Pesquisando fontes...' : 'Preparando sua aula...') : 'Começar a aprender'}
               </button>
                 </div>
               </div>
-              {selectedSubject && <p className="mt-2 text-[11px] text-neutral-600">{selectedSubject.description}</p>}
-              {error && <p role="alert" className="mt-3 rounded-lg border border-rose-900/50 bg-rose-950/25 px-3 py-2 text-xs text-rose-200">{error}</p>}
+              {selectedSubject && <p className="mt-2 text-[11px] text-slate-500">{selectedSubject.description}</p>}
+              {error && <p role="alert" className="mt-3 rounded-lg border border-rose-200 bg-rose-50 px-3 py-2 text-xs text-rose-800">{error}</p>}
           
               </form>
             </div>
 
-            <section className="mt-7 rounded-2xl border border-neutral-800 bg-[#111516]/90 p-4 sm:p-5">
-              <div className="flex flex-wrap items-end justify-between gap-3">
-                <div>
-                  <h2 className="text-sm font-semibold text-neutral-100">Escolha uma área ou tema</h2>
-                  <p className="mt-1 text-[11px] text-neutral-500">Comece por uma sugestão ou pesquise diretamente entre os temas.</p>
-                </div>
-                {topic && (
-                  <span className="rounded-full border border-emerald-900/60 bg-emerald-950/35 px-2.5 py-1 text-[10px] text-emerald-200">
-                    Tema: {topic}
-                  </span>
-                )}
-              </div>
-
-              <div className="relative mt-4">
-                <Search size={15} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-neutral-600" aria-hidden="true" />
-                <input
-                  value={topicSearch}
-                  onChange={(event) => setTopicSearch(event.target.value)}
-                  placeholder="Buscar tema, como gravidade, cores ou algoritmos"
-                  aria-label="Buscar temas de estudo"
-                  className="h-10 w-full rounded-xl border border-neutral-800 bg-neutral-950/80 pl-9 pr-10 text-xs text-neutral-100 outline-none placeholder:text-neutral-600 focus:border-emerald-500/60"
-                />
-                {topicSearch && (
-                  <button type="button" onClick={() => setTopicSearch('')} aria-label="Limpar busca de temas" className="absolute right-2 top-1/2 flex size-7 -translate-y-1/2 items-center justify-center rounded-lg text-neutral-500 hover:bg-neutral-800 hover:text-neutral-200">
-                    <X size={14} />
-                  </button>
-                )}
-              </div>
-
-              <div className="mt-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
-                <button
-                  type="button"
-                  onClick={() => {
-                    setSubjectId('general');
-                    setTopic('');
-                    setExpandedSubjectId(null);
-                  }}
-                  className={`group rounded-2xl border p-4 text-left transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-400/70 ${subjectId === 'general' ? 'border-emerald-400/60 bg-emerald-400/10' : 'border-emerald-900/50 bg-emerald-950/15 hover:border-emerald-700/70 hover:bg-emerald-950/25'}`}
-                  aria-pressed={subjectId === 'general'}
-                >
-                  <span className="flex items-center justify-between">
-                    <span className="flex size-8 items-center justify-center rounded-lg bg-emerald-400/10 text-emerald-300"><BookOpen size={15} /></span>
-                    {subjectId === 'general' && <Check size={15} className="text-emerald-300" aria-hidden="true" />}
-                  </span>
-                  <span className="mt-3 block text-xs font-semibold text-emerald-100">Deixe o Coru escolher</span>
-                  <span className="mt-1 block text-[11px] leading-5 text-neutral-500">Escreva qualquer tema e a IA identifica a melhor abordagem.</span>
-                </button>
-                {LEARNING_SUBJECTS.map((subject) => {
-                  const Icon = subjectIcons[subject.id] ?? BookOpen;
-                  const isExpanded = expandedSubjectId === subject.id;
-                  const isSelected = subjectId === subject.id;
-                  return (
-                    <div key={subject.id} className={isExpanded && !normalizedTopicSearch ? 'sm:col-span-2 xl:col-span-3' : ''}>
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setSubjectId(subject.id);
-                          if (subjectId !== subject.id && !subject.topics.includes(topic)) setTopic('');
-                          setExpandedSubjectId(isExpanded ? null : subject.id);
-                        }}
-                        className={`group w-full rounded-2xl border p-4 text-left transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-400/70 ${isSelected ? 'border-emerald-400/60 bg-emerald-400/10' : 'border-neutral-800 bg-[#131618] hover:border-emerald-800/60 hover:bg-[#171b1d]'}`}
-                        aria-pressed={isSelected}
-                        aria-expanded={isExpanded}
-                        aria-controls={isExpanded ? `subject-tree-${subject.id}` : undefined}
-                      >
-                        <span className="flex items-center justify-between">
-                          <span className={`flex size-8 items-center justify-center rounded-lg ${isSelected ? 'bg-emerald-400/15 text-emerald-200' : 'bg-neutral-800 text-emerald-300'}`}><Icon size={15} /></span>
-                          <span className="flex items-center gap-2">
-                            <span className="text-[10px] text-neutral-600">{subject.topics.length} temas</span>
-                            {isSelected ? <Check size={15} className="text-emerald-300" aria-hidden="true" /> : <ChevronDown size={14} className={`text-neutral-700 transition group-hover:text-emerald-300 ${isExpanded ? 'rotate-180' : ''}`} />}
-                          </span>
-                        </span>
-                        <span className={`mt-3 block text-xs font-semibold ${isSelected ? 'text-emerald-100' : 'text-neutral-200'}`}>{subject.name}</span>
-                        <span className="mt-1 block text-[11px] leading-5 text-neutral-500">{subject.description}</span>
-                      </button>
-                      {isExpanded && !normalizedTopicSearch && (
-                        <div id={`subject-tree-${subject.id}`} className="mt-2">
-                          <SubjectTree subjectId={subject.id} selectedTopic={topic} onTopicSelect={setTopic} />
-                        </div>
-                      )}
-                    </div>
-                  );
-                })}
-              </div>
-
-              {normalizedTopicSearch ? (
-                <div className="mt-4 rounded-2xl border border-neutral-800 bg-neutral-950/45 p-3">
-                  <div className="mb-3 flex items-center justify-between gap-3">
-                    <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-neutral-500">Resultados da busca</p>
-                    <span className="text-[10px] text-neutral-600">{matchingTopics.length} encontrado{matchingTopics.length === 1 ? '' : 's'}</span>
-                  </div>
-                  {matchingTopics.length > 0 ? (
-                    <div className="grid gap-2 sm:grid-cols-2">
-                      {matchingTopics.map(({ item, subject }) => {
-                        const isSelected = topic === item && subjectId === subject.id;
-                        return (
-                          <button
-                            key={`${subject.id}-${item}`}
-                            type="button"
-                            onClick={() => {
-                              setSubjectId(subject.id);
-                              setTopic(item);
-                              setExpandedSubjectId(subject.id);
-                              setTopicSearch('');
-                            }}
-                            className={`flex items-center justify-between gap-3 rounded-xl border px-3 py-2.5 text-left transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-400/70 ${isSelected ? 'border-emerald-400/60 bg-emerald-400/10' : 'border-neutral-800 bg-neutral-900/50 hover:border-emerald-800/70'}`}
-                            aria-pressed={isSelected}
-                          >
-                            <span className="min-w-0"><span className="block truncate text-xs text-neutral-200">{item}</span><span className="mt-1 block text-[10px] text-neutral-600">{subject.name}</span></span>
-                            {isSelected ? <Check size={14} className="shrink-0 text-emerald-300" /> : <ArrowRight size={14} className="shrink-0 text-neutral-600" />}
-                          </button>
-                        );
-                      })}
-                    </div>
-                  ) : (
-                    <p className="rounded-xl border border-dashed border-neutral-800 px-3 py-4 text-center text-xs text-neutral-500">Nenhum tema encontrado. Tente outro termo ou escreva um tema livre acima.</p>
-                  )}
-                </div>
-              ) : null}
-            </section>
+            <LearningSubjectRadialSelector
+              subjectId={subjectId}
+              expandedSubjectId={expandedSubjectId}
+              topic={topic}
+              topicSearch={topicSearch}
+              matchingTopics={matchingTopics}
+              onChooseForMe={() => {
+                setSubjectId('general');
+                setTopic('');
+                setExpandedSubjectId(null);
+                setTopicSearch('');
+              }}
+              onSubjectSelect={(subject) => {
+                setSubjectId(subject.id);
+                if (subjectId !== subject.id && !subject.topics.includes(topic)) setTopic('');
+                setExpandedSubjectId(subject.id);
+                setTopicSearch('');
+              }}
+              onTopicSelect={(subject, selectedTopic) => {
+                setSubjectId(subject.id);
+                setTopic(selectedTopic);
+                setExpandedSubjectId(subject.id);
+                setTopicSearch('');
+              }}
+              onReturnToSubjects={() => setExpandedSubjectId(null)}
+              onTopicSearchChange={setTopicSearch}
+            />
           </div>
         </div>
       ) : (
         <div className="flex min-h-0 flex-1 flex-col xl:flex-row">
-          <section className="flex min-h-[45%] min-w-0 flex-1 flex-col bg-[#080c0a]/95 shadow-[inset_-1px_0_0_rgba(52,211,153,0.08)] backdrop-blur-sm xl:basis-1/2 xl:min-h-0 xl:border-r xl:border-neutral-800">
-            <div className="flex shrink-0 items-center justify-between border-b border-neutral-800/80 px-4 py-2.5 lg:px-6">
+          <section className="flex min-h-[45%] min-w-0 flex-1 flex-col bg-white shadow-[inset_-1px_0_0_rgba(15,23,42,0.08)] xl:basis-1/2 xl:min-h-0 xl:border-r xl:border-slate-200">
+            <div className="flex shrink-0 items-center justify-between border-b border-slate-200 px-4 py-2.5 lg:px-6">
               <div className="min-w-0">
-                <p className="truncate text-xs font-semibold text-neutral-200">{session.subjectName} · {session.topic}</p>
-                <div className="mt-1 flex items-center gap-2 text-[10px] text-neutral-600">
+                <p className="truncate text-xs font-semibold text-slate-900">{session.subjectName} · {session.topic}</p>
+                <div className="mt-1 flex items-center gap-2 text-[10px] text-slate-500">
                   <span>Nível {levelLabels[session.level].toLowerCase()} · {project.messages.length} mensagens</span>
-                  {progressTotal > 0 && <span className="text-emerald-300">{progressPercent}% concluído</span>}
+                  {progressTotal > 0 && <span className="text-rose-700">{progressPercent}% concluído</span>}
                 </div>
                 {progressTotal > 0 && (
-                  <div className="mt-2 h-1 max-w-64 overflow-hidden rounded-full bg-neutral-800" aria-label={`${progressPercent}% da aula concluída`} role="progressbar" aria-valuemin={0} aria-valuemax={100} aria-valuenow={progressPercent}>
-                    <div className="h-full rounded-full bg-emerald-400 transition-all" style={{ width: `${progressPercent}%` }} />
+                  <div className="mt-2 h-1 max-w-64 overflow-hidden rounded-full bg-slate-200" aria-label={`${progressPercent}% da aula concluída`} role="progressbar" aria-valuemin={0} aria-valuemax={100} aria-valuenow={progressPercent}>
+                    <div className="h-full rounded-full bg-rose-500 transition-all" style={{ width: `${progressPercent}%` }} />
                   </div>
                 )}
               </div>
-              <button type="button" onClick={() => setActiveMode('scene')} className="ml-3 shrink-0 rounded-lg border border-neutral-700 px-3 py-2 text-[10px] font-medium text-neutral-300 hover:border-emerald-700/50 hover:text-emerald-200">Abrir cena</button>
+              <button type="button" onClick={() => setActiveMode('scene')} className="ml-3 shrink-0 rounded-lg border border-slate-300 bg-white px-3 py-2 text-[10px] font-medium text-slate-700 hover:border-rose-300 hover:text-rose-700">Abrir cena</button>
             </div>
             <div className="min-h-0 flex-1 overflow-y-auto px-4 py-5 lg:px-8">
               <div className="mx-auto flex max-w-4xl flex-col gap-4">
@@ -1883,10 +1703,10 @@ export default function LearningWorkspace() {
                   />
                 ))}
                 {isSending && (
-                  <div className="flex items-center gap-3 text-xs text-neutral-500"><span className="flex size-8 items-center justify-center overflow-hidden rounded-xl bg-emerald-400/10 text-emerald-300"><CoruAvatar className="size-8" /></span><LoaderCircle size={14} className="animate-spin" /> {isGeneratingModel ? 'Criando seu modelo 3D...' : isResearching ? 'Pesquisando fontes e montando sua aula...' : 'Coru está pensando...'}</div>
+                  <div className="flex items-center gap-3 text-xs text-slate-600"><span className="flex size-8 items-center justify-center overflow-hidden rounded-xl bg-rose-50 text-rose-700"><CoruAvatar className="size-8" /></span><LoaderCircle size={14} className="animate-spin text-slate-900" /> {isGeneratingModel ? 'Criando seu modelo 3D...' : isResearching ? 'Pesquisando fontes e montando sua aula...' : 'Coru está pensando...'}</div>
                 )}
                 {error && (
-                  <div role="alert" className="ml-11 rounded-xl border border-rose-900/50 bg-rose-950/20 px-3 py-2 text-xs text-rose-200">
+                  <div role="alert" className="ml-11 rounded-xl border border-rose-200 bg-rose-50 px-3 py-2 text-xs text-rose-800">
                     <span>{error}</span>
                     {session && !session.lesson && <button type="button" onClick={() => void requestLesson({ id: session.subjectId, name: session.subjectName }, session.topic, session.level, false)} className="ml-3 font-semibold underline underline-offset-2">Tentar novamente</button>}
                   </div>
@@ -1894,20 +1714,20 @@ export default function LearningWorkspace() {
                 {project.messages.length === 0 && session.lesson && <p className="ml-11 text-xs text-neutral-500">Sua aula está pronta. Comece pela explicação ou escolha uma etapa no plano ao lado.</p>}
               </div>
             </div>
-            <div className="shrink-0 border-t border-neutral-800 bg-[#101214] px-3 py-3 lg:px-6">
+            <div className="shrink-0 border-t border-slate-200 bg-white px-3 py-3 lg:px-6">
               <div className="mx-auto max-w-4xl">
                 <div className="mb-2 flex gap-2 overflow-x-auto pb-1">
-                  {quickPrompts.map((prompt) => <button key={prompt} type="button" disabled={isSending} onClick={() => void sendPrompt(prompt)} className="shrink-0 rounded-full border border-neutral-800 px-3 py-1.5 text-[10px] text-neutral-400 transition hover:border-emerald-800/50 hover:text-emerald-200 disabled:opacity-40">{prompt}</button>)}
+                  {quickPrompts.map((prompt) => <button key={prompt} type="button" disabled={isSending} onClick={() => void sendPrompt(prompt)} className="shrink-0 rounded-full border border-slate-200 bg-white px-3 py-1.5 text-[10px] text-slate-600 transition hover:border-rose-200 hover:bg-rose-50 hover:text-rose-700 disabled:opacity-40">{prompt}</button>)}
                 </div>
-                <form onSubmit={submitChat} className="flex items-end gap-2 rounded-2xl border border-neutral-700 bg-[#171a1d] p-2 focus-within:border-emerald-700/60">
-                  <textarea value={draft} onChange={(event) => setDraft(event.target.value)} onKeyDown={(event) => { if (event.key === 'Enter' && !event.shiftKey) { event.preventDefault(); void sendPrompt(draft); } }} placeholder="Pergunte, explique seu raciocínio ou conte o que observou..." rows={1} maxLength={1800} className="max-h-32 min-h-10 min-w-0 flex-1 resize-y bg-transparent px-2 py-2 text-xs leading-5 text-neutral-100 outline-none placeholder:text-neutral-600" />
-                  <button type="submit" disabled={isSending || !draft.trim()} aria-label="Enviar mensagem" className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-emerald-400 text-neutral-950 transition hover:bg-emerald-300 disabled:cursor-not-allowed disabled:opacity-40"><Send size={15} /></button>
+                <form onSubmit={submitChat} className="flex items-end gap-2 rounded-2xl border border-slate-300 bg-white p-2 focus-within:border-rose-400 focus-within:ring-2 focus-within:ring-rose-100">
+                  <textarea value={draft} onChange={(event) => setDraft(event.target.value)} onKeyDown={(event) => { if (event.key === 'Enter' && !event.shiftKey) { event.preventDefault(); void sendPrompt(draft); } }} placeholder="Pergunte, explique seu raciocínio ou conte o que observou..." rows={1} maxLength={1800} className="max-h-32 min-h-10 min-w-0 flex-1 resize-y bg-transparent px-2 py-2 text-xs leading-5 text-slate-900 outline-none placeholder:text-slate-400" />
+                  <button type="submit" disabled={isSending || !draft.trim()} aria-label="Enviar mensagem" className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-rose-600 text-white transition hover:bg-rose-700 disabled:cursor-not-allowed disabled:opacity-40"><Send size={15} /></button>
                 </form>
-                <p className="mt-1.5 text-center text-[9px] text-neutral-700">A IA pode cometer erros. Demonstrações e modelos visuais são recursos didáticos.</p>
+                <p className="mt-1.5 text-center text-[9px] text-slate-500">A IA pode cometer erros. Demonstrações e modelos visuais são recursos didáticos.</p>
               </div>
             </div>
           </section>
-          <aside className="min-h-0 min-w-0 flex-1 overflow-y-auto border-t border-neutral-800 p-3 lg:p-4 xl:basis-1/2 xl:border-l-0 xl:border-t-0">
+          <aside className="min-h-0 min-w-0 flex-1 overflow-y-auto border-t border-slate-200 bg-transparent p-3 lg:p-4 xl:basis-1/2 xl:border-l-0 xl:border-t-0">
             <LessonDetails
               onAskAssessment={(question) => void assessAnswer(question)}
               busyQuestionId={busyQuestionId}
@@ -1920,13 +1740,13 @@ export default function LearningWorkspace() {
               currentSession={session}
             />
             {session.status === 'paused' && (
-              <button type="button" onClick={handleResumeRequest} className="mt-4 flex w-full items-center justify-center gap-2 rounded-xl bg-emerald-400 px-4 py-3 text-xs font-semibold text-neutral-950 hover:bg-emerald-300"><Play size={14} /> Retomar estudo</button>
+              <button type="button" onClick={handleResumeRequest} className="mt-4 flex w-full items-center justify-center gap-2 rounded-xl bg-rose-600 px-4 py-3 text-xs font-semibold text-white hover:bg-rose-700"><Play size={14} /> Retomar estudo</button>
             )}
             {session.lesson && session.status !== 'completed' && (
-              <button type="button" onClick={() => setSessionStatus('completed')} className="mt-3 flex w-full items-center justify-center gap-2 rounded-xl border border-neutral-800 px-4 py-3 text-xs font-medium text-neutral-400 hover:bg-neutral-900 hover:text-neutral-200"><Check size={14} /> Concluir esta aula</button>
+              <button type="button" onClick={() => setSessionStatus('completed')} className="mt-3 flex w-full items-center justify-center gap-2 rounded-xl border border-slate-300 bg-white px-4 py-3 text-xs font-medium text-slate-700 hover:bg-slate-50"><Check size={14} /> Concluir esta aula</button>
             )}
             {session.status === 'completed' && (
-              <div className="mt-3 rounded-xl border border-emerald-900/40 bg-emerald-950/20 px-3 py-3 text-center text-xs text-emerald-200"><CircleCheck size={15} className="mx-auto mb-1" />Aula concluída. Seu progresso foi salvo no projeto.</div>
+              <div className="mt-3 rounded-xl border border-slate-300 bg-slate-100 px-3 py-3 text-center text-xs text-slate-900"><CircleCheck size={15} className="mx-auto mb-1" />Aula concluída. Seu progresso foi salvo no projeto.</div>
             )}
           </aside>
         </div>

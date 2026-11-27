@@ -915,9 +915,9 @@ function EmptySceneFallback() {
     <group>
       <mesh rotation={[0.4, 0.55, 0]}>
         <boxGeometry args={[1.4, 1.4, 1.4]} />
-        <meshStandardMaterial color="#34d399" wireframe transparent opacity={0.75} />
+        <meshStandardMaterial color="#0785cf" wireframe transparent opacity={0.75} />
       </mesh>
-      <gridHelper args={[8, 8, '#34d399', '#2f3633']} position={[0, -1.05, 0]} />
+      <gridHelper args={[8, 8, '#0785cf', '#d6e0eb']} position={[0, -1.05, 0]} />
     </group>
   );
 }

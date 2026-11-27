@@ -50,7 +50,7 @@ function EffectInstance({ effect, profile, intensity }: { effect: PageEffect; pr
           count={num(effect, 'count', 1800)}
           size={num(effect, 'size', 0.08)}
           speed={num(effect, 'speed', 0.4)}
-          color={str(effect, 'color', '#34d399')}
+          color={str(effect, 'color', '#0785cf')}
           colorB={str(effect, 'colorB', '#22d3ee')}
           opacity={num(effect, 'opacity', 0.9)}
           connectLines={bool(effect, 'connectLines', true)}

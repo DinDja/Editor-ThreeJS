@@ -17,7 +17,7 @@ export const EFFECT_REGISTRY: Record<EffectType, EffectDefinition> = {
       { key: 'count', label: 'Quantidade', type: 'range', min: 80, max: 6000, step: 20, default: 1800, description: 'Número de partículas (reduzido automaticamente em dispositivos fracos).' },
       { key: 'size', label: 'Tamanho', type: 'range', min: 0.01, max: 0.4, step: 0.01, default: 0.08 },
       { key: 'speed', label: 'Velocidade', type: 'range', min: 0, max: 2, step: 0.05, default: 0.4 },
-      { key: 'color', label: 'Cor', type: 'color', default: '#34d399' },
+      { key: 'color', label: 'Cor', type: 'color', default: '#0785cf' },
       { key: 'colorB', label: 'Cor 2', type: 'color', default: '#22d3ee' },
       { key: 'opacity', label: 'Opacidade', type: 'range', min: 0, max: 1, step: 0.05, default: 0.9 },
       { key: 'connectLines', label: 'Linhas de conexão', type: 'toggle', default: true },
@@ -147,7 +147,7 @@ export const EFFECT_REGISTRY: Record<EffectType, EffectDefinition> = {
     cost: 'low',
     category: 'interactive',
     props: [
-      { key: 'color', label: 'Cor', type: 'color', default: '#34d399' },
+      { key: 'color', label: 'Cor', type: 'color', default: '#0785cf' },
       { key: 'size', label: 'Tamanho', type: 'range', min: 80, max: 600, step: 10, default: 320 },
       { key: 'opacity', label: 'Opacidade', type: 'range', min: 0, max: 1, step: 0.05, default: 0.35 },
       { key: 'smooth', label: 'Suavidade', type: 'range', min: 0.04, max: 0.4, step: 0.02, default: 0.14 },
@@ -214,7 +214,7 @@ export const EFFECT_REGISTRY: Record<EffectType, EffectDefinition> = {
     cost: 'low',
     category: 'background',
     props: [
-      { key: 'color', label: 'Cor A', type: 'color', default: '#34d399' },
+      { key: 'color', label: 'Cor A', type: 'color', default: '#0785cf' },
       { key: 'colorB', label: 'Cor B', type: 'color', default: '#22d3ee' },
       { key: 'colorC', label: 'Cor C', type: 'color', default: '#a78bfa' },
       { key: 'speed', label: 'Velocidade', type: 'range', min: 0, max: 2, step: 0.05, default: 0.4 },
