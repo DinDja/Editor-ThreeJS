@@ -658,9 +658,11 @@ function WikipediaCuration({ articles }: { articles: LearningWikipediaArticle[] 
 function MessageBubble({
   message,
   wikipediaArticles,
+  messageRef,
 }: {
   message: LearningMessage;
   wikipediaArticles?: LearningWikipediaArticle[];
+  messageRef?: (element: HTMLElement | null) => void;
 }) {
   const isTeacher = message.role === 'teacher';
   const assessment = message.assessment;
@@ -672,7 +674,7 @@ function MessageBubble({
       ? 'border-amber-500/30 bg-amber-500/5 text-amber-100'
       : 'border-sky-500/30 bg-sky-500/5 text-sky-100';
   return (
-    <article className={`flex gap-3 ${isTeacher ? '' : 'flex-row-reverse'}`}>
+    <article ref={messageRef} className={`flex gap-3 ${isTeacher ? '' : 'flex-row-reverse'}`}>
       <div className={`mt-0.5 flex size-8 shrink-0 items-center justify-center overflow-hidden rounded-xl ${isTeacher ? 'bg-emerald-400/10 text-emerald-300' : 'bg-sky-400/10 text-sky-300'}`}>
         {isTeacher ? <CoruAvatar className="size-8" /> : <MessageCircle size={15} />}
       </div>
@@ -1302,13 +1304,14 @@ export default function LearningWorkspace() {
   const [preparedActionId, setPreparedActionId] = useState<string | null>(null);
   const [expandedSubjectId, setExpandedSubjectId] = useState<string | null>(null);
   const [topicSearch, setTopicSearch] = useState('');
-  const messagesEndRef = useRef<HTMLDivElement | null>(null);
+  const latestMessageRef = useRef<HTMLElement | null>(null);
   const teacherAbortRef = useRef<AbortController | null>(null);
   const session = project.currentSession;
   const firstTeacherMessageId = project.messages.find((message) => message.role === 'teacher')?.id;
+  const latestMessageId = project.messages[project.messages.length - 1]?.id;
 
   useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth', block: 'end' });
+    latestMessageRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
   }, [project.messages.length, isSending]);
 
   useEffect(() => () => {
@@ -1875,6 +1878,7 @@ export default function LearningWorkspace() {
                   <MessageBubble
                     key={message.id}
                     message={message}
+                    messageRef={message.id === latestMessageId ? (element) => { latestMessageRef.current = element; } : undefined}
                     wikipediaArticles={message.id === firstTeacherMessageId ? session.lesson?.wikipediaArticles : undefined}
                   />
                 ))}
@@ -1888,7 +1892,6 @@ export default function LearningWorkspace() {
                   </div>
                 )}
                 {project.messages.length === 0 && session.lesson && <p className="ml-11 text-xs text-neutral-500">Sua aula está pronta. Comece pela explicação ou escolha uma etapa no plano ao lado.</p>}
-                <div ref={messagesEndRef} />
               </div>
             </div>
             <div className="shrink-0 border-t border-neutral-800 bg-[#101214] px-3 py-3 lg:px-6">

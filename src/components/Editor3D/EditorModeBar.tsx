@@ -28,7 +28,7 @@ export default function EditorModeBar() {
           data-tutorial={`mode-${mode.id}`}
           className={`flex h-7 shrink-0 items-center gap-1.5 rounded-md px-3 text-xs font-medium transition ${
             activeMode === mode.id
-              ? 'bg-emerald-400/10 text-emerald-200 shadow-[inset_0_-1px_0_0_rgb(52,211,153)]'
+              ? 'bg-emerald-400/10 text-emerald-200'
               : 'text-neutral-500 hover:bg-neutral-800 hover:text-neutral-200'
           }`}
         >
