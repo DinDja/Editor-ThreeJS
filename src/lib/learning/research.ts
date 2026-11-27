@@ -12,10 +12,12 @@ const MAX_RESEARCH_RESPONSE_CHARS = 280_000;
 const MAX_WIKIPEDIA_PARSE_RESPONSE_CHARS = 480_000;
 const MAX_RESOURCES = 12;
 const RESEARCH_CACHE_TTL_MS = 10 * 60_000;
-const RESEARCH_CACHE_VERSION = 'v6-wikipedia-inline-only-images';
-const MAX_WIKIPEDIA_IMAGES = 6;
-const MAX_WIKIPEDIA_IMAGE_CANDIDATES = 18;
-const MAX_WIKIPEDIA_EXCERPT_CHARS = 8_000;
+const RESEARCH_CACHE_VERSION = 'v7-reliable-media-curation';
+const MAX_WIKIPEDIA_IMAGES = 8;
+const MAX_WIKIPEDIA_IMAGE_CANDIDATES = 24;
+const MAX_WIKIPEDIA_IMAGE_BATCH_SIZE = 6;
+const MAX_WIKIPEDIA_IMAGE_RESPONSE_CHARS = 500_000;
+const MAX_WIKIPEDIA_EXCERPT_CHARS = 12_000;
 const WIKIPEDIA_USER_AGENT = 'Editor-ThreeJS-Learning/1.0 (https://github.com/DinDja/Editor-ThreeJS)';
 const researchCache = new Map<string, { expiresAt: number; value: LearningResearch }>();
 
@@ -87,18 +89,113 @@ const youtubeThumbnail = (value: unknown) => {
     .find((url) => /^https?:\/\//i.test(url)) ?? '';
 };
 
-const parseYouTubeInitialData = (html: string): unknown => {
-  const marker = 'var ytInitialData = ';
-  const markerStart = html.indexOf(marker);
-  if (markerStart < 0) return null;
-  const start = markerStart + marker.length;
-  const end = html.indexOf(';</script>', start);
-  if (end < 0) return null;
+const isYouTubeVideoId = (value: string) => /^[A-Za-z0-9_-]{11}$/.test(value);
+
+const youtubeVideoIdFromUrl = (value: string): string => {
+  const normalizedValue = value.startsWith('//')
+    ? 'https:' + value
+    : value.startsWith('/')
+      ? 'https://duckduckgo.com' + value
+      : value;
   try {
-    return JSON.parse(html.slice(start, end));
+    const url = new URL(normalizedValue);
+    const host = url.hostname.replace(/^www\./i, '').replace(/^m\./i, '').toLowerCase();
+    let videoId = '';
+    if (host === 'youtu.be') {
+      videoId = url.pathname.split('/').filter(Boolean)[0] ?? '';
+    } else if (host === 'youtube.com') {
+      if (url.pathname === '/watch') videoId = url.searchParams.get('v') ?? '';
+      else if (['embed', 'shorts', 'live', 'v'].includes(url.pathname.split('/').filter(Boolean)[0] ?? '')) {
+        videoId = url.pathname.split('/').filter(Boolean)[1] ?? '';
+      }
+    }
+    if (isYouTubeVideoId(videoId)) return videoId;
+
+    const redirectedUrl = url.searchParams.get('uddg') || url.searchParams.get('url') || url.searchParams.get('q');
+    if (!redirectedUrl || redirectedUrl === value) return '';
+    const directVideoId = youtubeVideoIdFromUrl(redirectedUrl);
+    if (directVideoId) return directVideoId;
+    try {
+      const decodedRedirect = decodeURIComponent(redirectedUrl);
+      return decodedRedirect !== redirectedUrl ? youtubeVideoIdFromUrl(decodedRedirect) : '';
+    } catch {
+      return '';
+    }
   } catch {
-    return null;
+    try {
+      const decodedValue = decodeURIComponent(normalizedValue);
+      return decodedValue !== normalizedValue ? youtubeVideoIdFromUrl(decodedValue) : '';
+    } catch {
+      return '';
+    }
   }
+};
+const createYouTubeVideoResource = (
+  videoId: string,
+  title: string,
+  description: string,
+  author = '',
+  thumbnailUrl = '',
+) => createResource({
+  id: `youtube-${videoId}`,
+  provider: 'YouTube',
+  kind: 'video',
+  title,
+  description: description || 'Vídeo relacionado ao tema da aula.',
+  url: `https://www.youtube.com/watch?v=${encodeURIComponent(videoId)}`,
+  ...(thumbnailUrl ? { thumbnailUrl } : {}),
+  ...(author ? { author } : {}),
+});
+
+const parseJsonValueAt = (source: string, position: number): unknown => {
+  let start = position;
+  while (/\s/.test(source[start] ?? '')) start += 1;
+  if (source[start] !== '{' && source[start] !== '[') return null;
+
+  const expectedClosers: string[] = [];
+  let insideString = false;
+  let escaped = false;
+  for (let index = start; index < source.length; index += 1) {
+    const character = source[index];
+    if (insideString) {
+      if (escaped) escaped = false;
+      else if (character === '\\') escaped = true;
+      else if (character === '"') insideString = false;
+      continue;
+    }
+    if (character === '"') {
+      insideString = true;
+      continue;
+    }
+    if (character === '{') expectedClosers.push('}');
+    else if (character === '[') expectedClosers.push(']');
+    else if (character === '}' || character === ']') {
+      if (expectedClosers.pop() !== character) return null;
+      if (expectedClosers.length === 0) {
+        try {
+          return JSON.parse(source.slice(start, index + 1)) as unknown;
+        } catch {
+          return null;
+        }
+      }
+    }
+  }
+  return null;
+};
+
+const parseYouTubeInitialData = (html: string): unknown => {
+  const markerPatterns = [
+    /(?:var\s+)?ytInitialData\s*=\s*/g,
+    /window\[['"]ytInitialData['"]\]\s*=\s*/g,
+  ];
+  for (const markerPattern of markerPatterns) {
+    let marker: RegExpExecArray | null;
+    while ((marker = markerPattern.exec(html))) {
+      const payload = parseJsonValueAt(html, markerPattern.lastIndex);
+      if (payload) return payload;
+    }
+  }
+  return null;
 };
 
 const extractYouTubeVideos = (payload: unknown, query: string): LearningResource[] => {
@@ -109,50 +206,103 @@ const extractYouTubeVideos = (payload: unknown, query: string): LearningResource
   while (stack.length > 0 && videos.length < 5) {
     const current = stack.pop();
     if (Array.isArray(current)) {
-      stack.push(...current);
+      for (let index = current.length - 1; index >= 0; index -= 1) stack.push(current[index]);
       continue;
     }
     if (!isRecord(current)) continue;
 
-    const renderer = isRecord(current.videoRenderer) ? current.videoRenderer : null;
+    const renderer = [
+      current.videoRenderer,
+      current.gridVideoRenderer,
+      current.compactVideoRenderer,
+      current.playlistVideoRenderer,
+      current.playlistPanelVideoRenderer,
+      current.reelItemRenderer,
+    ].find((item): item is Record<string, unknown> => isRecord(item));
     if (renderer) {
       const videoId = text(renderer.videoId, 80);
-      const title = youtubeText(renderer.title).trim().slice(0, 180);
-      if (videoId && title && !seen.has(videoId)) {
+      const title = youtubeText(renderer.title ?? renderer.headline).trim().slice(0, 180);
+      if (isYouTubeVideoId(videoId) && title && !seen.has(videoId)) {
         seen.add(videoId);
         const description = youtubeText(renderer.detailedMetadataSnippets)
           || youtubeText(renderer.descriptionSnippet)
-          || `Vídeo relacionado a ${query}.`;
-        const author = youtubeText(renderer.ownerText).slice(0, 120);
-        const thumbnailUrl = youtubeThumbnail(renderer.thumbnail);
-        videos.push(createResource({
-          id: `youtube-${videoId}`,
-          provider: 'YouTube',
-          kind: 'video',
-          title,
-          description: description.slice(0, 420),
-          url: `https://www.youtube.com/watch?v=${encodeURIComponent(videoId)}`,
-          ...(thumbnailUrl ? { thumbnailUrl } : {}),
-          ...(author ? { author } : {}),
-        }));
+          || ('V\u00eddeo relacionado a ' + query + '.');
+        const author = youtubeText(renderer.ownerText ?? renderer.shortBylineText ?? renderer.longBylineText).slice(0, 120);
+        const thumbnailUrl = youtubeThumbnail(renderer.thumbnail ?? renderer.thumbnailRenderer);
+        videos.push(createYouTubeVideoResource(videoId, title, description.slice(0, 420), author, thumbnailUrl));
       }
     }
 
-    Object.values(current).forEach((value) => stack.push(value));
+    const values = Object.values(current);
+    for (let index = values.length - 1; index >= 0; index -= 1) stack.push(values[index]);
   }
 
   return videos;
 };
 
 const searchYouTubePage = async (query: string, requestSignal?: AbortSignal): Promise<LearningResource[]> => {
-  const url = new URL('https://www.youtube.com/results');
-  url.searchParams.set('search_query', query);
-  url.searchParams.set('hl', 'pt-BR');
-  url.searchParams.set('gl', 'BR');
+  for (const host of ['www.youtube.com', 'm.youtube.com']) {
+    if (requestSignal?.aborted) return [];
+    const url = new URL('https://' + host + '/results');
+    url.searchParams.set('search_query', query);
+    url.searchParams.set('hl', 'pt-BR');
+    url.searchParams.set('gl', 'BR');
+    const signal = requestSignal
+      ? AbortSignal.any([requestSignal, AbortSignal.timeout(RESEARCH_TIMEOUT_MS)])
+      : AbortSignal.timeout(RESEARCH_TIMEOUT_MS);
+
+    try {
+      const response = await fetch(url, {
+        signal,
+        cache: 'no-store',
+        headers: {
+          Accept: 'text/html,application/xhtml+xml',
+          'Accept-Language': 'pt-BR,pt;q=0.9,en;q=0.7',
+          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/131 Safari/537.36',
+        },
+      });
+      if (!response.ok) continue;
+      const html = await response.text();
+      if (html.length > 2_000_000) continue;
+      const videos = extractYouTubeVideos(parseYouTubeInitialData(html), query);
+      if (videos.length > 0) return videos;
+    } catch {
+      if (requestSignal?.aborted) return [];
+    }
+  }
+  return [];
+};
+
+const extractYouTubeVideosFromSearchHtml = (html: string, query: string): LearningResource[] => {
+  const videos: LearningResource[] = [];
+  const seen = new Set<string>();
+  const anchors = html.matchAll(/<a\b[^>]*href\s*=\s*(?:"([^"]+)"|'([^']+)'|([^\s>]+))[^>]*>([\s\S]*?)<\/a>/gi);
+  for (const anchor of anchors) {
+    const href = (anchor[1] ?? anchor[2] ?? anchor[3] ?? '').replace(/&amp;/g, '&');
+    const videoId = youtubeVideoIdFromUrl(href);
+    if (!videoId || seen.has(videoId)) continue;
+    const title = stripHtml((anchor[4] ?? '').replace(/<[^>]*>/g, ''), 180);
+    if (!title || /^(?:youtube|watch|sign in|entrar)$/i.test(title)) continue;
+    seen.add(videoId);
+    videos.push(createYouTubeVideoResource(
+      videoId,
+      title,
+      'V\u00eddeo relacionado a ' + query + '.',
+      '',
+      'https://i.ytimg.com/vi/' + videoId + '/hqdefault.jpg',
+    ));
+    if (videos.length >= 5) break;
+  }
+  return videos;
+};
+
+const searchYouTubeFromDuckDuckGo = async (query: string, requestSignal?: AbortSignal) => {
+  const url = new URL('https://html.duckduckgo.com/html/');
+  url.searchParams.set('q', 'site:youtube.com/watch ' + query);
+  url.searchParams.set('kl', 'br-pt');
   const signal = requestSignal
     ? AbortSignal.any([requestSignal, AbortSignal.timeout(RESEARCH_TIMEOUT_MS)])
     : AbortSignal.timeout(RESEARCH_TIMEOUT_MS);
-
   try {
     const response = await fetch(url, {
       signal,
@@ -165,8 +315,28 @@ const searchYouTubePage = async (query: string, requestSignal?: AbortSignal): Pr
     });
     if (!response.ok) return [];
     const html = await response.text();
-    if (html.length > 2_000_000) return [];
-    return extractYouTubeVideos(parseYouTubeInitialData(html), query);
+    return html.length <= 2_000_000 ? extractYouTubeVideosFromSearchHtml(html, query) : [];
+  } catch {
+    return [];
+  }
+};
+
+const searchYouTubeFromWeb = async (query: string, requestSignal?: AbortSignal) => {
+  try {
+    const results = await searchWeb(query + ' site:youtube.com/watch', requestSignal);
+    const videos = results.flatMap((result) => {
+      const videoId = youtubeVideoIdFromUrl(result.url);
+      return videoId
+        ? [createYouTubeVideoResource(
+            videoId,
+            result.title,
+            result.description,
+            result.author,
+            result.thumbnailUrl || 'https://i.ytimg.com/vi/' + videoId + '/hqdefault.jpg',
+          )]
+        : [];
+    });
+    return Array.from(new Map(videos.map((video) => [video.url, video])).values()).slice(0, 5);
   } catch {
     return [];
   }
@@ -373,7 +543,7 @@ const curateWikipediaExcerpt = (html: string, query: string, articleTitle: strin
   }
 
   const firstHeadingIndex = headings[0].index ?? cleanedHtml.length;
-  const lead = wikiHtmlToMarkdown(cleanedHtml.slice(0, firstHeadingIndex), 3_000);
+  const lead = wikiHtmlToMarkdown(cleanedHtml.slice(0, firstHeadingIndex), 3_500);
   const topicTerms = wikipediaTopicTerms(query);
   const articleTerms = wikipediaTerms(articleTitle);
   const sections = headings.flatMap((heading, index) => {
@@ -382,30 +552,31 @@ const curateWikipediaExcerpt = (html: string, query: string, articleTitle: strin
     const sectionTitle = stripHtml(heading[1], 180);
     const sectionKey = wikipediaTextKey(sectionTitle);
     if (!sectionTitle || WIKIPEDIA_NON_ARTICLE_SECTIONS.some((name) => sectionKey.includes(wikipediaTextKey(name)))) return [];
-    const markdown = wikiHtmlToMarkdown(cleanedHtml.slice(start, end), 3_600);
+    const markdown = wikiHtmlToMarkdown(cleanedHtml.slice(start, end), 4_500);
     if (!markdown) return [];
     const headingTopicMatches = matchingWikipediaTerms(sectionTitle, topicTerms);
     const bodyTopicMatches = matchingWikipediaTerms(markdown.slice(0, 2_000), topicTerms);
     const headingArticleMatches = matchingWikipediaTerms(sectionTitle, articleTerms);
     const bodyArticleMatches = matchingWikipediaTerms(markdown.slice(0, 2_000), articleTerms);
+    const imageCount = wikipediaImageTitlesInExcerpt(markdown).length;
     return [{
       index,
       markdown,
-      score: headingTopicMatches * 5 + bodyTopicMatches * 2 + headingArticleMatches + bodyArticleMatches * 0.25,
+      score: headingTopicMatches * 5 + bodyTopicMatches * 2 + headingArticleMatches + bodyArticleMatches * 0.25 + imageCount * 2,
     }];
   });
 
   const matchedSections = sections.filter((section) => section.score > 0);
   const selectedSections = (matchedSections.length > 0
-    ? matchedSections.slice().sort((a, b) => b.score - a.score).slice(0, 4)
-    : sections.slice(0, 4))
+    ? matchedSections.slice().sort((a, b) => b.score - a.score).slice(0, 6)
+    : sections.slice(0, 6))
     .sort((a, b) => a.index - b.index);
   const chunks = lead ? [lead] : [];
   let totalChars = lead.length;
   for (const section of selectedSections) {
     const remaining = MAX_WIKIPEDIA_EXCERPT_CHARS - totalChars - 2;
     if (remaining <= 0) break;
-    const excerpt = section.markdown.slice(0, Math.min(2_500, remaining)).trim();
+    const excerpt = section.markdown.slice(0, Math.min(2_800, remaining)).trim();
     if (!excerpt) continue;
     chunks.push(excerpt);
     totalChars += excerpt.length + 2;
@@ -434,17 +605,16 @@ const imageMetadataValue = (value: unknown, maxLength: number) => {
   return stripHtml(typeof metadata === 'string' ? decodeWikiEntities(metadata) : metadata, maxLength);
 };
 
-const fetchWikipediaImages = async (titles: string[], requestSignal?: AbortSignal) => {
-  const uniqueTitles = Array.from(new Set(titles.map((title) => {
-    const filename = title.replace(/^(?:File|Ficheiro):/i, '').trim();
-    return filename ? `File:${filename}` : '';
-  }).filter(Boolean))).slice(0, MAX_WIKIPEDIA_IMAGE_CANDIDATES);
-  if (uniqueTitles.length === 0) return new Map<string, LearningWikipediaImage>();
-
-  const url = new URL('https://commons.wikimedia.org/w/api.php');
+const fetchWikipediaImageBatch = async (
+  apiRoot: string,
+  titles: string[],
+  requestSignal?: AbortSignal,
+): Promise<Map<string, LearningWikipediaImage>> => {
+  if (titles.length === 0) return new Map<string, LearningWikipediaImage>();
+  const url = new URL('/w/api.php', apiRoot);
   url.searchParams.set('action', 'query');
   url.searchParams.set('prop', 'imageinfo');
-  url.searchParams.set('titles', uniqueTitles.join('|'));
+  url.searchParams.set('titles', titles.join('|'));
   url.searchParams.set('iiprop', 'url|size|extmetadata');
   url.searchParams.set('iiurlwidth', '960');
   url.searchParams.set('iiextmetadatalanguage', 'pt');
@@ -453,8 +623,15 @@ const fetchWikipediaImages = async (titles: string[], requestSignal?: AbortSigna
   url.searchParams.set('utf8', '1');
 
   try {
-    const payload = await requestJson(url, requestSignal, mediaWikiUserAgentHeaders);
-    if (!isRecord(payload) || !isRecord(payload.query) || !isRecord(payload.query.pages)) return new Map<string, LearningWikipediaImage>();
+    const payload = await requestJson(
+      url,
+      requestSignal,
+      mediaWikiUserAgentHeaders,
+      MAX_WIKIPEDIA_IMAGE_RESPONSE_CHARS,
+    );
+    if (!isRecord(payload) || !isRecord(payload.query) || !isRecord(payload.query.pages)) {
+      return new Map<string, LearningWikipediaImage>();
+    }
     return new Map(Object.values(payload.query.pages).flatMap((page) => {
       if (!isRecord(page) || !Array.isArray(page.imageinfo) || !isRecord(page.imageinfo[0])) return [];
       const image = page.imageinfo[0];
@@ -467,12 +644,12 @@ const fetchWikipediaImages = async (titles: string[], requestSignal?: AbortSigna
       if ((Number.isFinite(width) && width > 0 && width < 180) || (Number.isFinite(height) && height > 0 && height < 120)) return [];
 
       const metadata = isRecord(image.extmetadata) ? image.extmetadata : {};
-      const filename = fileTitle.replace(/^File:/i, '').replace(/\.[^.]+$/, '').replace(/_/g, ' ');
+      const filename = fileTitle.replace(/^(?:File|Ficheiro|Arquivo):/i, '').replace(/\.[^.]+$/, '').replace(/_/g, ' ');
       const caption = imageMetadataValue(metadata.ImageDescription, 320) || filename;
       const artist = imageMetadataValue(metadata.Artist, 180) || imageMetadataValue(metadata.Credit, 180);
       const license = imageMetadataValue(metadata.LicenseShortName, 80);
       const licenseUrl = text(isRecord(metadata.LicenseUrl) ? metadata.LicenseUrl.value : '', 700);
-      const filePageUrl = `https://commons.wikimedia.org/wiki/${encodeURIComponent(fileTitle.replace(/\s+/g, '_'))}`;
+      const filePageUrl = apiRoot + '/wiki/' + encodeURIComponent(fileTitle.replace(/\s+/g, '_'));
       const result: LearningWikipediaImage = {
         fileTitle,
         url: imageUrl,
@@ -488,6 +665,34 @@ const fetchWikipediaImages = async (titles: string[], requestSignal?: AbortSigna
   } catch {
     return new Map<string, LearningWikipediaImage>();
   }
+};
+
+const fetchWikipediaImages = async (titles: string[], requestSignal?: AbortSignal) => {
+  const uniqueByKey = new Map<string, string>();
+  for (const title of titles) {
+    const canonicalTitle = canonicalWikipediaFileTitle(title);
+    const key = wikipediaTitleKey(canonicalTitle);
+    if (key && !uniqueByKey.has(key)) uniqueByKey.set(key, canonicalTitle);
+  }
+  const uniqueTitles = Array.from(uniqueByKey.values()).slice(0, MAX_WIKIPEDIA_IMAGE_CANDIDATES);
+  const results = new Map<string, LearningWikipediaImage>();
+
+  for (let offset = 0; offset < uniqueTitles.length; offset += MAX_WIKIPEDIA_IMAGE_BATCH_SIZE) {
+    if (requestSignal?.aborted) break;
+    const batch = uniqueTitles.slice(offset, offset + MAX_WIKIPEDIA_IMAGE_BATCH_SIZE);
+    const localTitles = batch.map((title) => 'Ficheiro:' + title.replace(/^(?:File|Ficheiro|Arquivo):/i, ''));
+    const localDetails = await fetchWikipediaImageBatch('https://pt.wikipedia.org', localTitles, requestSignal);
+    localDetails.forEach((image, key) => results.set(key, image));
+
+    const missingTitles = batch.filter((title) => !results.has(wikipediaTitleKey(title)));
+    if (missingTitles.length > 0 && !requestSignal?.aborted) {
+      const commonsTitles = missingTitles.map((title) => canonicalWikipediaFileTitle(title));
+      const commonsDetails = await fetchWikipediaImageBatch('https://commons.wikimedia.org', commonsTitles, requestSignal);
+      commonsDetails.forEach((image, key) => results.set(key, image));
+    }
+  }
+
+  return results;
 };
 
 const fetchWikipediaArticleHtml = async (title: string, requestSignal?: AbortSignal) => {
@@ -674,9 +879,7 @@ const searchWikipedia = async (query: string, requestSignal?: AbortSignal): Prom
 
 const searchYouTube = async (query: string, requestSignal?: AbortSignal): Promise<LearningResource[]> => {
   const apiKey = process.env.YOUTUBE_API_KEY?.trim();
-  if (!apiKey) {
-    return searchYouTubeWithoutApiKey(query, requestSignal);
-  }
+  if (!apiKey) return searchYouTubeWithoutApiKey(query, requestSignal);
 
   const url = new URL('https://www.googleapis.com/youtube/v3/search');
   url.searchParams.set('part', 'snippet');
@@ -690,43 +893,52 @@ const searchYouTube = async (query: string, requestSignal?: AbortSignal): Promis
   url.searchParams.set('videoEmbeddable', 'true');
   url.searchParams.set('key', apiKey);
 
-  const payload = await requestJson(url, requestSignal);
-  if (!isRecord(payload) || !Array.isArray(payload.items)) return [];
+  try {
+    const payload = await requestJson(url, requestSignal);
+    if (isRecord(payload) && Array.isArray(payload.items)) {
+      const videos = payload.items.flatMap((item) => {
+        if (!isRecord(item) || !isRecord(item.id) || !isRecord(item.snippet)) return [];
+        const videoId = text(item.id.videoId, 80);
+        const title = stripHtml(item.snippet.title, 180);
+        if (!isYouTubeVideoId(videoId) || !title) return [];
+        const thumbnails = isRecord(item.snippet.thumbnails) ? item.snippet.thumbnails : {};
+        const medium = isRecord(thumbnails.medium) ? text(thumbnails.medium.url, 700) : '';
+        return [createYouTubeVideoResource(
+          videoId,
+          title,
+          stripHtml(item.snippet.description, 420) || ('V\u00eddeo relacionado ao tema da aula.'),
+          stripHtml(item.snippet.channelTitle, 120),
+          medium,
+        )];
+      });
+      if (videos.length > 0) return videos;
+    }
+  } catch (error) {
+    if (requestSignal?.aborted) throw error;
+  }
 
-  const videos = payload.items.flatMap((item, index) => {
-    if (!isRecord(item) || !isRecord(item.id) || !isRecord(item.snippet)) return [];
-    const videoId = text(item.id.videoId, 80);
-    const title = stripHtml(item.snippet.title, 180);
-    if (!videoId || !title) return [];
-    const thumbnails = isRecord(item.snippet.thumbnails) ? item.snippet.thumbnails : {};
-    const medium = isRecord(thumbnails.medium) ? text(thumbnails.medium.url, 700) : '';
-    return [createResource({
-      id: `youtube-${videoId || index}`,
-      provider: 'YouTube',
-      kind: 'video',
-      title,
-      description: stripHtml(item.snippet.description, 420) || 'Vídeo relacionado ao tema da aula.',
-      url: `https://www.youtube.com/watch?v=${encodeURIComponent(videoId)}`,
-      ...(medium ? { thumbnailUrl: medium } : {}),
-      author: stripHtml(item.snippet.channelTitle, 120),
-    })];
-  });
-
-  return videos.length > 0 ? videos : searchYouTubeWithoutApiKey(query, requestSignal);
+  return searchYouTubeWithoutApiKey(query, requestSignal);
 };
 
 const searchYouTubeWithoutApiKey = async (query: string, requestSignal?: AbortSignal): Promise<LearningResource[]> => {
-  const videos = await searchYouTubePage(query, requestSignal);
-  return videos.length > 0 ? videos : [createResource({
+  const results = await Promise.allSettled([
+    searchYouTubePage(query, requestSignal),
+    searchYouTubeFromDuckDuckGo(query, requestSignal),
+    searchYouTubeFromWeb(query, requestSignal),
+  ]);
+  const videos = results.flatMap((result) => result.status === 'fulfilled' ? result.value : []);
+  const uniqueVideos = Array.from(new Map(videos.map((video) => [video.url, video])).values()).slice(0, 5);
+  if (uniqueVideos.length > 0) return uniqueVideos;
+
+  return [createResource({
     id: 'youtube-search',
     provider: 'YouTube',
     kind: 'search',
-    title: `Pesquisar vídeos sobre “${query}”`,
+    title: 'Pesquisar vídeos sobre ' + query,
     description: 'Abra uma busca pronta no YouTube para encontrar explicações, aulas e demonstrações.',
-    url: `https://www.youtube.com/results?search_query=${encodeURIComponent(query)}`,
+    url: 'https://www.youtube.com/results?search_query=' + encodeURIComponent(query),
   })];
 };
-
 const searchWeb = async (query: string, requestSignal?: AbortSignal): Promise<LearningResource[]> => {
   const apiKey = process.env.BRAVE_SEARCH_API_KEY?.trim();
   if (!apiKey) return [];

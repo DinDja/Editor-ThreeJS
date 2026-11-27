@@ -310,7 +310,7 @@ const buildUserPrompt = (input: TeacherRequest, research?: LearningResearch) => 
   const wikipediaArticles = research?.wikipediaArticles?.map((article) => ({
     titulo: article.title,
     url: article.url,
-    trecho: article.excerpt.replace(/\[\[WIKI_IMAGE:[^\]]+\]\]/g, ' ').slice(0, 5_000),
+    trecho: article.excerpt.replace(/\[\[WIKI_IMAGE:[^\]]+\]\]/g, ' ').slice(0, 8_000),
   })) ?? [];
   const context = {
     disciplina: input.subjectName,

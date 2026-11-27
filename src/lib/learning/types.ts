@@ -291,12 +291,12 @@ const normalizeLearningWikipediaArticles = (value: unknown): LearningWikipediaAr
     if (!isRecord(item)) return [];
     const title = cleanText(item.title, '', 180);
     const url = cleanHttpUrl(item.url);
-    const excerpt = cleanText(item.excerpt, '', 8000);
+    const excerpt = cleanText(item.excerpt, '', 12000);
     if (!title || !url || !excerpt) return [];
 
     const seenImageTitles = new Set<string>();
     const images: LearningWikipediaImage[] = Array.isArray(item.images)
-      ? item.images.slice(0, 24).flatMap((image) => {
+      ? item.images.slice(0, 32).flatMap((image) => {
         if (!isRecord(image)) return [];
         const fileTitle = cleanText(image.fileTitle, '', 180);
         const imageUrl = cleanHttpUrl(image.url);
@@ -327,7 +327,7 @@ const normalizeLearningWikipediaArticles = (value: unknown): LearningWikipediaAr
           ...(license ? { license } : {}),
           ...(licenseUrl ? { licenseUrl } : {}),
         }];
-      }).slice(0, 6)
+      }).slice(0, 8)
       : [];
 
     return [{ title, url, excerpt, images }];

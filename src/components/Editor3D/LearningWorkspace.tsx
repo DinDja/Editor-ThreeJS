@@ -336,7 +336,7 @@ const LearningLevelSelector = ({ level, onLevelChange }: LearningLevelSelectorPr
     <details ref={detailsRef} className="relative w-full">
       <summary
         aria-label={`Nível do estudo: ${levelLabels[level]}`}
-        className="flex h-10 w-full cursor-pointer list-none items-center gap-2 rounded-lg border border-neutral-800 bg-neutral-950/50 px-2.5 outline-none transition hover:border-neutral-700 focus-visible:ring-2 focus-visible:ring-emerald-500 [&::-webkit-details-marker]:hidden"
+        className="flex h-11 w-full cursor-pointer list-none items-center gap-2 rounded-lg border border-neutral-800 bg-neutral-950/50 px-2.5 outline-none transition hover:border-neutral-700 focus-visible:ring-2 focus-visible:ring-emerald-500 [&::-webkit-details-marker]:hidden"
       >
         <span className={`flex size-6 shrink-0 items-center justify-center rounded-md border border-neutral-800 bg-neutral-900 ${levelDetails[level].tone}`}>
           <SelectedIcon size={14} aria-hidden="true" />
@@ -1718,17 +1718,17 @@ export default function LearningWorkspace() {
                 required
               />
               <div className="mt-4 flex flex-wrap items-end gap-4">
-                <div className="w-full sm:w-52">
+                <div className="flex w-full flex-col gap-2 sm:grid sm:grid-cols-2">
                   <LearningLevelSelector level={level} onLevelChange={setLevel} />
-                </div>
-                <p className="pb-2 text-[11px] text-neutral-600">Você também pode escolher uma área e um tema abaixo.</p>
-              </div>
-              {selectedSubject && <p className="mt-2 text-[11px] text-neutral-600">{selectedSubject.description}</p>}
-              {error && <p role="alert" className="mt-3 rounded-lg border border-rose-900/50 bg-rose-950/25 px-3 py-2 text-xs text-rose-200">{error}</p>}
-              <button type="submit" disabled={isSending || !topic.trim()} className="mt-5 flex h-11 w-full items-center justify-center gap-2 rounded-xl bg-emerald-400 px-4 text-sm font-semibold text-neutral-950 transition hover:bg-emerald-300 disabled:cursor-wait disabled:opacity-60 sm:w-auto sm:min-w-48">
+                  <button type="submit" disabled={isSending || !topic.trim()} className="flex h-11 w-full items-center justify-center gap-2 rounded-xl bg-emerald-400 px-4 text-sm font-semibold text-neutral-950 transition hover:bg-emerald-300 disabled:cursor-wait disabled:opacity-60">
                 {isSending ? <LoaderCircle size={16} className="animate-spin" /> : <BookOpen size={16} />}
                 {isSending ? (isResearching ? 'Pesquisando fontes...' : 'Preparando sua aula...') : 'Começar a aprender'}
               </button>
+                </div>
+              </div>
+              {selectedSubject && <p className="mt-2 text-[11px] text-neutral-600">{selectedSubject.description}</p>}
+              {error && <p role="alert" className="mt-3 rounded-lg border border-rose-900/50 bg-rose-950/25 px-3 py-2 text-xs text-rose-200">{error}</p>}
+          
               </form>
             </div>
 

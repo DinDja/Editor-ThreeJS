@@ -177,20 +177,6 @@ const createLayout = (root: TeacherMindMapNode, expandedIds: Set<string>, queryA
     index,
     height: measure(child, 1),
   }));
-  const leftBranches: typeof branches = [];
-  const rightBranches: typeof branches = [];
-  let leftHeight = 0;
-  let rightHeight = 0;
-  branches.forEach((branch) => {
-    if (leftHeight <= rightHeight) {
-      leftBranches.push(branch);
-      leftHeight += branch.height + (leftBranches.length > 1 ? NODE_GAP_Y : 0);
-    } else {
-      rightBranches.push(branch);
-      rightHeight += branch.height + (rightBranches.length > 1 ? NODE_GAP_Y : 0);
-    }
-  });
-
   const place = (
     node: TeacherMindMapNode,
     depth: number,
@@ -233,18 +219,13 @@ const createLayout = (root: TeacherMindMapNode, expandedIds: Set<string>, queryA
     });
   };
 
-  const placeSide = (side: Side, branchList: typeof branches) => {
-    const sideHeight = branchList.reduce((total, branch) => total + branch.height, 0)
-      + NODE_GAP_Y * Math.max(0, branchList.length - 1);
-    let top = -sideHeight / 2;
-    branchList.forEach(({ child, index, height }) => {
-      place(child, 1, index, rootNode, top, height, side);
-      top += height + NODE_GAP_Y;
-    });
-  };
-
-  placeSide('left', leftBranches);
-  placeSide('right', rightBranches);
+  const branchesHeight = branches.reduce((total, branch) => total + branch.height, 0)
+    + NODE_GAP_Y * Math.max(0, branches.length - 1);
+  let branchTop = -branchesHeight / 2;
+  branches.forEach(({ child, index, height }) => {
+    place(child, 1, index, rootNode, branchTop, height, 'right');
+    branchTop += height + NODE_GAP_Y;
+  });
 
   const minX = Math.min(...nodes.map((node) => node.x));
   const maxX = Math.max(...nodes.map((node) => node.x + node.width));
@@ -312,7 +293,7 @@ function MindMapViewport({
     if (!node) return;
     requestAnimationFrame(() => {
       if (!node.isConnected) return;
-      if (node.scrollWidth > node.clientWidth) node.scrollLeft = (node.scrollWidth - node.clientWidth) / 2;
+      node.scrollLeft = 0;
       if (node.scrollHeight > node.clientHeight) node.scrollTop = (node.scrollHeight - node.clientHeight) / 2;
     });
   }, [viewportRef]);
@@ -1092,7 +1073,7 @@ export default function LearningMindMap({ root, marks, notes, onMark, onNote }: 
     const rounded = Number(nextZoom.toFixed(2));
     setZoom(rounded);
     requestAnimationFrame(() => {
-      viewport.scrollLeft = Math.max(0, (layout.width * rounded - viewport.clientWidth) / 2);
+      viewport.scrollLeft = 0;
       viewport.scrollTop = Math.max(0, (layout.height * rounded - viewport.clientHeight) / 2);
     });
   };
