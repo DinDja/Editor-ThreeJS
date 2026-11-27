@@ -1,10 +1,10 @@
 'use client';
 
+import Image from 'next/image';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useState } from 'react';
 import { Menu, X, ArrowRight } from 'lucide-react';
-import BrandMark from '@/components/auth/BrandMark';
 import Button from '@/components/ui/Button';
 
 const navLinks = [
@@ -22,7 +22,14 @@ export default function PublicHeader() {
     <header className="sticky top-0 z-40 border-b border-neutral-800/60 bg-[#0a0c0d]/90 backdrop-blur-md">
       <nav className="mx-auto flex max-w-6xl items-center justify-between px-4 py-3 sm:px-6 lg:px-8">
         <Link href="/" className="shrink-0 outline-none focus-visible:ring-2 focus-visible:ring-emerald-400/60 rounded-lg">
-          <BrandMark />
+          <Image
+            src="/estuda-logo.svg"
+            alt="Estuda — Juntos aprendemos mais"
+            width={360}
+            height={128}
+            priority
+            className="h-10 w-auto"
+          />
         </Link>
 
         <ul className="hidden items-center gap-1 md:flex">

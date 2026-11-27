@@ -1,12 +1,22 @@
 import 'server-only';
 
-import type { LearningResearch, LearningResource } from './types';
+import type {
+  LearningResearch,
+  LearningResource,
+  LearningWikipediaArticle,
+  LearningWikipediaImage,
+} from './types';
 
 const RESEARCH_TIMEOUT_MS = 5_000;
 const MAX_RESEARCH_RESPONSE_CHARS = 280_000;
+const MAX_WIKIPEDIA_PARSE_RESPONSE_CHARS = 480_000;
 const MAX_RESOURCES = 12;
 const RESEARCH_CACHE_TTL_MS = 10 * 60_000;
-const RESEARCH_CACHE_VERSION = 'v2-youtube-results';
+const RESEARCH_CACHE_VERSION = 'v6-wikipedia-inline-only-images';
+const MAX_WIKIPEDIA_IMAGES = 6;
+const MAX_WIKIPEDIA_IMAGE_CANDIDATES = 18;
+const MAX_WIKIPEDIA_EXCERPT_CHARS = 8_000;
+const WIKIPEDIA_USER_AGENT = 'Editor-ThreeJS-Learning/1.0 (https://github.com/DinDja/Editor-ThreeJS)';
 const researchCache = new Map<string, { expiresAt: number; value: LearningResearch }>();
 
 const isRecord = (value: unknown): value is Record<string, unknown> =>
@@ -24,7 +34,12 @@ const stripHtml = (value: unknown, maxLength: number) =>
     .replace(/&lt;/g, '<')
     .replace(/&gt;/g, '>');
 
-const requestJson = async (url: URL, requestSignal?: AbortSignal, headers?: HeadersInit): Promise<unknown> => {
+const requestJson = async (
+  url: URL,
+  requestSignal?: AbortSignal,
+  headers?: HeadersInit,
+  maxResponseChars = MAX_RESEARCH_RESPONSE_CHARS,
+): Promise<unknown> => {
   const signal = requestSignal
     ? AbortSignal.any([requestSignal, AbortSignal.timeout(RESEARCH_TIMEOUT_MS)])
     : AbortSignal.timeout(RESEARCH_TIMEOUT_MS);
@@ -35,7 +50,7 @@ const requestJson = async (url: URL, requestSignal?: AbortSignal, headers?: Head
   });
   if (!response.ok) throw new Error(`research_http_${response.status}`);
   const body = await response.text();
-  if (body.length > MAX_RESEARCH_RESPONSE_CHARS) throw new Error('research_response_too_large');
+  if (body.length > maxResponseChars) throw new Error('research_response_too_large');
   return JSON.parse(body) as unknown;
 };
 
@@ -157,64 +172,504 @@ const searchYouTubePage = async (query: string, requestSignal?: AbortSignal): Pr
   }
 };
 
-const fetchWikipediaThumbnails = async (titles: string[], requestSignal?: AbortSignal) => {
-  if (titles.length === 0) return new Map<string, string>();
-  const url = new URL('https://pt.wikipedia.org/w/api.php');
+const decodeWikiEntities = (value: string) => {
+  const namedEntities: Record<string, string> = {
+    amp: '&', apos: "'", quot: '"', nbsp: ' ', lt: '<', gt: '>',
+    aacute: 'á', Aacute: 'Á', acirc: 'â', Acirc: 'Â', atilde: 'ã', Atilde: 'Ã',
+    agrave: 'à', Agrave: 'À', eacute: 'é', Eacute: 'É', ecirc: 'ê', Ecirc: 'Ê',
+    iacute: 'í', Iacute: 'Í', oacute: 'ó', Oacute: 'Ó', ocirc: 'ô', Ocirc: 'Ô',
+    otilde: 'õ', Otilde: 'Õ', uacute: 'ú', Uacute: 'Ú', ccedil: 'ç', Ccedil: 'Ç',
+    ndash: '–', mdash: '—', hellip: '…',
+  };
+  return value
+    .replace(/&([a-zA-Z]+);/g, (entity, name: string) => namedEntities[name] ?? entity)
+    .replace(/&#(\d+);/g, (entity, code: string) => {
+      const point = Number(code);
+      return Number.isFinite(point) && point > 0 && point <= 0x10ffff ? String.fromCodePoint(point) : entity;
+    })
+    .replace(/&#x([\da-f]+);/gi, (entity, code: string) => {
+      const point = Number.parseInt(code, 16);
+      return Number.isFinite(point) && point > 0 && point <= 0x10ffff ? String.fromCodePoint(point) : entity;
+    });
+};
+
+const removeWikiElements = (
+  html: string,
+  shouldRemove: (tagName: string, attributes: string) => boolean,
+) => {
+  const voidElements = new Set(['area', 'base', 'br', 'col', 'embed', 'hr', 'img', 'input', 'link', 'meta', 'param', 'source', 'track', 'wbr']);
+  const openingTagPattern = /<([a-z][a-z\d:-]*)\b([^>]*)>/gi;
+  const output: string[] = [];
+  let cursor = 0;
+  let openingTag: RegExpExecArray | null;
+
+  while ((openingTag = openingTagPattern.exec(html))) {
+    const tagName = openingTag[1].toLocaleLowerCase('en-US');
+    const attributes = openingTag[2];
+    const rawTag = openingTag[0];
+    if (voidElements.has(tagName) || /\/\s*>$/.test(rawTag) || !shouldRemove(tagName, attributes)) continue;
+
+    const matchingTags = new RegExp(`<\\/?${tagName}\\b[^>]*>`, 'gi');
+    matchingTags.lastIndex = openingTagPattern.lastIndex;
+    let depth = 1;
+    let closingEnd = -1;
+    let matchingTag: RegExpExecArray | null;
+    while ((matchingTag = matchingTags.exec(html))) {
+      if (matchingTag[0].startsWith('</')) {
+        depth -= 1;
+      } else if (!/\/\s*>$/.test(matchingTag[0])) {
+        depth += 1;
+      }
+      if (depth === 0) {
+        closingEnd = matchingTags.lastIndex;
+        break;
+      }
+    }
+    if (closingEnd < 0) continue;
+
+    output.push(html.slice(cursor, openingTag.index));
+    cursor = closingEnd;
+    openingTagPattern.lastIndex = cursor;
+  }
+
+  output.push(html.slice(cursor));
+  return output.join('');
+};
+
+const cleanWikipediaArticleHtml = (html: string) => removeWikiElements(
+  html.replace(/<!--[^]*?-->/g, ''),
+  (tagName, attributes) => {
+    if (tagName === 'script' || tagName === 'style' || tagName === 'noscript') return true;
+    const classes = attributes.match(/\bclass\s*=\s*(?:"([^"]*)"|'([^']*)'|([^\s>]+))/i);
+    const classNames = classes?.[1] ?? classes?.[2] ?? classes?.[3] ?? '';
+    return /(?:^|\s)(?:navbox|vertical-navbox|infobox|sidebar|metadata|ambox|ombox|sistersitebox|authority-control|mw-editsection|mw-references-wrap|reflist|reference|toc|portal|hatnote|shortdescription|noprint|nomobile|mw-empty-elt)(?:\s|$)/i.test(classNames)
+      || /\bid\s*=\s*["'](?:toc|catlinks|mw-navigation|mw-panel)["']/i.test(attributes);
+  },
+);
+
+const canonicalWikipediaFileTitle = (title: string) => {
+  const filename = title.replace(/^(?:File|Ficheiro|Arquivo):/i, '').trim().replace(/_/g, ' ');
+  return filename ? `File:${filename}` : '';
+};
+
+const wikipediaImageMarker = (title: string) => {
+  const fileTitle = canonicalWikipediaFileTitle(title);
+  return fileTitle ? `[[WIKI_IMAGE:${encodeURIComponent(fileTitle)}]]` : '';
+};
+
+const wikipediaFileTitleFromHref = (href: string) => {
+  const safeHref = href.replace(/&amp;/g, '&');
+  let decodedHref = safeHref;
+  try {
+    decodedHref = decodeURIComponent(safeHref);
+  } catch {
+    // Keep the original href if a page contains a malformed escape sequence.
+  }
+  const match = decodedHref.match(/(?:^|\/)(?:File|Ficheiro|Arquivo):([^/?#]+)/i);
+  return match ? canonicalWikipediaFileTitle(match[0].replace(/^\//, '')) : '';
+};
+
+const replaceWikipediaImagesWithMarkers = (html: string) => {
+  const markerFromAnchor = (anchor: string) => {
+    const href = anchor.match(/\bhref\s*=\s*(?:"([^"]+)"|'([^']+)'|([^\s>]+))/i);
+    return href ? wikipediaImageMarker(wikipediaFileTitleFromHref(href[1] ?? href[2] ?? href[3] ?? '')) : '';
+  };
+  return html
+    .replace(/<figure\b[^>]*>[\s\S]*?<\/figure>/gi, (figure) => {
+      const imageAnchor = figure.match(/<a\b[^>]*>[\s\S]*?<img\b[^>]*>[\s\S]*?<\/a>/i)?.[0];
+      const marker = imageAnchor ? markerFromAnchor(imageAnchor) : '';
+      const caption = figure.match(/<figcaption\b[^>]*>([^]*?)<\/figcaption>/i)?.[1] ?? '';
+      return marker ? `\n\n${marker}${caption ? `\n\n${caption}` : ''}\n\n` : figure;
+    })
+    .replace(/<a\b[^>]*>[\s\S]*?<img\b[^>]*>[\s\S]*?<\/a>/gi, (anchor) => {
+      const marker = markerFromAnchor(anchor);
+      return marker ? `\n\n${marker}\n\n` : anchor;
+    });
+};
+
+const wikipediaImageTitlesInExcerpt = (excerpt: string) => Array.from(excerpt.matchAll(/\[\[WIKI_IMAGE:([^\]]+)\]\]/g))
+  .flatMap((match) => {
+    try {
+      const title = decodeURIComponent(match[1]);
+      return title ? [canonicalWikipediaFileTitle(title)] : [];
+    } catch {
+      return [];
+    }
+  });
+
+const insertRepresentativeWikipediaImage = (excerpt: string, pageImage: string) => {
+  if (!pageImage || isWikipediaInterfaceImage(pageImage)) return excerpt;
+  const marker = wikipediaImageMarker(pageImage);
+  if (!marker || excerpt.includes(marker)) return excerpt;
+  const firstParagraphEnd = excerpt.indexOf('\n\n');
+  if (firstParagraphEnd < 0) return excerpt ? `${excerpt}\n\n${marker}` : marker;
+  return `${excerpt.slice(0, firstParagraphEnd)}\n\n${marker}\n\n${excerpt.slice(firstParagraphEnd + 2)}`;
+};
+
+const wikiHtmlToMarkdown = (value: unknown, maxLength = MAX_WIKIPEDIA_EXCERPT_CHARS) => {
+  if (typeof value !== 'string') return '';
+  return decodeWikiEntities(replaceWikipediaImagesWithMarkers(cleanWikipediaArticleHtml(value.slice(0, MAX_WIKIPEDIA_PARSE_RESPONSE_CHARS)))
+    .replace(/<h([2-6])\b[^>]*>([^]*?)<\/h\1>/gi, (_, level: string, content: string) => `\n\n${'#'.repeat(Math.min(Number(level), 5))} ${content}\n\n`)
+    .replace(/<(?:b|strong)\b[^>]*>([^]*?)<\/(?:b|strong)>/gi, '**$1**')
+    .replace(/<(?:i|em)\b[^>]*>([^]*?)<\/(?:i|em)>/gi, '*$1*')
+    .replace(/<sup\b[^>]*>([^]*?)<\/sup>/gi, '^$1')
+    .replace(/<sub\b[^>]*>([^]*?)<\/sub>/gi, '$1')
+    .replace(/<a\b[^>]*>([^]*?)<\/a>/gi, '$1')
+    .replace(/<li\b[^>]*>/gi, '\n- ')
+    .replace(/<\/(?:ul|ol)>/gi, '\n')
+    .replace(/<tr\b[^>]*>/gi, '\n')
+    .replace(/<\/(?:tr|table)>/gi, '\n')
+    .replace(/<\/(?:th|td)>/gi, ' | ')
+    .replace(/<br\s*\/?>/gi, '\n')
+    .replace(/<\/?(?:p|div|section|article|blockquote|dl|dd|dt)\b[^>]*>/gi, '\n\n')
+    .replace(/<[^>]+>/g, ''))
+    .replace(/[ \t]+\n/g, '\n')
+    .replace(/\n[ \t]+/g, '\n')
+    .replace(/[ \t]{2,}/g, ' ')
+    .replace(/\n{3,}/g, '\n\n')
+    .trim()
+    .slice(0, maxLength);
+};
+
+const wikipediaTextKey = (value: string) => value
+  .normalize('NFD')
+  .replace(/[\u0300-\u036f]/g, '')
+  .toLocaleLowerCase('pt-BR')
+  .replace(/[^a-z0-9]+/g, ' ')
+  .trim();
+
+const wikipediaTitleKey = (value: string) => wikipediaTextKey(value.replace(/^(?:File|Ficheiro|Arquivo):/i, '').replace(/_/g, ' '));
+
+const WIKIPEDIA_RELEVANCE_STOPWORDS = new Set([
+  'a', 'ao', 'aos', 'as', 'com', 'como', 'da', 'das', 'de', 'do', 'dos', 'e', 'em', 'entre', 'essa', 'esse', 'esta', 'este',
+  'mais', 'na', 'nas', 'no', 'nos', 'o', 'os', 'ou', 'para', 'por', 'que', 'se', 'sem', 'sobre', 'um', 'uma', 'umas', 'uns',
+  'the', 'and', 'for', 'from', 'into', 'its', 'of', 'on', 'or', 'the', 'to', 'with',
+]);
+
+const wikipediaTerms = (value: string) => Array.from(new Set(wikipediaTextKey(value)
+  .split(' ')
+  .filter((term) => term.length >= 3 && !WIKIPEDIA_RELEVANCE_STOPWORDS.has(term))));
+
+const matchingWikipediaTerms = (value: string, terms: string[]) => {
+  const key = ` ${wikipediaTextKey(value)} `;
+  return terms.reduce((score, term) => score + (key.includes(` ${term} `) ? 1 : 0), 0);
+};
+
+const wikipediaTopicTerms = (query: string) => {
+  const topic = query.split(':').slice(1).join(':').trim() || query;
+  return wikipediaTerms(topic);
+};
+
+const WIKIPEDIA_NON_ARTICLE_SECTIONS = [
+  'bibliografia', 'fontes', 'leitura complementar', 'notas', 'referencias', 'ver tambem', 'ligacoes externas',
+  'further reading', 'bibliography', 'references', 'notes', 'see also', 'external links', 'sources',
+];
+
+const curateWikipediaExcerpt = (html: string, query: string, articleTitle: string, pageImage: string) => {
+  const cleanedHtml = cleanWikipediaArticleHtml(html);
+  const headings = Array.from(cleanedHtml.matchAll(/<h2\b[^>]*>([^]*?)<\/h2>/gi));
+  if (headings.length === 0) {
+    return insertRepresentativeWikipediaImage(wikiHtmlToMarkdown(cleanedHtml, MAX_WIKIPEDIA_EXCERPT_CHARS), pageImage);
+  }
+
+  const firstHeadingIndex = headings[0].index ?? cleanedHtml.length;
+  const lead = wikiHtmlToMarkdown(cleanedHtml.slice(0, firstHeadingIndex), 3_000);
+  const topicTerms = wikipediaTopicTerms(query);
+  const articleTerms = wikipediaTerms(articleTitle);
+  const sections = headings.flatMap((heading, index) => {
+    const start = heading.index ?? 0;
+    const end = headings[index + 1]?.index ?? cleanedHtml.length;
+    const sectionTitle = stripHtml(heading[1], 180);
+    const sectionKey = wikipediaTextKey(sectionTitle);
+    if (!sectionTitle || WIKIPEDIA_NON_ARTICLE_SECTIONS.some((name) => sectionKey.includes(wikipediaTextKey(name)))) return [];
+    const markdown = wikiHtmlToMarkdown(cleanedHtml.slice(start, end), 3_600);
+    if (!markdown) return [];
+    const headingTopicMatches = matchingWikipediaTerms(sectionTitle, topicTerms);
+    const bodyTopicMatches = matchingWikipediaTerms(markdown.slice(0, 2_000), topicTerms);
+    const headingArticleMatches = matchingWikipediaTerms(sectionTitle, articleTerms);
+    const bodyArticleMatches = matchingWikipediaTerms(markdown.slice(0, 2_000), articleTerms);
+    return [{
+      index,
+      markdown,
+      score: headingTopicMatches * 5 + bodyTopicMatches * 2 + headingArticleMatches + bodyArticleMatches * 0.25,
+    }];
+  });
+
+  const matchedSections = sections.filter((section) => section.score > 0);
+  const selectedSections = (matchedSections.length > 0
+    ? matchedSections.slice().sort((a, b) => b.score - a.score).slice(0, 4)
+    : sections.slice(0, 4))
+    .sort((a, b) => a.index - b.index);
+  const chunks = lead ? [lead] : [];
+  let totalChars = lead.length;
+  for (const section of selectedSections) {
+    const remaining = MAX_WIKIPEDIA_EXCERPT_CHARS - totalChars - 2;
+    if (remaining <= 0) break;
+    const excerpt = section.markdown.slice(0, Math.min(2_500, remaining)).trim();
+    if (!excerpt) continue;
+    chunks.push(excerpt);
+    totalChars += excerpt.length + 2;
+  }
+  return insertRepresentativeWikipediaImage(chunks.join('\n\n').slice(0, MAX_WIKIPEDIA_EXCERPT_CHARS), pageImage);
+};
+
+const isWikipediaInterfaceImage = (title: string) =>
+  /(?:commons[ _-]?logo|(?:wikimedia|mediawiki|wikipedia)[ _-](?:logo|icon|wordmark|button|search|menu)|(?:^|[\s_.-])(?:menu|toolbar|search|edit|upload|pencil|cursor|button|navigation|navbar|favicon)(?:[\s_.-]|$))/i.test(title);
+
+const scoreWikipediaImageTitle = (title: string, query: string, articleTitle: string, pageImage: string) => {
+  const imageName = title.replace(/^(?:File|Ficheiro):/i, '').replace(/[_-]/g, ' ');
+  const topicMatches = matchingWikipediaTerms(imageName, wikipediaTopicTerms(query));
+  const articleMatches = matchingWikipediaTerms(imageName, wikipediaTerms(articleTitle));
+  const representativeImage = pageImage && wikipediaTitleKey(title) === wikipediaTitleKey(pageImage) ? 4 : 0;
+  return topicMatches * 4 + articleMatches + representativeImage;
+};
+
+const scoreWikipediaImage = (image: LearningWikipediaImage, query: string, articleTitle: string, pageImage: string) =>
+  scoreWikipediaImageTitle(`${image.fileTitle} ${image.caption}`, query, articleTitle, pageImage);
+
+const mediaWikiUserAgentHeaders = { 'User-Agent': WIKIPEDIA_USER_AGENT };
+
+const imageMetadataValue = (value: unknown, maxLength: number) => {
+  const metadata = isRecord(value) && 'value' in value ? value.value : value;
+  return stripHtml(typeof metadata === 'string' ? decodeWikiEntities(metadata) : metadata, maxLength);
+};
+
+const fetchWikipediaImages = async (titles: string[], requestSignal?: AbortSignal) => {
+  const uniqueTitles = Array.from(new Set(titles.map((title) => {
+    const filename = title.replace(/^(?:File|Ficheiro):/i, '').trim();
+    return filename ? `File:${filename}` : '';
+  }).filter(Boolean))).slice(0, MAX_WIKIPEDIA_IMAGE_CANDIDATES);
+  if (uniqueTitles.length === 0) return new Map<string, LearningWikipediaImage>();
+
+  const url = new URL('https://commons.wikimedia.org/w/api.php');
   url.searchParams.set('action', 'query');
-  url.searchParams.set('prop', 'pageimages');
-  url.searchParams.set('titles', titles.join('|'));
-  url.searchParams.set('piprop', 'thumbnail');
-  url.searchParams.set('pithumbsize', '640');
+  url.searchParams.set('prop', 'imageinfo');
+  url.searchParams.set('titles', uniqueTitles.join('|'));
+  url.searchParams.set('iiprop', 'url|size|extmetadata');
+  url.searchParams.set('iiurlwidth', '960');
+  url.searchParams.set('iiextmetadatalanguage', 'pt');
+  url.searchParams.set('iiextmetadatafilter', 'ImageDescription|Artist|Credit|LicenseShortName|LicenseUrl');
   url.searchParams.set('format', 'json');
   url.searchParams.set('utf8', '1');
-  url.searchParams.set('origin', '*');
 
   try {
-    const payload = await requestJson(url, requestSignal);
-    if (!isRecord(payload) || !isRecord(payload.query) || !isRecord(payload.query.pages)) return new Map<string, string>();
+    const payload = await requestJson(url, requestSignal, mediaWikiUserAgentHeaders);
+    if (!isRecord(payload) || !isRecord(payload.query) || !isRecord(payload.query.pages)) return new Map<string, LearningWikipediaImage>();
     return new Map(Object.values(payload.query.pages).flatMap((page) => {
-      if (!isRecord(page) || !isRecord(page.thumbnail)) return [];
-      const title = text(page.title, 180);
-      const source = text(page.thumbnail.source, 700);
-      return title && /^https?:\/\//i.test(source) ? [[title, source] as const] : [];
+      if (!isRecord(page) || !Array.isArray(page.imageinfo) || !isRecord(page.imageinfo[0])) return [];
+      const image = page.imageinfo[0];
+      const fileTitle = text(page.title, 180);
+      const imageUrl = text(image.url, 700);
+      const thumbnailUrl = text(image.thumburl, 700) || imageUrl;
+      const width = Number(image.width);
+      const height = Number(image.height);
+      if (!fileTitle || !/^https?:\/\//i.test(imageUrl) || !/^https?:\/\//i.test(thumbnailUrl)) return [];
+      if ((Number.isFinite(width) && width > 0 && width < 180) || (Number.isFinite(height) && height > 0 && height < 120)) return [];
+
+      const metadata = isRecord(image.extmetadata) ? image.extmetadata : {};
+      const filename = fileTitle.replace(/^File:/i, '').replace(/\.[^.]+$/, '').replace(/_/g, ' ');
+      const caption = imageMetadataValue(metadata.ImageDescription, 320) || filename;
+      const artist = imageMetadataValue(metadata.Artist, 180) || imageMetadataValue(metadata.Credit, 180);
+      const license = imageMetadataValue(metadata.LicenseShortName, 80);
+      const licenseUrl = text(isRecord(metadata.LicenseUrl) ? metadata.LicenseUrl.value : '', 700);
+      const filePageUrl = `https://commons.wikimedia.org/wiki/${encodeURIComponent(fileTitle.replace(/\s+/g, '_'))}`;
+      const result: LearningWikipediaImage = {
+        fileTitle,
+        url: imageUrl,
+        thumbnailUrl,
+        filePageUrl,
+        caption,
+        ...(artist ? { artist } : {}),
+        ...(license ? { license } : {}),
+        ...(licenseUrl && /^https?:\/\//i.test(licenseUrl) ? { licenseUrl } : {}),
+      };
+      return [[wikipediaTitleKey(fileTitle), result] as const];
     }));
   } catch {
-    return new Map<string, string>();
+    return new Map<string, LearningWikipediaImage>();
   }
 };
 
-const searchWikipedia = async (query: string, requestSignal?: AbortSignal): Promise<LearningResource[]> => {
+const fetchWikipediaArticleHtml = async (title: string, requestSignal?: AbortSignal) => {
+  const url = new URL('https://pt.wikipedia.org/w/api.php');
+  url.searchParams.set('action', 'parse');
+  url.searchParams.set('page', title);
+  url.searchParams.set('prop', 'text');
+  url.searchParams.set('disabletoc', '1');
+  url.searchParams.set('disableeditsection', '1');
+  url.searchParams.set('disablelimitreport', '1');
+  url.searchParams.set('format', 'json');
+  url.searchParams.set('formatversion', '2');
+  url.searchParams.set('utf8', '1');
+
+  try {
+    const payload = await requestJson(url, requestSignal, mediaWikiUserAgentHeaders, MAX_WIKIPEDIA_PARSE_RESPONSE_CHARS);
+    if (!isRecord(payload) || !isRecord(payload.parse)) return '';
+    const parsedText = payload.parse.text;
+    if (typeof parsedText === 'string') return parsedText;
+    if (isRecord(parsedText) && typeof parsedText['*'] === 'string') return parsedText['*'];
+    return '';
+  } catch {
+    return '';
+  }
+};
+
+type WikipediaSearchResult = {
+  resources: LearningResource[];
+  articles: LearningWikipediaArticle[];
+};
+
+const searchWikipedia = async (query: string, requestSignal?: AbortSignal): Promise<WikipediaSearchResult> => {
   const url = new URL('https://pt.wikipedia.org/w/api.php');
   url.searchParams.set('action', 'query');
   url.searchParams.set('list', 'search');
-  url.searchParams.set('srsearch', query);
+  url.searchParams.set('srsearch', query.replace(/:\s*/g, ' '));
   url.searchParams.set('srlimit', '5');
   url.searchParams.set('format', 'json');
   url.searchParams.set('utf8', '1');
   url.searchParams.set('origin', '*');
 
-  const payload = await requestJson(url, requestSignal);
-  if (!isRecord(payload) || !isRecord(payload.query) || !Array.isArray(payload.query.search)) return [];
+  const payload = await requestJson(url, requestSignal, mediaWikiUserAgentHeaders);
+  if (!isRecord(payload) || !isRecord(payload.query) || !Array.isArray(payload.query.search)) return { resources: [], articles: [] };
 
-  const resources = payload.query.search.flatMap((item, index) => {
+  const candidates = payload.query.search.flatMap((item, index) => {
     if (!isRecord(item)) return [];
     const title = text(item.title, 180);
     if (!title) return [];
     const encodedTitle = encodeURIComponent(title.replace(/\s+/g, '_'));
-    return [createResource({
-      id: `wikipedia-${index + 1}-${encodedTitle.slice(0, 40)}`,
-      provider: 'Wikipedia',
-      kind: 'reference',
+    const description = stripHtml(item.snippet, 420) || 'Artigo de referência para aprofundar o tema.';
+    return [{
       title,
-      description: stripHtml(item.snippet, 420) || 'Artigo de referência para aprofundar o tema.',
+      description,
       url: `https://pt.wikipedia.org/wiki/${encodedTitle}`,
-    })];
+      rank: index,
+      resource: createResource({
+        id: `wikipedia-${index + 1}-${encodedTitle.slice(0, 40)}`,
+        provider: 'Wikipedia',
+        kind: 'reference',
+        title,
+        description,
+        url: `https://pt.wikipedia.org/wiki/${encodedTitle}`,
+      }),
+    }];
   });
-  const thumbnails = await fetchWikipediaThumbnails(resources.map((resource) => resource.title), requestSignal);
-  return resources.map((resource) => {
-    const thumbnailUrl = thumbnails.get(resource.title);
-    return thumbnailUrl ? { ...resource, thumbnailUrl } : resource;
+  if (candidates.length === 0) return { resources: [], articles: [] };
+  const primaryCandidate = candidates[0];
+  const fallbackArticles = [{
+    title: primaryCandidate.title,
+    url: primaryCandidate.resource.url,
+    excerpt: primaryCandidate.description,
+    images: [] as LearningWikipediaImage[],
+  }];
+
+  const pageUrl = new URL('https://pt.wikipedia.org/w/api.php');
+  pageUrl.searchParams.set('action', 'query');
+  pageUrl.searchParams.set('prop', 'extracts|pageimages');
+  pageUrl.searchParams.set('titles', primaryCandidate.title);
+  pageUrl.searchParams.set('exchars', String(MAX_WIKIPEDIA_EXCERPT_CHARS + 2_000));
+  pageUrl.searchParams.set('piprop', 'thumbnail|name');
+  pageUrl.searchParams.set('pithumbsize', '800');
+  pageUrl.searchParams.set('format', 'json');
+  pageUrl.searchParams.set('utf8', '1');
+  pageUrl.searchParams.set('origin', '*');
+
+  let pagePayload: unknown;
+  try {
+    pagePayload = await requestJson(pageUrl, requestSignal, mediaWikiUserAgentHeaders);
+  } catch {
+    return { resources: candidates.map((candidate) => candidate.resource), articles: fallbackArticles };
+  }
+  if (!isRecord(pagePayload) || !isRecord(pagePayload.query) || !isRecord(pagePayload.query.pages)) {
+    return { resources: candidates.map((candidate) => candidate.resource), articles: fallbackArticles };
+  }
+
+  const pagesByTitle = new Map(Object.values(pagePayload.query.pages).flatMap((page) => {
+    if (!isRecord(page) || typeof page.title !== 'string') return [];
+    return [[wikipediaTitleKey(page.title), page] as const];
+  }));
+  const page = pagesByTitle.get(wikipediaTitleKey(primaryCandidate.title));
+  if (!isRecord(page)) return { resources: candidates.map((candidate) => candidate.resource), articles: fallbackArticles };
+
+  const pageImage = text(page.pageimage, 180);
+  const pageExcerpt = wikiHtmlToMarkdown(page.extract, MAX_WIKIPEDIA_EXCERPT_CHARS);
+  const parsedArticleHtml = await fetchWikipediaArticleHtml(primaryCandidate.title, requestSignal);
+  const curatedExcerpt = parsedArticleHtml
+    ? curateWikipediaExcerpt(parsedArticleHtml, query, primaryCandidate.title, pageImage)
+    : insertRepresentativeWikipediaImage(pageExcerpt, pageImage);
+  const excerpt = curatedExcerpt.length >= 100 ? curatedExcerpt : primaryCandidate.description;
+  const inlineImageTitles = wikipediaImageTitlesInExcerpt(excerpt);
+  const inlineImageKeys = new Set(inlineImageTitles.map(wikipediaTitleKey));
+  const imageTitleByKey = new Map<string, string>();
+  for (const title of inlineImageTitles) {
+    const imageKey = wikipediaTitleKey(title);
+    if (!imageKey || isWikipediaInterfaceImage(title) || imageTitleByKey.has(imageKey)) continue;
+    imageTitleByKey.set(imageKey, canonicalWikipediaFileTitle(title));
+  }
+  const prioritizedImageTitles = Array.from(imageTitleByKey.values())
+    .map((title, index) => ({
+      title,
+      index,
+      score: scoreWikipediaImageTitle(title, query, primaryCandidate.title, pageImage)
+        + (inlineImageKeys.has(wikipediaTitleKey(title)) ? 100 : 0),
+    }))
+    .sort((a, b) => b.score - a.score || a.index - b.index)
+    .slice(0, MAX_WIKIPEDIA_IMAGE_CANDIDATES)
+    .map(({ title }) => title);
+  const thumbnail = isRecord(page.thumbnail) ? text(page.thumbnail.source, 700) : '';
+  const imageDetails = await fetchWikipediaImages(prioritizedImageTitles, requestSignal);
+  const articleImages = Array.from(new Map(prioritizedImageTitles.flatMap((title) => {
+    const detail = imageDetails.get(wikipediaTitleKey(title));
+    return detail ? [[wikipediaTitleKey(detail.fileTitle), detail] as const] : [];
+  })).values());
+  const rankedImages = articleImages
+    .map((image, index) => ({
+      image,
+      index,
+      score: scoreWikipediaImage(image, query, primaryCandidate.title, pageImage)
+        + (inlineImageKeys.has(wikipediaTitleKey(image.fileTitle)) ? 100 : 0),
+    }))
+    .sort((a, b) => b.score - a.score || a.index - b.index);
+  const images = rankedImages
+    .slice(0, MAX_WIKIPEDIA_IMAGES)
+    .map(({ image }) => image);
+  if (pageImage && !isWikipediaInterfaceImage(pageImage) && thumbnail && /^https?:\/\//i.test(thumbnail)
+    && !images.some((image) => wikipediaTitleKey(image.fileTitle) === wikipediaTitleKey(pageImage))) {
+    images.unshift({
+      fileTitle: pageImage,
+      url: thumbnail,
+      thumbnailUrl: thumbnail,
+      filePageUrl: primaryCandidate.resource.url,
+      caption: pageImage.replace(/^(?:File|Ficheiro):/i, '').replace(/_/g, ' '),
+    });
+    images.splice(MAX_WIKIPEDIA_IMAGES);
+  }
+  if (images.length === 0 && !isWikipediaInterfaceImage(pageImage) && thumbnail && /^https?:\/\//i.test(thumbnail)) {
+    const fallbackTitle = pageImage || `Imagem de ${primaryCandidate.title}`;
+    images.push({
+      fileTitle: fallbackTitle,
+      url: thumbnail,
+      thumbnailUrl: thumbnail,
+      filePageUrl: primaryCandidate.resource.url,
+      caption: fallbackTitle.replace(/^(?:File|Ficheiro):/i, '').replace(/_/g, ' '),
+    });
+  }
+  const inlineImages = images.filter((image) => inlineImageKeys.has(wikipediaTitleKey(image.fileTitle)));
+  const articles = [{
+    title: primaryCandidate.title,
+    url: primaryCandidate.resource.url,
+    excerpt,
+    images: inlineImages,
+  }];
+
+  const imageByArticleTitle = new Map(articles.flatMap((article) => {
+    const thumbnailUrl = article.images[0]?.thumbnailUrl;
+    return thumbnailUrl ? [[wikipediaTitleKey(article.title), thumbnailUrl] as const] : [];
+  }));
+  const resources = candidates.map((candidate) => {
+    const thumbnailUrl = imageByArticleTitle.get(wikipediaTitleKey(candidate.title));
+    return thumbnailUrl ? { ...candidate.resource, thumbnailUrl } : candidate.resource;
   });
+  return { resources, articles };
 };
 
 const searchYouTube = async (query: string, requestSignal?: AbortSignal): Promise<LearningResource[]> => {
@@ -325,7 +780,12 @@ export async function researchLearningTopic(
     throw new DOMException('Pesquisa cancelada.', 'AbortError');
   }
 
-  const resources = results.flatMap((result) => result.status === 'fulfilled' ? result.value : []);
+  const youtubeResources = results[0].status === 'fulfilled' ? results[0].value : [];
+  const wikipediaResearch = results[1].status === 'fulfilled'
+    ? results[1].value
+    : { resources: [], articles: [] };
+  const webResources = results[2].status === 'fulfilled' ? results[2].value : [];
+  const resources = [...youtubeResources, ...wikipediaResearch.resources, ...webResources];
   const uniqueResources = Array.from(new Map(resources.map((resource) => [resource.url, resource])).values()).slice(0, MAX_RESOURCES);
 
   const research = {
@@ -333,6 +793,7 @@ export async function researchLearningTopic(
     searchedAt: new Date().toISOString(),
     providers: Array.from(new Set(uniqueResources.map((resource) => resource.provider))),
     resources: uniqueResources,
+    ...(wikipediaResearch.articles.length > 0 ? { wikipediaArticles: wikipediaResearch.articles } : {}),
   };
   if (!resources.some((resource) => resource.kind === 'search')) {
     researchCache.set(cacheKey, { expiresAt: Date.now() + RESEARCH_CACHE_TTL_MS, value: research });

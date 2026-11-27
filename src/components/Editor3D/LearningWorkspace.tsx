@@ -58,6 +58,7 @@ import {
   type TeacherLessonUpdate,
   type TeacherQuestion,
   type TeacherRequest,
+  type LearningWikipediaArticle,
 } from '@/lib/learning/types';
 import LearningMindMap from './LearningMindMap';
 import { LearningRichText } from './LearningRichText';
@@ -535,7 +536,132 @@ const createGravityExperiment = () => {
   return sphere;
 };
 
-function MessageBubble({ message }: { message: LearningMessage }) {
+const learningWikipediaImageKey = (title: string) => title
+  .replace(/^(?:File|Ficheiro|Arquivo):/i, '')
+  .replace(/_/g, ' ')
+  .normalize('NFD')
+  .replace(/[\u0300-\u036f]/g, '')
+  .toLocaleLowerCase('pt-BR')
+  .replace(/[^a-z0-9]+/g, ' ')
+  .trim();
+
+function WikipediaImageFigure({
+  image,
+  className = '',
+}: {
+  image: LearningWikipediaArticle['images'][number];
+  className?: string;
+}) {
+  return (
+    <figure className={'min-w-0 overflow-hidden rounded-xl border border-neutral-800 bg-black/20 ' + className}>
+      <a href={image.filePageUrl} target="_blank" rel="noreferrer" aria-label={'Abrir cr\u00e9ditos da imagem: ' + image.caption}>
+        <div className="relative aspect-[16/10] bg-neutral-900">
+          <Image
+            src={image.thumbnailUrl}
+            alt={image.caption}
+            fill
+            unoptimized
+            sizes="(max-width: 640px) 42vw, 260px"
+            className="object-contain"
+          />
+        </div>
+      </a>
+      <figcaption className="p-2">
+        <p className="line-clamp-2 text-[10px] leading-4 text-neutral-300">{image.caption}</p>
+        <div className="mt-1 flex flex-wrap gap-x-2 gap-y-0.5 text-[9px] text-neutral-600">
+          {image.artist && <span>Autor: {image.artist}</span>}
+          {image.licenseUrl ? (
+            <a href={image.licenseUrl} target="_blank" rel="noreferrer" className="hover:text-sky-200">
+              {image.license || 'Licen\u00e7a'}
+            </a>
+          ) : image.license ? <span>{image.license}</span> : null}
+          <a href={image.filePageUrl} target="_blank" rel="noreferrer" className="hover:text-sky-200">{'Cr\u00e9ditos'}</a>
+        </div>
+      </figcaption>
+    </figure>
+  );
+}
+
+function WikipediaArticleContent({ article }: { article: LearningWikipediaArticle }) {
+  const imagesByTitle = new Map<string, LearningWikipediaArticle['images'][number]>();
+  article.images.forEach((image) => imagesByTitle.set(learningWikipediaImageKey(image.fileTitle), image));
+  const usedImages = new Set<string>();
+  const parts: Array<
+    | { kind: 'text'; id: string; content: string }
+    | { kind: 'image'; id: string; image: LearningWikipediaArticle['images'][number] }
+  > = [];
+  const markerPattern = /\[\[WIKI_IMAGE:([^\]]+)\]\]/g;
+  let cursor = 0;
+  let partIndex = 0;
+  let marker: RegExpExecArray | null;
+
+  while ((marker = markerPattern.exec(article.excerpt))) {
+    const textBefore = article.excerpt.slice(cursor, marker.index).trim();
+    if (textBefore) parts.push({ kind: 'text', id: 'text-' + partIndex++, content: textBefore });
+    cursor = markerPattern.lastIndex;
+
+    try {
+      const imageTitle = decodeURIComponent(marker[1]);
+      const imageKey = learningWikipediaImageKey(imageTitle);
+      const image = imagesByTitle.get(imageKey);
+      if (image && !usedImages.has(imageKey)) {
+        usedImages.add(imageKey);
+        parts.push({ kind: 'image', id: 'image-' + partIndex++ + '-' + imageKey, image });
+      }
+    } catch {
+      // Ignore malformed placement tokens and keep rendering the article text.
+    }
+  }
+
+  const remainingText = article.excerpt.slice(cursor).trim();
+  if (remainingText) parts.push({ kind: 'text', id: 'text-' + partIndex++, content: remainingText });
+
+  return (
+    <>
+      <div className="mt-2">
+        {parts.map((part) => part.kind === 'text'
+          ? <LearningRichText key={part.id} className="text-xs leading-5 text-neutral-300">{part.content}</LearningRichText>
+          : <WikipediaImageFigure key={part.id} image={part.image} className="mx-auto my-3 w-full max-w-md" />)}
+      </div>
+    </>
+  );
+}
+
+function WikipediaCuration({ articles }: { articles: LearningWikipediaArticle[] }) {
+  if (articles.length === 0) return null;
+
+  return (
+    <section className="mt-4 overflow-hidden rounded-2xl" aria-label="Curadoria">
+      <header className="flex items-center gap-3  px-3 py-3">
+        <span className="flex size-8 shrink-0 items-center justify-center rounded-xl bg-sky-400/10 "><BookOpen size={15} /></span>
+        <div className="min-w-0">
+          <p className="text-xs font-semibold text-sky-100">Curadoria</p>
+        </div>
+      </header>
+      <div className="grid gap-3 p-3 sm:p-4">
+        {articles.map((article) => (
+          <article key={article.url} className="min-w-0 rounded-xl border border-neutral-800 bg-neutral-950/45 p-3">
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <a href={article.url} target="_blank" rel="noreferrer" className="inline-flex max-w-full items-center gap-1 text-[10px] font-medium text-neutral-500 transition hover:text-sky-200">
+                Ver artigo <ExternalLink size={11} />
+              </a>
+            </div>
+            <h3 className="mt-2 text-sm font-semibold text-neutral-100">{article.title}</h3>
+            <WikipediaArticleContent article={article} />
+          </article>
+        ))}
+      </div>
+    </section>
+  );
+}
+
+function MessageBubble({
+  message,
+  wikipediaArticles,
+}: {
+  message: LearningMessage;
+  wikipediaArticles?: LearningWikipediaArticle[];
+}) {
   const isTeacher = message.role === 'teacher';
   const assessment = message.assessment;
   const modelInfo = isTeacher ? message.modelInfo : undefined;
@@ -572,6 +698,7 @@ function MessageBubble({ message }: { message: LearningMessage }) {
           </div>
         )}
         <LearningRichText>{message.content}</LearningRichText>
+        {isTeacher && wikipediaArticles && <WikipediaCuration articles={wikipediaArticles} />}
         {assessment && (
           <div className={`mt-3 rounded-xl border p-3 ${assessmentTone}`}>
             <div className="mb-1 flex items-center gap-2 text-xs font-semibold">
@@ -1178,6 +1305,7 @@ export default function LearningWorkspace() {
   const messagesEndRef = useRef<HTMLDivElement | null>(null);
   const teacherAbortRef = useRef<AbortController | null>(null);
   const session = project.currentSession;
+  const firstTeacherMessageId = project.messages.find((message) => message.role === 'teacher')?.id;
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth', block: 'end' });
@@ -1332,8 +1460,12 @@ export default function LearningWorkspace() {
         scene: getSceneContext(),
       }, controller.signal);
       if (!result.lesson) throw new Error('O Coru não conseguiu montar o plano da aula.');
+      const wikipediaArticles = result.research?.wikipediaArticles
+        ?? result.lesson.wikipediaArticles
+        ?? targetSession.lesson?.wikipediaArticles;
       const lesson = {
         ...result.lesson,
+        ...(wikipediaArticles?.length ? { wikipediaArticles } : {}),
         actions: result.lesson.actions.length > 0
           ? result.lesson.actions
           : builtInActions(result.lesson.subjectId, targetSession.topic),
@@ -1739,7 +1871,13 @@ export default function LearningWorkspace() {
             </div>
             <div className="min-h-0 flex-1 overflow-y-auto px-4 py-5 lg:px-8">
               <div className="mx-auto flex max-w-4xl flex-col gap-4">
-                {project.messages.map((message) => <MessageBubble key={message.id} message={message} />)}
+                {project.messages.map((message) => (
+                  <MessageBubble
+                    key={message.id}
+                    message={message}
+                    wikipediaArticles={message.id === firstTeacherMessageId ? session.lesson?.wikipediaArticles : undefined}
+                  />
+                ))}
                 {isSending && (
                   <div className="flex items-center gap-3 text-xs text-neutral-500"><span className="flex size-8 items-center justify-center overflow-hidden rounded-xl bg-emerald-400/10 text-emerald-300"><CoruAvatar className="size-8" /></span><LoaderCircle size={14} className="animate-spin" /> {isGeneratingModel ? 'Criando seu modelo 3D...' : isResearching ? 'Pesquisando fontes e montando sua aula...' : 'Coru está pensando...'}</div>
                 )}

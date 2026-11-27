@@ -40,11 +40,30 @@ export type LearningResource = {
   author?: string;
 };
 
+export type LearningWikipediaImage = {
+  fileTitle: string;
+  url: string;
+  thumbnailUrl: string;
+  filePageUrl: string;
+  caption: string;
+  artist?: string;
+  license?: string;
+  licenseUrl?: string;
+};
+
+export type LearningWikipediaArticle = {
+  title: string;
+  url: string;
+  excerpt: string;
+  images: LearningWikipediaImage[];
+};
+
 export type LearningResearch = {
   query: string;
   searchedAt: string;
   providers: string[];
   resources: LearningResource[];
+  wikipediaArticles?: LearningWikipediaArticle[];
 };
 
 export type TeacherActionSuggestion = {
@@ -110,6 +129,7 @@ export type TeacherLessonPlan = {
   actions: TeacherActionSuggestion[];
   mindMap: TeacherMindMapNode;
   resources?: LearningResource[];
+  wikipediaArticles?: LearningWikipediaArticle[];
 };
 
 export type TeacherLessonUpdate = {
@@ -265,15 +285,66 @@ export const normalizeLearningResources = (value: unknown): LearningResource[] =
   });
 };
 
+const normalizeLearningWikipediaArticles = (value: unknown): LearningWikipediaArticle[] => {
+  if (!Array.isArray(value)) return [];
+  return value.slice(0, 1).flatMap((item) => {
+    if (!isRecord(item)) return [];
+    const title = cleanText(item.title, '', 180);
+    const url = cleanHttpUrl(item.url);
+    const excerpt = cleanText(item.excerpt, '', 8000);
+    if (!title || !url || !excerpt) return [];
+
+    const seenImageTitles = new Set<string>();
+    const images: LearningWikipediaImage[] = Array.isArray(item.images)
+      ? item.images.slice(0, 24).flatMap((image) => {
+        if (!isRecord(image)) return [];
+        const fileTitle = cleanText(image.fileTitle, '', 180);
+        const imageUrl = cleanHttpUrl(image.url);
+        const thumbnailUrl = cleanHttpUrl(image.thumbnailUrl);
+        const filePageUrl = cleanHttpUrl(image.filePageUrl);
+        if (!fileTitle || !imageUrl || !thumbnailUrl || !filePageUrl) return [];
+        const imageKey = fileTitle
+          .replace(/^(?:File|Ficheiro|Arquivo):/i, '')
+          .replace(/_/g, ' ')
+          .normalize('NFD')
+          .replace(/[\u0300-\u036f]/g, '')
+          .toLocaleLowerCase('pt-BR')
+          .replace(/[^a-z0-9]+/g, ' ')
+          .trim();
+        if (seenImageTitles.has(imageKey)) return [];
+        seenImageTitles.add(imageKey);
+        const caption = cleanText(image.caption, fileTitle.replace(/^File:/i, ''), 320);
+        const artist = cleanText(image.artist, '', 180);
+        const license = cleanText(image.license, '', 80);
+        const licenseUrl = cleanHttpUrl(image.licenseUrl);
+        return [{
+          fileTitle,
+          url: imageUrl,
+          thumbnailUrl,
+          filePageUrl,
+          caption,
+          ...(artist ? { artist } : {}),
+          ...(license ? { license } : {}),
+          ...(licenseUrl ? { licenseUrl } : {}),
+        }];
+      }).slice(0, 6)
+      : [];
+
+    return [{ title, url, excerpt, images }];
+  });
+};
+
 export const normalizeLearningResearch = (value: unknown): LearningResearch | undefined => {
   if (!isRecord(value)) return undefined;
   const resources = normalizeLearningResources(value.resources);
-  if (resources.length === 0) return undefined;
+  const wikipediaArticles = normalizeLearningWikipediaArticles(value.wikipediaArticles);
+  if (resources.length === 0 && wikipediaArticles.length === 0) return undefined;
   return {
     query: cleanText(value.query, 'Tema da aula', 180),
     searchedAt: cleanText(value.searchedAt, new Date().toISOString(), 40),
     providers: cleanList(value.providers, 8, 80),
     resources,
+    ...(wikipediaArticles.length > 0 ? { wikipediaArticles } : {}),
   };
 };
 
@@ -538,6 +609,7 @@ export const normalizeTeacherResponse = (value: unknown): TeacherApiResponse => 
     const level = levels.includes(raw.level as LearningLevel) ? (raw.level as LearningLevel) : 'beginner';
     const explanation = cleanText(raw.explanation, '', 7000) || steps.map((step) => step.content).join('\n\n');
     const resources = normalizeLearningResources(raw.resources);
+    const wikipediaArticles = normalizeLearningWikipediaArticles(raw.wikipediaArticles);
     const title = cleanText(raw.title, 'Aula interativa', 120);
     const topic = cleanText(raw.topic, 'Tema de estudo', 180);
     const objective = cleanText(raw.objective, 'Compreender o tema por meio de explicação e prática.', 360);
@@ -562,6 +634,7 @@ export const normalizeTeacherResponse = (value: unknown): TeacherApiResponse => 
       actions: normalizeTeacherActions(raw.actions),
       mindMap,
       ...(resources.length > 0 ? { resources } : {}),
+      ...(wikipediaArticles.length > 0 ? { wikipediaArticles } : {}),
     };
     if (steps.length === 0) throw new Error('O plano de aula veio sem etapas válidas. Tente novamente.');
   }

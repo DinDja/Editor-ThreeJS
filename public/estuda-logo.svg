@@ -1,0 +1,51 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 360 128" role="img" aria-labelledby="title description">
+  <title id="title">Estuda</title>
+  <desc id="description">Juntos aprendemos mais</desc>
+  <defs>
+    <linearGradient id="book" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#29d7eb" />
+      <stop offset="1" stop-color="#0785cf" />
+    </linearGradient>
+    <filter id="word-shadow" x="-10%" y="-20%" width="120%" height="145%">
+      <feDropShadow dx="0" dy="2" stdDeviation="1.2" flood-color="#101828" flood-opacity=".6" />
+    </filter>
+  </defs>
+
+  <g aria-hidden="true" stroke="#fff" stroke-linejoin="round" stroke-width="3">
+    <path d="M25 7v9H16v9h9v9h9v-9h9v-9h-9V7z" fill="#0785cf" />
+  </g>
+
+  <text
+    x="43"
+    y="82"
+    fill="#ff111b"
+    stroke="#fff"
+    stroke-linejoin="round"
+    stroke-width="3"
+    paint-order="stroke"
+    font-family="Impact, 'Arial Black', sans-serif"
+    font-size="72"
+    font-weight="900"
+    letter-spacing="-5"
+    filter="url(#word-shadow)"
+  >ESTUDA</text>
+
+  <g aria-hidden="true" transform="rotate(-13 318 66)" stroke="#075e9e" stroke-linejoin="round" stroke-width="2">
+    <path d="M300 51h11v39h-11z" fill="url(#book)" />
+    <path d="M311 48h11v39h-11z" fill="#f6cf21" />
+    <path d="M322 54h10v34h-10z" fill="#16c8df" />
+    <path d="M300 51h11m0-3h11m0 6h10" fill="none" stroke="#fff" stroke-width="2.5" />
+  </g>
+
+  <rect x="96" y="97" width="192" height="23" rx="11.5" fill="#f8fbff" />
+  <text
+    x="192"
+    y="112.5"
+    fill="#0785cf"
+    text-anchor="middle"
+    font-family="Arial, sans-serif"
+    font-size="10.5"
+    font-weight="800"
+    letter-spacing=".15"
+  >JUNTOS APRENDEMOS MAIS</text>
+</svg>
